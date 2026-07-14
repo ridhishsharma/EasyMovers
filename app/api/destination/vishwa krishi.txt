@@ -1,0 +1,16 @@
+17:55 01-07-20261. Classify the Opening stock (a) live Stock (b) Opeing stock of feed
+2. Classify the sales : Net Sales of Egg 
+Net Sales of Feed
+Other Income 
+
+3. Purchase of Live Stock & Purchase of feed to be seperate
+
+4. Do Not deduct the amout of loss of Biological assets from the sales amount.
+(Since Its End of Life of the live stock)
+5. Net profit should not be more then 10% of the sales.
+6. DSCR , Project IRR, Loan IRR, Equity IRR, FACR (Fixed Asset Coverage Ratio), ICR, Gearing Ratio, Inventory Turnover Days Calculation.
+7. Value of Debtors & Creditors 
+8. DP Calculation as per the WC Requirement.
+9. Surplus fund to be utlised for the expansion purpose not visible in cash flow or in B/S.
+
+

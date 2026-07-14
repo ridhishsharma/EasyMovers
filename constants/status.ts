@@ -1,0 +1,39 @@
+
+export const LEAD_STATUS = {
+
+  DRAFT: "DRAFT",
+
+  SUBMITTED: "SUBMITTED",
+
+  QUOTED: "QUOTED",
+
+  BOOKED: "BOOKED",
+
+  COMPLETED: "COMPLETED",
+
+  CANCELLED: "CANCELLED"
+
+} as const
+
+export const QUOTATION_STATUS = {
+
+  PENDING: "PENDING",
+
+  APPROVED: "APPROVED",
+
+  REJECTED: "REJECTED"
+
+} as const
+
+export const BOOKING_STATUS = {
+
+  CONFIRMED: "CONFIRMED",
+
+  IN_PROGRESS: "IN_PROGRESS",
+
+  COMPLETED: "COMPLETED",
+
+  CANCELLED: "CANCELLED"
+
+} as const
+

@@ -1,0 +1,89 @@
+hero-background.tsx
+
+Everything sits on top of the background.
+
+It will contain:
+
+Light gradient
+Enterprise grid
+Animated blobs
+Floating particles
+Radial glow
+Glass overlays
+
+Once this exists, every other component automatically looks premium.
+
+2️⃣ hero-heading.tsx
+
+Contains:
+
+Enterprise badge
+Headline
+Description
+
+Completely reusable.
+
+3️⃣ hero-buttons.tsx
+
+Contains only:
+
+Primary CTA
+Secondary CTA
+Watch Demo
+4️⃣ hero-search.tsx
+
+This is one of the most important components.
+
+Eventually it becomes your AI quotation engine.
+
+Initially it will support:
+
+Move From
+Move To
+Move Type
+Instant Quote
+
+Later it will connect to:
+
+KGME
+AI Engine
+Vendor Matching
+Pricing Engine
+5️⃣ hero-metrics.tsx
+
+Animated counters.
+
+850+
+Cities
+
+6500+
+Verified Movers
+
+250+
+Enterprise Clients
+
+120000+
+Moves Completed
+6️⃣ hero-illustration.tsx
+
+This is the premium visual.
+
+We'll avoid stock images.
+
+Instead we'll build:
+
+Floating Truck
+House
+Office
+Warehouse
+AI Cards
+Tracking Cards
+Pricing Cards
+
+This will make Easy Movers look like a funded startup.
+
+7️⃣ hero.tsx
+
+Only after all pieces are finished.
+
+It simply composes everything.

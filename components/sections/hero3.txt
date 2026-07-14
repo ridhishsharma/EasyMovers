@@ -1,0 +1,363 @@
+"use client"
+
+import { useState } from "react"
+import {
+Building2,
+Calendar,
+Car,
+Home,
+MapPin,
+Truck,
+} from "lucide-react"
+
+import { AnimatedCounter } from "@/components/sections/animated-counter"
+import { MovingTruck } from "@/components/sections/moving-truck"
+
+export function HeroSection() {
+
+const [moveType, setMoveType] = useState("household")
+
+return ( <section
+   id="home"
+   className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 pt-32 pb-24"
+ >
+
+  {/* BACKGROUND EFFECT */}
+  <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(251,146,60,0.12),transparent_35%)]" />
+
+  <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+
+    {/* HERO GRID */}
+    <div className="grid items-center gap-14 lg:grid-cols-2">
+
+      {/* LEFT SIDE */}
+      <div className="space-y-8">
+
+        {/* BADGE */}
+        <div className="inline-flex items-center gap-2 rounded-full border border-orange-400/20 bg-orange-500/10 px-5 py-2 text-sm font-medium text-orange-300 backdrop-blur-md">
+          <Truck className="h-4 w-4" />
+          AI Powered Smart Relocator
+        </div>
+
+        {/* HEADING */}
+        <div className="space-y-6">
+
+          <h1 className="text-5xl font-bold leading-tight tracking-tight text-white sm:text-6xl lg:text-7xl">
+
+            Move Anywhere
+
+            <span className="mt-2 block text-orange-400">
+              With Confidence
+            </span>
+
+          </h1>
+
+          <p className="max-w-2xl text-lg leading-relaxed text-slate-300">
+
+            Compare verified packers & movers, get instant quotations,
+            relocate safely, and manage your shifting experience with India’s
+            premium relocation platform.
+
+          </p>
+
+        </div>
+
+        {/* COUNTERS */}
+        <div className="grid grid-cols-2 gap-4 pt-4 lg:grid-cols-4">
+
+          {/* MOVES */}
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 text-center backdrop-blur-md">
+
+            <div className="text-2xl font-bold text-orange-400 lg:text-3xl">
+              <AnimatedCounter endValue={15000} />+
+            </div>
+
+            <p className="mt-2 text-sm text-slate-300">
+              Moves Completed
+            </p>
+
+          </div>
+
+          {/* CITIES */}
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 text-center backdrop-blur-md">
+
+            <div className="text-2xl font-bold text-orange-400 lg:text-3xl">
+              <AnimatedCounter endValue={120} />+
+            </div>
+
+            <p className="mt-2 text-sm text-slate-300">
+              Cities Covered
+            </p>
+
+          </div>
+
+          {/* VENDORS */}
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 text-center backdrop-blur-md">
+
+            <div className="text-2xl font-bold text-orange-400 lg:text-3xl">
+              <AnimatedCounter endValue={8500} />+
+            </div>
+
+            <p className="mt-2 text-sm text-slate-300">
+              Verified Vendors
+            </p>
+
+          </div>
+
+          {/* RATING */}
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 text-center backdrop-blur-md">
+
+            <div className="text-2xl font-bold text-orange-400 lg:text-3xl">
+              4.9★
+            </div>
+
+            <p className="mt-2 text-sm text-slate-300">
+              Customer Rating
+            </p>
+
+          </div>
+
+        </div>
+
+      </div>
+
+      {/* RIGHT SIDE FORM */}
+      <div>
+
+        <div className="rounded-3xl border border-white/10 bg-white/10 p-8 shadow-2xl backdrop-blur-xl">
+
+          <div className="mb-8">
+
+            <h2 className="text-3xl font-bold text-white">
+              Get Free Quotes
+            </h2>
+
+            <p className="mt-2 text-slate-300">
+              Compare trusted relocation partners instantly.
+            </p>
+
+          </div>
+
+          {/* TABS */}
+          <div className="mb-8 grid grid-cols-3 gap-3">
+
+            <button
+              onClick={() => setMoveType("household")}
+              className={`rounded-2xl p-4 transition-all ${
+                moveType === "household"
+                  ? "bg-orange-500 text-white"
+                  : "bg-white/5 text-slate-300"
+              }`}
+            >
+              <Home className="mx-auto mb-2 h-5 w-5" />
+              <p className="text-sm font-medium">
+                House
+              </p>
+            </button>
+
+            <button
+              onClick={() => setMoveType("office")}
+              className={`rounded-2xl p-4 transition-all ${
+                moveType === "office"
+                  ? "bg-blue-500 text-white"
+                  : "bg-white/5 text-slate-300"
+              }`}
+            >
+              <Building2 className="mx-auto mb-2 h-5 w-5" />
+              <p className="text-sm font-medium">
+                Office
+              </p>
+            </button>
+
+            <button
+              onClick={() => setMoveType("vehicle")}
+              className={`rounded-2xl p-4 transition-all ${
+                moveType === "vehicle"
+                  ? "bg-emerald-500 text-white"
+                  : "bg-white/5 text-slate-300"
+              }`}
+            >
+              <Car className="mx-auto mb-2 h-5 w-5" />
+              <p className="text-sm font-medium">
+                Vehicle
+              </p>
+            </button>
+
+          </div>
+
+          {/* FORM */}
+          <div className="space-y-5">
+
+            {/* PICKUP */}
+            <div>
+
+              <label className="mb-2 block text-sm font-medium text-slate-200">
+                Pickup City
+              </label>
+
+              <div className="flex items-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+
+                <MapPin className="mr-3 h-5 w-5 text-orange-400" />
+
+                <select className="w-full bg-transparent text-white outline-none">
+
+                  <option className="text-black">Delhi</option>
+                  <option className="text-black">Mumbai</option>
+                  <option className="text-black">Pune</option>
+                  <option className="text-black">Bangalore</option>
+                  <option className="text-black">Hyderabad</option>
+                  <option className="text-black">Ahmedabad</option>
+                  <option className="text-black">Chennai</option>
+                  <option className="text-black">Kolkata</option>
+                  <option className="text-black">Jaipur</option>
+                  <option className="text-black">Indore</option>
+
+                </select>
+
+              </div>
+
+            </div>
+
+            {/* DESTINATION */}
+            <div>
+
+              <label className="mb-2 block text-sm font-medium text-slate-200">
+                Destination City
+              </label>
+
+              <div className="flex items-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+
+                <MapPin className="mr-3 h-5 w-5 text-orange-400" />
+
+                <select className="w-full bg-transparent text-white outline-none">
+
+                  <option className="text-black">Mumbai</option>
+                  <option className="text-black">Delhi</option>
+                  <option className="text-black">Hyderabad</option>
+                  <option className="text-black">Ahmedabad</option>
+                  <option className="text-black">Chennai</option>
+                  <option className="text-black">Pune</option>
+
+                </select>
+
+              </div>
+
+            </div>
+
+            {/* HOUSEHOLD */}
+            {moveType === "household" && (
+
+              <div className="grid gap-5 md:grid-cols-2">
+
+                <select className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none">
+
+                  <option className="text-black">1 BHK</option>
+                  <option className="text-black">2 BHK</option>
+                  <option className="text-black">3 BHK</option>
+                  <option className="text-black">Villa</option>
+
+                </select>
+
+                <select className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none">
+
+                  <option className="text-black">No Plants</option>
+                  <option className="text-black">1-5 Plants</option>
+                  <option className="text-black">5-15 Plants</option>
+
+                </select>
+
+              </div>
+
+            )}
+
+            {/* OFFICE */}
+            {moveType === "office" && (
+
+              <div className="grid gap-5 md:grid-cols-2">
+
+                <input
+                  type="number"
+                  placeholder="No. of Workstations"
+                  className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none placeholder:text-slate-400"
+                />
+
+                <input
+                  type="number"
+                  placeholder="No. of Servers"
+                  className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none placeholder:text-slate-400"
+                />
+
+              </div>
+
+            )}
+
+            {/* VEHICLE */}
+            {moveType === "vehicle" && (
+
+              <div className="grid gap-5 md:grid-cols-2">
+
+                <select className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none">
+
+                  <option className="text-black">Bike</option>
+                  <option className="text-black">Car</option>
+                  <option className="text-black">SUV</option>
+
+                </select>
+
+                <input
+                  type="number"
+                  placeholder="No. of Vehicles"
+                  className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none placeholder:text-slate-400"
+                />
+
+              </div>
+
+            )}
+
+            {/* DATE */}
+            <div className="flex items-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+
+              <Calendar className="mr-3 h-5 w-5 text-orange-400" />
+
+              <input
+                type="date"
+                className="w-full bg-transparent text-white outline-none"
+              />
+
+            </div>
+
+            {/* MOBILE */}
+            <input
+              type="text"
+              placeholder="Mobile Number"
+              className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none placeholder:text-slate-400"
+            />
+
+            {/* BUTTON */}
+            <button className="w-full rounded-2xl bg-orange-500 py-4 text-lg font-semibold text-white transition-all hover:bg-orange-600">
+
+              Get Quotation
+
+            </button>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  {/* TRUCK */}
+  <div className="absolute bottom-0 left-0 w-full overflow-hidden opacity-70">
+
+    <MovingTruck />
+
+  </div>
+
+</section>
+
+)
+}

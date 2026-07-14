@@ -1,0 +1,213 @@
+"use client"
+
+import Link from "next/link"
+import Image from "next/image"
+import { Menu, X } from "lucide-react"
+import { useEffect, useState } from "react"
+
+export function Navbar() {
+
+const [scrolled, setScrolled] = useState(false)
+const [mobileOpen, setMobileOpen] = useState(false)
+
+useEffect(() => {
+
+const handleScroll = () => {
+  setScrolled(window.scrollY > 30)
+}
+
+window.addEventListener("scroll", handleScroll)
+
+return () => window.removeEventListener("scroll", handleScroll)
+
+
+}, [])
+
+return (
+
+<header
+  className={`fixed top-0 left-0 z-50 w-full transition-all duration-300 ${
+    scrolled
+      ? "border-b border-white/10 bg-slate-950/85 backdrop-blur-xl"
+      : "bg-transparent"
+  }`}
+>
+
+  <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+
+    {/* LOGO */}
+    <Link
+      href="/"
+      className="flex items-center gap-3"
+    >
+
+      <div className="relative h-14 w-14 overflow-hidden rounded-xl">
+
+        <Image
+          src="/logo.png"
+          alt="Easy Movers"
+          fill
+          className="object-contain"
+          priority
+        />
+
+      </div>
+
+      <div className="hidden sm:block">
+
+        <h1 className="text-2xl font-bold tracking-wide text-white">
+          EASY
+          <span className="ml-2 text-orange-400">
+            MOVERS
+          </span>
+        </h1>
+
+        <p className="text-xs tracking-[0.3em] text-slate-400">
+          MOVE ANYWHERE WITH CONFIDENCE
+        </p>
+
+      </div>
+
+    </Link>
+
+    {/* DESKTOP MENU */}
+    <nav className="hidden items-center gap-8 lg:flex">
+
+      <Link
+        href="/"
+        className="text-sm font-medium text-slate-300 transition hover:text-orange-400"
+      >
+        Home
+      </Link>
+
+      <Link
+        href="#services"
+        className="text-sm font-medium text-slate-300 transition hover:text-orange-400"
+      >
+        Services
+      </Link>
+
+      <Link
+        href="#corporate"
+        className="text-sm font-medium text-slate-300 transition hover:text-orange-400"
+      >
+        Corporate
+      </Link>
+
+      <Link
+        href="#partners"
+        className="text-sm font-medium text-slate-300 transition hover:text-orange-400"
+      >
+        Partner With Us
+      </Link>
+
+      <Link
+        href="#faq"
+        className="text-sm font-medium text-slate-300 transition hover:text-orange-400"
+      >
+        FAQ
+      </Link>
+
+    </nav>
+
+    {/* RIGHT CTA */}
+    <div className="hidden items-center gap-4 lg:flex">
+
+      <button className="rounded-xl border border-white/10 px-5 py-2 text-sm font-medium text-slate-300 transition hover:border-orange-400 hover:text-orange-400">
+
+        Login
+
+      </button>
+
+      <button className="rounded-xl bg-orange-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-orange-500/20 transition hover:bg-orange-600">
+
+        Sign Up
+
+      </button>
+
+    </div>
+
+    {/* MOBILE BUTTON */}
+    <button
+      onClick={() => setMobileOpen(!mobileOpen)}
+      className="lg:hidden"
+    >
+
+      {mobileOpen ? (
+        <X className="h-7 w-7 text-white" />
+      ) : (
+        <Menu className="h-7 w-7 text-white" />
+      )}
+
+    </button>
+
+  </div>
+
+  {/* MOBILE MENU */}
+  {mobileOpen && (
+
+    <div className="border-t border-white/10 bg-slate-950/95 backdrop-blur-xl lg:hidden">
+
+      <div className="space-y-5 px-6 py-6">
+
+        <Link
+          href="/"
+          className="block text-slate-300"
+        >
+          Home
+        </Link>
+
+        <Link
+          href="#services"
+          className="block text-slate-300"
+        >
+          Services
+        </Link>
+
+        <Link
+          href="#corporate"
+          className="block text-slate-300"
+        >
+          Corporate
+        </Link>
+
+        <Link
+          href="#partners"
+          className="block text-slate-300"
+        >
+          Partner With Us
+        </Link>
+
+        <Link
+          href="#faq"
+          className="block text-slate-300"
+        >
+          FAQ
+        </Link>
+
+        <div className="flex gap-4 pt-4">
+
+          <button className="flex-1 rounded-xl border border-white/10 px-4 py-3 text-sm text-slate-300">
+
+            Login
+
+          </button>
+
+          <button className="flex-1 rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white">
+
+            Sign Up
+
+          </button>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  )}
+
+</header>
+
+)
+}

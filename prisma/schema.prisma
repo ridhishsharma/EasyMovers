@@ -1,0 +1,1429 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Lead {
+  id                 String      @id @default(cuid())
+  referenceId        String      @unique
+  name               String
+  mobile             String
+  email              String?
+  pickupCity         String?
+  destinationCity    String?
+  shiftingType       String?
+  pickupFloor        String?
+  liftAvailable      String?
+  packingRequired    String?
+  notes              String?
+  status             String      @default("NEW")
+  createdAt          DateTime    @default(now())
+  bikeCount          Int?
+  carCount           Int?
+  destinationInput   String?
+  destinationPincode String?
+  destinationState   String?
+  houseType          String?
+  officeSize         String?
+  plantsIncluded     Boolean?
+  shiftingDate       String?
+  vehicleCount       Int?
+  vehicleType        String?
+  lastUpdatedAt      DateTime    @updatedAt
+  inventory          Inventory?
+  quotations         Quotation[]
+  User               User?       @relation(fields: [userId], references: [id])
+  userId             String?
+}
+
+model Vendor {
+  id                     String              @id @default(cuid())
+  companyName            String
+  ownerName              String
+  gstNumber              String?
+  serviceCities          String
+  householdService       Boolean             @default(false)
+  officeService          Boolean             @default(false)
+  vehicleService         Boolean             @default(false)
+  experienceYears        Int?
+  rating                 Float               @default(0)
+  reviewCount            Int                 @default(0)
+  reviews                VendorReview[]
+  status                 String              @default("PENDING")
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+  address                String?
+  city                   String?
+  companyLogo            String?
+  completedMoves         Int                 @default(0)
+  coordinatorEmail       String?
+  coordinatorMobile      String?
+  coordinatorName        String?
+  insuranceAvailable     Boolean             @default(false)
+  ownerEmail             String?
+  ownerMobile            String              @unique
+  panNumber              String?
+  pincode                String?
+  quotationContactEmail  String?
+  quotationContactMobile String?
+  quotationContactName   String?
+  remarks                String?
+  state                  String?
+  totalLabours           Int?
+  totalVehicles          Int?
+  vendorCode             String              @unique
+  website                String?
+  ratingSummary          VendorRating?
+  vehicles               VendorVehicle[]
+  documents              VendorDocument[]
+  bankAccounts           VendorBankAccount[]
+  quotations             Quotation[]
+  User                   User[]
+}
+
+model Quotation {
+  id                 String   @id @default(cuid())
+  referenceId        String   @unique
+  quotationNumber    String   @unique
+  leadId             String
+  vendorId           String
+  transportationCost Float?   @default(0)
+  packingCost        Float?   @default(0)
+  unpackingCost      Float?   @default(0)
+  labourCost         Float?   @default(0)
+  insuranceCost      Float?   @default(0)
+  otherCost          Float?   @default(0)
+  totalAmount        Float
+  pickupDate         String?
+  deliveryDate       String?
+  transitDays        Int?
+  remarks            String?
+  status             String   @default("SUBMITTED")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  lead               Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  vendor             Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  User               User?    @relation(fields: [userId], references: [id])
+  userId             String?
+}
+
+model InventoryItem {
+  id              String    @id @default(cuid())
+  inventoryId     String
+  category        String
+  itemName        String
+  quantity        Int       @default(1)
+  fragile         Boolean   @default(false)
+  requiresPacking Boolean   @default(true)
+  remarks         String?
+  createdAt       DateTime  @default(now())
+  inventory       Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+}
+
+model InventoryPhoto {
+  id          String    @id @default(cuid())
+  inventoryId String
+  imageUrl    String
+  roomType    String?
+  createdAt   DateTime  @default(now())
+  inventory   Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+}
+
+model Inventory {
+  id          String @id @default(cuid())
+  referenceId String @unique
+  leadId      String @unique
+
+  status               String @default("DRAFT")
+  completionPercentage Int    @default(0)
+  moveReadinessScore   Int    @default(0)
+
+  createdBy String?
+  remarks   String?
+
+  packingType     String? @default("STANDARD")
+  specialHandling Json?
+  preMoveServices Json?
+
+  additionalServices Json?
+
+  // ----------------------------
+  // Pickup Property
+  // ----------------------------
+
+  pickupPropertyType    String?
+  pickupFloor           Int?
+  pickupLiftAvailable   Boolean @default(false)
+  pickupParkingDistance String?
+
+  // ----------------------------
+  // Destination Property
+  // ----------------------------
+
+  destinationSame Boolean @default(true)
+
+  destinationPropertyType    String?
+  destinationFloor           Int?
+  destinationLiftAvailable   Boolean @default(false)
+  destinationParkingDistance String?
+
+  // ----------------------------
+  // Moving Services
+  // ----------------------------
+
+  packingServices      Json?
+  dismantlingServices  Json?
+  installationServices Json?
+  postMoveServices     Json?
+
+  // ----------------------------
+  // Inventory Method
+  // ----------------------------
+
+  surveyType              String? @default("MANUAL")
+  photoInventoryRequested Boolean @default(false)
+  photoInventoryUrls      Json?
+
+  // ----------------------------
+  // Callback
+  // ----------------------------
+
+  callbackRequested Boolean @default(false)
+  callbackSlot      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lead   Lead             @relation(fields: [leadId], references: [id])
+  items  InventoryItem[]
+  photos InventoryPhoto[]
+}
+
+model DestinationDetails {
+  id String @id @default(cuid())
+
+  referenceId String @unique
+
+  propertyType    String?
+  floorNumber     Int?
+  liftAvailable   Boolean?
+  parkingDistance String?
+
+  installationServices Json?
+  additionalServices   Json?
+
+  specialInstructions String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Booking {
+  id String @id @default(cuid())
+
+  bookingNumber String  @unique
+  quotationId   String? @unique
+
+  customerName   String
+  customerMobile String
+  customerEmail  String?
+
+  moveType     String
+  moveDate     DateTime
+  deliveryDate DateTime?
+
+  pickupAddress String
+  dropAddress   String
+
+  vendorId   String?
+  vendorName String?
+
+  totalAmount Decimal @db.Decimal(12, 2)
+  currency    String  @default("INR")
+
+  bookingStatus String @default("Pending")
+  paymentStatus String @default("Pending")
+
+  trackingStatus TrackingStatus
+
+  trackingEvents BookingTracking[]
+  notes          String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  User      User?    @relation(fields: [userId], references: [id])
+  userId    String?
+
+  @@index([customerMobile])
+  @@index([bookingStatus])
+  @@index([moveDate])
+}
+
+model CallbackRequest {
+  id String @id @default(cuid())
+
+  fullName String
+  mobile   String
+  email    String?
+
+  city        String?
+  serviceType String?
+
+  preferredTime String?
+  message       String?
+
+  status String @default("Pending")
+
+  assignedTo String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  User      User?    @relation(fields: [userId], references: [id])
+  userId    String?
+
+  @@index([mobile])
+  @@index([status])
+}
+
+enum UserRole {
+  CUSTOMER
+  VENDOR
+  CORPORATE
+  FRANCHISE
+  ADMIN
+  SUPER_ADMIN
+}
+
+model User {
+  id String @id @default(cuid())
+
+  email  String? @unique
+  mobile String  @unique
+
+  passwordHash String
+
+  fullName String
+
+  role UserRole @default(CUSTOMER)
+
+  avatar String?
+
+  isActive               Boolean                 @default(true)
+  customerDocuments      CustomerDocument[]
+  emailVerified          Boolean                 @default(false)
+  mobileVerified         Boolean                 @default(false)
+  notificationPreference NotificationPreference?
+  lastLogin              DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /**
+   * -------------------------------------------------------
+   * Relations
+   * -------------------------------------------------------
+   */
+
+  leads Lead[]
+
+  quotations Quotation[]
+
+  bookings Booking[]
+
+  callbackRequests CallbackRequest[]
+
+  vendor       Vendor?        @relation(fields: [vendorId], references: [id])
+  vendorId     String?
+  Customer     Customer?
+  Corporate    Corporate?
+  Franchise    Franchise?
+  Notification Notification[]
+
+  @@index([mobile])
+  @@index([email])
+  @@index([role])
+}
+
+model Customer {
+  id String @id @default(cuid())
+
+  userId String @unique
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  alternateMobile String?
+
+  dateOfBirth DateTime?
+
+  gender String?
+
+  companyName String?
+
+  gstNumber String?
+
+  panNumber String?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@index([companyName])
+}
+
+model Corporate {
+  id String @id @default(cuid())
+
+  userId String @unique
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  companyName String
+
+  legalName String?
+
+  registrationNumber String?
+
+  gstNumber String?
+
+  panNumber String?
+
+  contactPerson String
+
+  designation String?
+
+  alternateMobile String?
+
+  landline String?
+
+  website String?
+
+  email String?
+
+  industry String?
+
+  employeeStrength Int?
+
+  annualRelocations Int?
+
+  billingAddress String?
+
+  city String?
+
+  state String?
+
+  pincode String?
+
+  country String? @default("India")
+
+  accountManager String?
+
+  contractStartDate DateTime?
+
+  contractEndDate DateTime?
+
+  creditLimit Decimal? @db.Decimal(12, 2)
+
+  paymentTerms Int? @default(30)
+
+  preferredVendorId String?
+
+  isActive Boolean @default(true)
+
+  notes String?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@index([companyName])
+  @@index([gstNumber])
+  @@index([city])
+  @@index([state])
+}
+
+model Franchise {
+  id String @id @default(cuid())
+
+  userId String @unique
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  franchiseCode String @unique
+
+  franchiseName String
+
+  ownerName String
+
+  businessName String?
+
+  gstNumber String?
+
+  panNumber String?
+
+  aadhaarNumber String?
+
+  email String?
+
+  mobile String
+
+  alternateMobile String?
+
+  landline String?
+
+  website String?
+
+  address String
+
+  city String
+
+  district String?
+
+  state String
+
+  pincode String
+
+  country String @default("India")
+
+  operatingArea String?
+
+  territory String?
+
+  latitude Float?
+
+  longitude Float?
+
+  joiningDate DateTime?
+
+  agreementExpiry DateTime?
+
+  commissionPercent Decimal? @db.Decimal(5, 2)
+
+  securityDeposit Decimal? @db.Decimal(12, 2)
+
+  monthlyTarget Int?
+
+  yearlyTarget Int?
+
+  achievedBookings Int @default(0)
+
+  rating Float? @default(0)
+
+  totalRevenue Decimal? @db.Decimal(14, 2)
+
+  bankName String?
+
+  accountHolderName String?
+
+  accountNumber String?
+
+  ifscCode String?
+
+  branchName String?
+
+  isActive Boolean @default(true)
+
+  notes String?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@index([franchiseCode])
+  @@index([city])
+  @@index([state])
+  @@index([mobile])
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+
+  BOOKING
+  QUOTATION
+  PAYMENT
+  PROMOTION
+  SYSTEM
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  SMS
+  PUSH
+}
+
+model Notification {
+  id String @id @default(cuid())
+
+  userId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title String
+
+  message String
+
+  type NotificationType
+
+  channel NotificationChannel @default(IN_APP)
+
+  referenceId String?
+
+  referenceType String?
+
+  actionUrl String?
+
+  icon String?
+
+  image String?
+
+  priority Int @default(1)
+
+  isRead Boolean @default(false)
+
+  readAt DateTime?
+
+  sent Boolean @default(false)
+
+  sentAt DateTime?
+
+  expiresAt DateTime?
+
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([type])
+  @@index([createdAt])
+}
+
+enum VendorDocumentType {
+  GST
+  PAN
+  AADHAAR
+  DRIVING_LICENSE
+  VEHICLE_RC
+  VEHICLE_INSURANCE
+  GOODS_CARRIER_PERMIT
+  TRADE_LICENSE
+  COMPANY_REGISTRATION
+  MSME_CERTIFICATE
+  ISO_CERTIFICATE
+  BANK_CANCELLED_CHEQUE
+  OTHER
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+model VendorDocument {
+  id String @id @default(cuid())
+
+  vendorId String
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  documentType VendorDocumentType
+
+  documentNumber String?
+
+  fileName String
+
+  fileUrl String
+
+  fileSize Int?
+
+  mimeType String?
+
+  issuedBy String?
+
+  issuedDate DateTime?
+
+  expiryDate DateTime?
+
+  verificationStatus VerificationStatus @default(PENDING)
+
+  verifiedBy String?
+
+  verifiedAt DateTime?
+
+  rejectionReason String?
+
+  remarks String?
+
+  isMandatory Boolean @default(false)
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@index([vendorId])
+  @@index([documentType])
+  @@index([verificationStatus])
+}
+
+model VendorRating {
+  id String @id @default(cuid())
+
+  vendorId String @unique
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  averageRating Decimal @default(0.00) @db.Decimal(3, 2)
+
+  totalReviews Int @default(0)
+
+  rating5 Int @default(0)
+
+  rating4 Int @default(0)
+
+  rating3 Int @default(0)
+
+  rating2 Int @default(0)
+
+  rating1 Int @default(0)
+
+  onTimeDeliveryScore Decimal @default(0.00) @db.Decimal(5, 2)
+
+  packingQualityScore Decimal @default(0.00) @db.Decimal(5, 2)
+
+  staffBehaviourScore Decimal @default(0.00) @db.Decimal(5, 2)
+
+  communicationScore Decimal @default(0.00) @db.Decimal(5, 2)
+
+  pricingScore Decimal @default(0.00) @db.Decimal(5, 2)
+
+  complaintCount Int @default(0)
+
+  resolvedComplaints Int @default(0)
+
+  cancellationCount Int @default(0)
+
+  completedBookings Int @default(0)
+
+  repeatCustomers Int @default(0)
+
+  recommendationRate Decimal @default(0.00) @db.Decimal(5, 2)
+
+  lastReviewedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@index([averageRating])
+  @@index([completedBookings])
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  HIDDEN
+}
+
+enum RecommendationType {
+  YES
+  NO
+}
+
+model VendorReview {
+  id String @id @default(cuid())
+
+  vendorId String
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  customerId String?
+
+  bookingId String?
+
+  quotationId String?
+
+  customerName String
+
+  customerMobile String?
+
+  customerEmail String?
+
+  overallRating Decimal @db.Decimal(3, 2)
+
+  packingRating Decimal? @db.Decimal(3, 2)
+
+  deliveryRating Decimal? @db.Decimal(3, 2)
+
+  behaviourRating Decimal? @db.Decimal(3, 2)
+
+  communicationRating Decimal? @db.Decimal(3, 2)
+
+  pricingRating Decimal? @db.Decimal(3, 2)
+
+  title String?
+
+  review String
+
+  recommendation RecommendationType @default(YES)
+
+  verifiedBooking Boolean @default(false)
+
+  helpfulCount Int @default(0)
+
+  reportedCount Int @default(0)
+
+  status ReviewStatus @default(PENDING)
+
+  adminRemarks String?
+
+  approvedBy String?
+
+  approvedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@index([vendorId])
+  @@index([bookingId])
+  @@index([quotationId])
+  @@index([status])
+  @@index([overallRating])
+}
+
+enum PaymentMethod {
+  CASH
+  UPI
+  CREDIT_CARD
+  DEBIT_CARD
+  NET_BANKING
+  NEFT
+  RTGS
+  IMPS
+  CHEQUE
+  WALLET
+  RAZORPAY
+}
+
+enum PaymentStatus {
+  PENDING
+  INITIATED
+  SUCCESS
+  FAILED
+  CANCELLED
+  REFUNDED
+  PARTIAL_REFUND
+}
+
+enum PaymentType {
+  ADVANCE
+  PARTIAL
+  FINAL
+  REFUND
+}
+
+model Payment {
+  id String @id @default(cuid())
+
+  paymentNumber String @unique
+
+  bookingId String?
+
+  quotationId String?
+
+  customerId String?
+
+  vendorId String?
+
+  amount Decimal @db.Decimal(12, 2)
+
+  currency String @default("INR")
+
+  paymentMethod PaymentMethod
+
+  paymentType PaymentType
+
+  paymentStatus PaymentStatus @default(PENDING)
+
+  transactionId String?
+
+  gatewayTransactionId String?
+
+  gatewayOrderId String?
+
+  gatewayPaymentId String?
+
+  gatewaySignature String?
+
+  bankReference String?
+
+  remarks String?
+
+  paidAt DateTime?
+
+  refundAmount Decimal? @db.Decimal(12, 2)
+
+  refundReason String?
+
+  refundedAt DateTime?
+
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@index([bookingId])
+  @@index([quotationId])
+  @@index([customerId])
+  @@index([vendorId])
+  @@index([paymentStatus])
+  @@index([paymentMethod])
+}
+
+enum InvoiceType {
+  PROFORMA
+  TAX
+  ADVANCE
+  FINAL
+  CREDIT_NOTE
+  DEBIT_NOTE
+}
+
+enum InvoiceStatus {
+  DRAFT
+  GENERATED
+  SENT
+  PAID
+  CANCELLED
+}
+
+model Invoice {
+  id String @id @default(cuid())
+
+  invoiceNumber String @unique
+
+  bookingId String?
+
+  quotationId String?
+
+  paymentId String?
+
+  customerId String?
+
+  vendorId String?
+
+  invoiceType InvoiceType
+
+  invoiceStatus InvoiceStatus @default(DRAFT)
+
+  invoiceDate DateTime
+
+  dueDate DateTime?
+
+  taxableAmount Decimal @db.Decimal(12, 2)
+
+  cgst Decimal @default(0) @db.Decimal(12, 2)
+
+  sgst Decimal @default(0) @db.Decimal(12, 2)
+
+  igst Decimal @default(0) @db.Decimal(12, 2)
+
+  cess Decimal @default(0) @db.Decimal(12, 2)
+
+  discount Decimal @default(0) @db.Decimal(12, 2)
+
+  totalAmount Decimal @db.Decimal(12, 2)
+
+  amountPaid Decimal @default(0) @db.Decimal(12, 2)
+
+  balanceAmount Decimal @db.Decimal(12, 2)
+
+  currency String @default("INR")
+
+  billingName String
+
+  billingAddress String
+
+  billingGST String?
+
+  placeOfSupply String?
+
+  pdfUrl String?
+
+  remarks String?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@index([bookingId])
+  @@index([quotationId])
+  @@index([paymentId])
+  @@index([invoiceStatus])
+  @@index([invoiceDate])
+}
+
+enum TrackingStatus {
+  BOOKING_CONFIRMED
+  VENDOR_ASSIGNED
+  SURVEY_SCHEDULED
+  SURVEY_COMPLETED
+  PACKING_STARTED
+  PACKING_COMPLETED
+  LOADED
+  IN_TRANSIT
+  ARRIVED_AT_DESTINATION
+  UNLOADING_STARTED
+  UNLOADING_COMPLETED
+  DELIVERY_COMPLETED
+  CANCELLED
+}
+
+model BookingTracking {
+  id String @id @default(cuid())
+
+  bookingId String
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  trackingStatus TrackingStatus
+
+  location String?
+
+  latitude Float?
+
+  longitude Float?
+
+  remarks String?
+
+  updatedBy String?
+
+  updatedByRole String?
+
+  estimatedArrival DateTime?
+
+  actualArrival DateTime?
+
+  photoUrl String?
+
+  signatureUrl String?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@index([bookingId])
+  @@index([trackingStatus])
+  @@index([createdAt])
+}
+
+enum OTPPurpose {
+  LOGIN
+  REGISTER
+  MOBILE_VERIFICATION
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+  BOOKING_CONFIRMATION
+  PAYMENT_VERIFICATION
+}
+
+model OTP {
+  id String @id @default(cuid())
+
+  mobile String?
+
+  email String?
+
+  otpCode String
+
+  purpose OTPPurpose
+
+  userId String?
+
+  bookingId String?
+
+  quotationId String?
+
+  attempts Int @default(0)
+
+  maxAttempts Int @default(5)
+
+  verified Boolean @default(false)
+
+  expiresAt DateTime
+
+  verifiedAt DateTime?
+
+  ipAddress String?
+
+  deviceInfo String?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@index([mobile])
+  @@index([email])
+  @@index([purpose])
+  @@index([expiresAt])
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  APPROVE
+  REJECT
+  ASSIGN
+  PAYMENT
+  DOWNLOAD
+  EXPORT
+  IMPORT
+  OTHER
+}
+
+enum AuditEntity {
+  USER
+  CUSTOMER
+  VENDOR
+  CORPORATE
+  FRANCHISE
+  QUOTATION
+  BOOKING
+  PAYMENT
+  INVOICE
+  INVENTORY
+  DOCUMENT
+  SYSTEM
+}
+
+model AuditLog {
+  id String @id @default(cuid())
+
+  userId String?
+
+  action AuditAction
+
+  entity AuditEntity
+
+  entityId String?
+
+  description String
+
+  oldValues Json?
+
+  newValues Json?
+
+  ipAddress String?
+
+  deviceInfo String?
+
+  browser String?
+
+  operatingSystem String?
+
+  requestMethod String?
+
+  requestUrl String?
+
+  responseCode Int?
+
+  success Boolean @default(true)
+
+  remarks String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([entity])
+  @@index([entityId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+enum VehicleType {
+  PICKUP
+  TATA_ACE
+  BOLERO_PICKUP
+  MINI_TRUCK
+  LIGHT_TRUCK
+  MEDIUM_TRUCK
+  HEAVY_TRUCK
+  CONTAINER
+  TRAILER
+  OTHER
+}
+
+enum VehicleOwnership {
+  OWNED
+  HIRED
+  LEASED
+}
+
+enum VehicleStatus {
+  AVAILABLE
+  BOOKED
+  IN_TRANSIT
+  MAINTENANCE
+  INACTIVE
+}
+
+model VendorVehicle {
+  id String @id @default(cuid())
+
+  vendorId String
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  registrationNumber String @unique
+
+  vehicleType VehicleType
+
+  ownership VehicleOwnership @default(OWNED)
+
+  status VehicleStatus @default(AVAILABLE)
+
+  brand String?
+
+  model String?
+
+  manufacturingYear Int?
+
+  color String?
+
+  fuelType String?
+
+  carryingCapacityKg Int?
+
+  volumeCapacityCft Int?
+
+  lengthFt Float?
+
+  widthFt Float?
+
+  heightFt Float?
+
+  driverName String?
+
+  driverMobile String?
+
+  driverLicenseNumber String?
+
+  insuranceNumber String?
+
+  insuranceExpiry DateTime?
+
+  permitNumber String?
+
+  permitExpiry DateTime?
+
+  fitnessExpiry DateTime?
+
+  pollutionExpiry DateTime?
+
+  gpsInstalled Boolean @default(false)
+
+  gpsDeviceId String?
+
+  currentCity String?
+
+  currentLatitude Float?
+
+  currentLongitude Float?
+
+  remarks String?
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@index([vendorId])
+  @@index([vehicleType])
+  @@index([status])
+  @@index([registrationNumber])
+}
+
+enum BankAccountType {
+  SAVINGS
+  CURRENT
+  CASH_CREDIT
+  OVERDRAFT
+}
+
+model VendorBankAccount {
+  id String @id @default(cuid())
+
+  vendorId String
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  accountHolderName String
+
+  bankName String
+
+  branchName String?
+
+  accountNumber String
+
+  ifscCode String
+
+  swiftCode String?
+
+  upiId String?
+
+  accountType BankAccountType
+
+  cancelledChequeUrl String?
+
+  verified Boolean @default(false)
+
+  verifiedBy String?
+
+  verifiedAt DateTime?
+
+  isPrimary Boolean @default(false)
+
+  isActive Boolean @default(true)
+
+  remarks String?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@index([vendorId])
+  @@index([ifscCode])
+  @@index([accountNumber])
+}
+
+enum NotificationFrequency {
+  IMMEDIATE
+  DAILY
+  WEEKLY
+  NEVER
+}
+
+model NotificationPreference {
+  id String @id @default(cuid())
+
+  userId String @unique
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  emailEnabled Boolean @default(true)
+
+  smsEnabled Boolean @default(true)
+
+  pushEnabled Boolean @default(true)
+
+  inAppEnabled Boolean @default(true)
+
+  bookingUpdates Boolean @default(true)
+
+  quotationUpdates Boolean @default(true)
+
+  paymentUpdates Boolean @default(true)
+
+  vendorUpdates Boolean @default(true)
+
+  promotionalMessages Boolean @default(false)
+
+  newsletter Boolean @default(false)
+
+  reminderNotifications Boolean @default(true)
+
+  frequency NotificationFrequency @default(IMMEDIATE)
+
+  quietHoursEnabled Boolean @default(false)
+
+  quietHoursStart String?
+
+  quietHoursEnd String?
+
+  preferredLanguage String @default("en")
+
+  timezone String @default("Asia/Kolkata")
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+}
+
+enum CustomerDocumentType {
+  AADHAAR
+  PAN
+  PASSPORT
+  DRIVING_LICENSE
+  VOTER_ID
+  RENT_AGREEMENT
+  ELECTRICITY_BILL
+  GAS_CONNECTION
+  COMPANY_ID
+  OTHER
+}
+
+model CustomerDocument {
+  id String @id @default(cuid())
+
+  userId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  documentType CustomerDocumentType
+
+  documentNumber String?
+
+  fileName String
+
+  fileUrl String
+
+  fileSize Int?
+
+  mimeType String?
+
+  issuedBy String?
+
+  issuedDate DateTime?
+
+  expiryDate DateTime?
+
+  verificationStatus VerificationStatus @default(PENDING)
+
+  verifiedBy String?
+
+  verifiedAt DateTime?
+
+  rejectionReason String?
+
+  remarks String?
+
+  isMandatory Boolean @default(false)
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([documentType])
+  @@index([verificationStatus])
+}

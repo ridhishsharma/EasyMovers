@@ -1,0 +1,485 @@
+"use client";
+
+import React, { useState, useEffect } from 'react';
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  Truck, 
+  Menu, 
+  X, 
+  ChevronDown,
+  User,
+  Settings,
+  HelpCircle,
+  LogOut,
+  Phone,
+  Mail,
+  MapPin
+} from 'lucide-react';
+
+const navLinks = [
+  { href: "#", label: "Home" },
+  { href: "#services", label: "Services" },
+  { href: "#cities", label: "Cities" },
+  { href: "#corporate", label: "Corporate" },
+  { href: "#vendor", label: "Partner With Us" },
+  { href: "#about", label: "About" },
+]	
+
+interface NavbarProps {
+  isLoggedIn?: boolean;
+  userName?: string;
+}
+
+export const Navbar = ({ isLoggedIn = false, userName = "User" }: NavbarProps) => {
+const [isScrolled, setIsScrolled] = useState(false);
+useEffect(() => {
+const handleScroll = () => {
+setIsScrolled(window.scrollY > 50)
+}
+
+window.addEventListener("scroll", handleScroll)
+
+return () => window.removeEventListener("scroll", handleScroll)
+}, [])
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+
+
+
+  // Handle scroll effect
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Close mobile menu on resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 768) {
+        setIsMobileMenuOpen(false);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Prevent scroll when mobile menu is open
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isMobileMenuOpen]);
+
+  const navLinks = [
+    {
+      name: 'Services',
+      href: '#services',
+      hasDropdown: true,
+      dropdownItems: [
+        { name: 'Household Moving', href: '#household' },
+        { name: 'Office Relocation', href: '#office' },
+        { name: 'Vehicle Transport', href: '#vehicle' },
+        { name: 'International Moving', href: '#international' },
+      ]
+    },
+    { name: 'How it Works', href: '#how-it-works' },
+    { name: 'Pricing', href: '#pricing' },
+    {
+      name: 'Resources',
+      href: '#resources',
+      hasDropdown: true,
+      dropdownItems: [
+        { name: 'Blog', href: '#blog' },
+        { name: 'Moving Guides', href: '#guides' },
+        { name: 'FAQs', href: '#faqs' },
+        { name: 'Customer Stories', href: '#stories' },
+      ]
+    },
+    { name: 'Contact', href: '#contact' }
+  ];
+
+  const userMenuItems = [
+    { icon: User, label: 'My Profile', href: '#profile' },
+    { icon: MapPin, label: 'My Moves', href: '#moves' },
+    { icon: Settings, label: 'Settings', href: '#settings' },
+    { icon: HelpCircle, label: 'Help Center', href: '#help' },
+    { icon: LogOut, label: 'Sign Out', href: '#signout', danger: true }
+  ];
+
+  return (
+    <>
+      <motion.nav
+        initial={{ y: -100 }}
+        animate={{ y: 0 }}
+        transition={{ duration: 0.5 }}
+        className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 ${
+  isScrolled
+    ? "bg-white/90 backdrop-blur-xl border-b border-gray-200 shadow-lg"
+    : "bg-transparent"
+}`}
+
+
+      >
+        <div className="max-w-[1400px] mx-auto px-6 lg:px-12">
+          <div className="flex items-center justify-between h-20">
+            
+            {/* Logo */}
+            <motion.a
+              href="/"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2 }}
+              className="flex items-center gap-3 group"
+            >
+              <div className="bg-gradient-to-br from-blue-600 to-cyan-600 p-2.5 rounded-xl shadow-lg shadow-blue-500/20 group-hover:shadow-blue-500/40 transition-shadow">
+                <Truck className="w-7 h-7 text-white" />
+              </div>
+              <span 
+                className="text-2xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent" 
+                style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
+              >
+                EasyMovers
+              </span>
+            </motion.a>
+
+            {/* Desktop Navigation */}
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="hidden md:flex items-center gap-8"
+            >
+              {navLinks.map((link, index) => (
+                <div
+                  key={link.name}
+                  className="relative"
+                  onMouseEnter={() => link.hasDropdown && setActiveDropdown(link.name)}
+                  onMouseLeave={() => link.hasDropdown && setActiveDropdown(null)}
+                >
+                  <a
+                    href={link.href}
+                    className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+  isScrolled
+    ? "text-slate-800 hover:text-orange-500"
+    : "text-white hover:text-orange-300"
+                    }`}
+                  >
+                    {link.name}
+                    {link.hasDropdown && (
+                      <ChevronDown className={`w-4 h-4 transition-transform ${
+                        activeDropdown === link.name ? 'rotate-180' : ''
+                      }`} />
+                    )}
+                  </a>
+
+                  {/* Dropdown Menu */}
+                  {link.hasDropdown && (
+                    <AnimatePresence>
+                      {activeDropdown === link.name && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 10 }}
+                          transition={{ duration: 0.2 }}
+                          className="absolute top-full left-0 mt-2 w-56 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl shadow-slate-900/10 border border-slate-200/50 overflow-hidden"
+                        >
+                          <div className="py-2">
+                            {link.dropdownItems?.map((item, idx) => (
+                              <a
+                                key={idx}
+                                href={item.href}
+                                className="block px-4 py-3 text-sm font-medium text-slate-700 hover:text-blue-600 hover:bg-blue-50/50 transition-colors"
+                              >
+                                {item.name}
+                              </a>
+                            ))}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  )}
+                </div>
+              ))}
+            </motion.div>
+
+            {/* Right Side Actions */}
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.4 }}
+              className="flex items-center gap-4"
+            >
+              {/* Contact Info - Desktop Only */}
+              <div className="hidden lg:flex items-center gap-6 whitespace-nowrap">
+ 
+                <a 
+                  href="tel:+911234567890" 
+                  className="flex items-center gap-2 text-sm text-slate-600 hover:text-blue-600 transition-colors"
+                >
+                  <Phone className="w-4 h-4" />
+                  <span className="font-medium">+91 123 456 7890</span>
+                </a>
+              </div>
+
+              {isLoggedIn ? (
+                // User Menu
+                <div className="relative">
+                  <button
+                    onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50 transition-all"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center">
+                      <span className="text-white font-bold text-sm">
+                        {userName.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                    <span className="hidden md:block font-semibold text-slate-700">
+                      {userName}
+                    </span>
+                    <ChevronDown className={`w-4 h-4 text-slate-600 transition-transform ${
+                      isUserMenuOpen ? 'rotate-180' : ''
+                    }`} />
+                  </button>
+
+                  {/* User Dropdown */}
+                  <AnimatePresence>
+                    {isUserMenuOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 10 }}
+                        transition={{ duration: 0.2 }}
+                        className="absolute right-0 top-full mt-2 w-56 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl shadow-slate-900/10 border border-slate-200/50 overflow-hidden"
+                      >
+                        <div className="py-2">
+                          {userMenuItems.map((item, idx) => (
+                            <a
+                              key={idx}
+                              href={item.href}
+                              className={`flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors ${
+                                item.danger
+                                  ? 'text-red-600 hover:bg-red-50/50'
+                                  : 'text-slate-700 hover:text-blue-600 hover:bg-blue-50/50'
+                              }`}
+                            >
+                              <item.icon className="w-4 h-4" />
+                              {item.label}
+                            </a>
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              ) : (
+                // Sign In Button
+                <button className="hidden md:block px-5 py-2.5 rounded-xl font-semibold text-white bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 transition-all shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30">
+                  Sign In
+                </button>
+              )}
+
+              {/* Mobile Menu Toggle */}
+              <button
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className="md:hidden p-2 rounded-lg hover:bg-slate-100 transition-colors"
+                aria-label="Toggle menu"
+              >
+                {isMobileMenuOpen ? (
+                  <X className="w-6 h-6 text-slate-700" />
+                ) : (
+                  <Menu className="w-6 h-6 text-slate-700" />
+                )}
+              </button>
+            </motion.div>
+          </div>
+        </div>
+      </motion.nav>
+
+      {/* Mobile Menu */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 md:hidden"
+            />
+
+            {/* Menu Panel */}
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="fixed top-0 right-0 bottom-0 w-full max-w-sm bg-white z-50 md:hidden overflow-y-auto"
+            >
+              <div className="p-6">
+                {/* Mobile Menu Header */}
+                <div className="flex items-center justify-between mb-8">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-gradient-to-br from-blue-600 to-cyan-600 p-2 rounded-xl">
+                      <Truck className="w-6 h-6 text-white" />
+                    </div>
+                    <span 
+                      className="text-xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent"
+                      style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
+                    >
+                      EasyMovers
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="p-2 rounded-lg hover:bg-slate-100 transition-colors"
+                  >
+                    <X className="w-6 h-6 text-slate-700" />
+                  </button>
+                </div>
+
+                {/* User Info - Mobile */}
+                {isLoggedIn && (
+                  <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center">
+                        <span className="text-white font-bold text-lg">
+                          {userName.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-800">{userName}</p>
+                        <p className="text-sm text-slate-600">View Profile</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Mobile Navigation Links */}
+                <nav className="space-y-2">
+                  {navLinks.map((link, index) => (
+                    <div key={link.name}>
+                      {link.hasDropdown ? (
+                        <div className="space-y-2">
+                          <button
+                            onClick={() => setActiveDropdown(
+                              activeDropdown === link.name ? null : link.name
+                            )}
+                            className="flex items-center justify-between w-full px-4 py-3 rounded-xl font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
+                          >
+                            {link.name}
+                            <ChevronDown className={`w-4 h-4 transition-transform ${
+                              activeDropdown === link.name ? 'rotate-180' : ''
+                            }`} />
+                          </button>
+                          
+                          {activeDropdown === link.name && (
+                            <div className="pl-4 space-y-1">
+                              {link.dropdownItems?.map((item, idx) => (
+                                <a
+                                  key={idx}
+                                  href={item.href}
+                                  className="block px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                                  onClick={() => setIsMobileMenuOpen(false)}
+                                >
+                                  {item.name}
+                                </a>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <a
+                          href={link.href}
+                          className="block px-4 py-3 rounded-xl font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
+                          onClick={() => setIsMobileMenuOpen(false)}
+                        >
+                          {link.name}
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </nav>
+
+                {/* Mobile Contact Info */}
+                <div className="mt-8 pt-6 border-t border-slate-200 space-y-3">
+                  <a 
+                    href="tel:+911234567890"
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-700 hover:bg-slate-100 transition-colors"
+                  >
+                    <Phone className="w-5 h-5 text-blue-600" />
+                    <div>
+                      <p className="text-xs text-slate-500">Call Us</p>
+                      <p className="font-semibold">+91 123 456 7890</p>
+                    </div>
+                  </a>
+                  <a 
+                    href="mailto:support@easymovers.com"
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-700 hover:bg-slate-100 transition-colors"
+                  >
+                    <Mail className="w-5 h-5 text-blue-600" />
+                    <div>
+                      <p className="text-xs text-slate-500">Email Us</p>
+                      <p className="font-semibold">support@easymovers.com</p>
+                    </div>
+                  </a>
+                </div>
+
+                {/* Mobile CTA */}
+                {!isLoggedIn && (
+                  <div className="mt-6">
+                    <button className="w-full py-3.5 rounded-xl font-bold text-white bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 transition-all shadow-lg shadow-blue-500/25">
+                      Sign In
+                    </button>
+                    <p className="mt-3 text-center text-sm text-slate-600">
+                      Don't have an account?{' '}
+                      <a href="#signup" className="font-semibold text-blue-600 hover:text-blue-700">
+                        Sign Up Free
+                      </a>
+                    </p>
+                  </div>
+                )}
+
+                {/* User Menu - Mobile */}
+                {isLoggedIn && (
+                  <div className="mt-6 pt-6 border-t border-slate-200 space-y-2">
+                    {userMenuItems.map((item, idx) => (
+                      <a
+                        key={idx}
+                        href={item.href}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${
+                          item.danger
+                            ? 'text-red-600 hover:bg-red-50'
+                            : 'text-slate-700 hover:bg-slate-100'
+                        }`}
+                        onClick={() => setIsMobileMenuOpen(false)}
+                      >
+                        <item.icon className="w-5 h-5" />
+                        {item.label}
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </>
+  );
+};
+
