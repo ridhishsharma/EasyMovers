@@ -1,0 +1,125 @@
+../../../../ai/config/openai.ts(31,20): error TS2307: Cannot find module 'openai' or its corresponding type declarations.
+../../../../ai/config/openai.ts(248,5): error TS2345: Argument of type 'AIModel' is not assignable to parameter of type 'AIModel.GPT_4_1 | AIModel.GPT_4O | AIModel.GPT_4O_MINI | AIModel.GPT_5 | AIModel.GPT_5_MINI'.
+../../../../ai/services/ai.service.ts(22,20): error TS2307: Cannot find module 'openai' or its corresponding type declarations.
+../../../../ai/services/ai.service.ts(28,8): error TS2307: Cannot find module 'openai/resources/chat/completions' or its corresponding type declarations.
+../../../../ai/services/lead-ai.service.ts(31,20): error TS2307: Cannot find module 'openai' or its corresponding type declarations.
+../../../../ai/services/lead-ai.service.ts(33,26): error TS2307: Cannot find module '../logger/ai.logger' or its corresponding type declarations.
+../../../../ai/services/lead-ai.service.ts(37,32): error TS2307: Cannot find module './ai-cache.service' or its corresponding type declarations.
+../../../../ai/services/lead-ai.service.ts(39,34): error TS2307: Cannot find module './ai-history.service' or its corresponding type declarations.
+../../../../ai/services/lead-ai.service.ts(41,32): error TS2307: Cannot find module './ai-token.service' or its corresponding type declarations.
+../../../../ai/services/lead-ai.service.ts(43,35): error TS2307: Cannot find module '../providers/ai-provider.factory' or its corresponding type declarations.
+../../../../ai/services/lead-ai.service.ts(45,35): error TS2307: Cannot find module '../lead/lead.prompt' or its corresponding type declarations.
+../../../../ai/services/lead-ai.service.ts(63,8): error TS2307: Cannot find module '../models/ai.model' or its corresponding type declarations.
+../../../../ai/services/lead-ai.service.ts(89,8): error TS2307: Cannot find module '../lead/lead.model' or its corresponding type declarations.
+../../../../ai/services/lead-ai.service.ts(304,20): error TS2339: Property 'reason' does not exist on type 'AISecurityResult'.
+../../../../ai/token/ai-token.service.ts(150,3): error TS2561: Object literal may only specify known properties, but 'OPENAI' does not exist in type 'Record<AIProvider, ProviderPricing>'. Did you mean to write 'openai'?
+../../../../ai/vendor/vendor-ai.service.ts(58,8): error TS2307: Cannot find module '../tokens/ai-token.service' or its corresponding type declarations.
+../../../../ai/vendor/vendor-ai.service.ts(267,7): error TS18048: 'ratings.customerRating' is possibly 'undefined'.
+../../../../ai/vendor/vendor-ai.service.ts(309,13): error TS2339: Property 'totalLabours' does not exist on type 'VendorFleet'.
+../../../../ai/vendor/vendor-ai.service.ts(361,7): error TS18048: 'ratings.customerRating' is possibly 'undefined'.
+../../../../ai/vendor/vendor-ai.service.ts(432,6): error TS2304: Cannot find name 'VendorWarning'.
+../../../../ai/vendor/vendor-ai.service.ts(434,21): error TS2304: Cannot find name 'VendorWarning'.
+../../../../ai/vendor/vendor-ai.service.ts(486,21): error TS2339: Property 'acceptanceRate' does not exist on type 'VendorPerformance'.
+../../../../ai/vendor/vendor-ai.service.ts(496,50): error TS2339: Property 'acceptanceRate' does not exist on type 'VendorPerformance'.
+../../../../ai/vendor/vendor-ai.service.ts(508,21): error TS2339: Property 'cancellationRate' does not exist on type 'VendorPerformance'.
+../../../../ai/vendor/vendor-ai.service.ts(518,47): error TS2339: Property 'cancellationRate' does not exist on type 'VendorPerformance'.
+../../../../ai/vendor/vendor-ai.service.ts(530,21): error TS2339: Property 'onTimeDelivery' does not exist on type 'VendorPerformance'.
+../../../../ai/vendor/vendor-ai.service.ts(552,21): error TS2339: Property 'damageFreeMoves' does not exist on type 'VendorPerformance'.
+../../../../ai/vendor/vendor-ai.service.ts(697,6): error TS2552: Cannot find name 'VendorRecommendationReason'. Did you mean 'VendorRecommendationResult'?
+../../../../ai/vendor/vendor-ai.service.ts(699,20): error TS2552: Cannot find name 'VendorRecommendationReason'. Did you mean 'VendorRecommendationResult'?
+../../../../ai/vendor/vendor-ai.service.ts(765,9): error TS18048: 'ratings.customerRating' is possibly 'undefined'.
+../../../../ai/vendor/vendor-ai.service.ts(773,41): error TS18048: 'ratings.customerRating' is possibly 'undefined'.
+../../../../ai/vendor/vendor-ai.service.ts(779,16): error TS18048: 'ratings.customerRating' is possibly 'undefined'.
+../../../../ai/vendor/vendor-ai.service.ts(787,41): error TS18048: 'ratings.customerRating' is possibly 'undefined'.
+../../../../ai/vendor/vendor-ai.service.ts(867,6): error TS2304: Cannot find name 'VendorBusinessInsight'.
+../../../../ai/vendor/vendor-ai.service.ts(869,21): error TS2304: Cannot find name 'VendorBusinessInsight'.
+../../../../ai/vendor/vendor-ai.service.ts(971,21): error TS2339: Property 'onTimeDelivery' does not exist on type 'VendorPerformance'.
+../../../../ai/vendor/vendor-ai.service.ts(984,28): error TS2339: Property 'onTimeDelivery' does not exist on type 'VendorPerformance'.
+../../../../ai/vendor/vendor-ai.service.ts(1018,21): error TS2339: Property 'cancellationRate' does not exist on type 'VendorPerformance'.
+../../../../ai/vendor/vendor-ai.service.ts(1039,21): error TS2339: Property 'damageFreeMoves' does not exist on type 'VendorPerformance'.
+../../../../ai/vendor/vendor-ai.service.ts(1052,28): error TS2339: Property 'damageFreeMoves' does not exist on type 'VendorPerformance'.
+../../../../ai/vendor/vendor-ai.service.ts(1131,6): error TS2304: Cannot find name 'VendorFraudRisk'.
+../../../../ai/vendor/vendor-ai.service.ts(1277,9): error TS18048: 'ratings.customerRating' is possibly 'undefined'.
+../../../../ai/vendor/vendor-ai.service.ts(1285,16): error TS18048: 'ratings.customerRating' is possibly 'undefined'.
+../../../../ai/vendor/vendor-ai.service.ts(1303,7): error TS18048: 'ratings.reviewCount' is possibly 'undefined'.
+../../../../ai/vendor/vendor-ai.service.ts(1305,7): error TS18048: 'ratings.customerRating' is possibly 'undefined'.
+../../../../ai/vendor/vendor-ai.service.ts(1428,9): error TS18048: 'ratings.customerRating' is possibly 'undefined'.
+../../../../ai/vendor/vendor-ai.service.ts(1438,9): error TS18048: 'ratings.reviewCount' is possibly 'undefined'.
+../../../../ai/vendor/vendor-ai.service.ts(1442,16): error TS18048: 'ratings.reviewCount' is possibly 'undefined'.
+../../../../ai/vendor/vendor-ai.service.ts(1446,16): error TS18048: 'ratings.reviewCount' is possibly 'undefined'.
+../../../../ai/vendor/vendor-ai.service.ts(1450,16): error TS18048: 'ratings.reviewCount' is possibly 'undefined'.
+../../../../ai/vendor/vendor-ai.service.ts(1454,16): error TS18048: 'ratings.reviewCount' is possibly 'undefined'.
+../../../../ai/vendor/vendor-ai.service.ts(1495,17): error TS2339: Property 'priceCompetitiveness' does not exist on type 'VendorPricing'.
+../../../../ai/vendor/vendor-ai.service.ts(1499,24): error TS2339: Property 'priceCompetitiveness' does not exist on type 'VendorPricing'.
+../../../../ai/vendor/vendor-ai.service.ts(1503,24): error TS2339: Property 'priceCompetitiveness' does not exist on type 'VendorPricing'.
+../../../../ai/vendor/vendor-ai.service.ts(1507,24): error TS2339: Property 'priceCompetitiveness' does not exist on type 'VendorPricing'.
+../../../../ai/vendor/vendor-ai.service.ts(1511,24): error TS2339: Property 'priceCompetitiveness' does not exist on type 'VendorPricing'.
+../../../../ai/vendor/vendor-ai.service.ts(1527,17): error TS2339: Property 'transparentPricing' does not exist on type 'VendorPricing'.
+../../../../ai/vendor/vendor-ai.service.ts(1539,17): error TS2339: Property 'negotiable' does not exist on type 'VendorPricing'.
+../../../../ai/vendor/vendor-ai.service.ts(1551,17): error TS2339: Property 'hiddenChargesReported' does not exist on type 'VendorPricing'.
+../../../../ai/vendor/vendor-ai.service.ts(1563,17): error TS2339: Property 'discountAvailable' does not exist on type 'VendorPricing'.
+../../../../ai/vendor/vendor-ai.service.ts(1810,15): error TS2339: Property 'totalLabours' does not exist on type 'VendorFleet'.
+../../../../ai/vendor/vendor-ai.service.ts(1814,22): error TS2339: Property 'totalLabours' does not exist on type 'VendorFleet'.
+../../../../ai/vendor/vendor-ai.service.ts(1818,22): error TS2339: Property 'totalLabours' does not exist on type 'VendorFleet'.
+../../../../ai/vendor/vendor-ai.service.ts(1822,22): error TS2339: Property 'totalLabours' does not exist on type 'VendorFleet'.
+../../../../ai/vendor/vendor-ai.service.ts(1826,22): error TS2339: Property 'totalLabours' does not exist on type 'VendorFleet'.
+../../../../ai/vendor/vendor-ai.service.ts(1830,22): error TS2339: Property 'totalLabours' does not exist on type 'VendorFleet'.
+../../../../ai/vendor/vendor-ai.service.ts(1842,15): error TS2339: Property 'panIndiaOperations' does not exist on type 'VendorFleet'.
+../../../../ai/vendor/vendor-ai.service.ts(1913,21): error TS2339: Property 'acceptanceRate' does not exist on type 'VendorPerformance'.
+../../../../ai/vendor/vendor-ai.service.ts(1917,28): error TS2339: Property 'acceptanceRate' does not exist on type 'VendorPerformance'.
+../../../../ai/vendor/vendor-ai.service.ts(1921,28): error TS2339: Property 'acceptanceRate' does not exist on type 'VendorPerformance'.
+../../../../ai/vendor/vendor-ai.service.ts(1925,28): error TS2339: Property 'acceptanceRate' does not exist on type 'VendorPerformance'.
+../../../../ai/vendor/vendor-ai.service.ts(1941,21): error TS2339: Property 'onTimeDelivery' does not exist on type 'VendorPerformance'.
+../../../../ai/vendor/vendor-ai.service.ts(1945,28): error TS2339: Property 'onTimeDelivery' does not exist on type 'VendorPerformance'.
+../../../../ai/vendor/vendor-ai.service.ts(1949,28): error TS2339: Property 'onTimeDelivery' does not exist on type 'VendorPerformance'.
+../../../../ai/vendor/vendor-ai.service.ts(1953,28): error TS2339: Property 'onTimeDelivery' does not exist on type 'VendorPerformance'.
+../../../../ai/vendor/vendor-ai.service.ts(1969,21): error TS2339: Property 'damageFreeMoves' does not exist on type 'VendorPerformance'.
+../../../../ai/vendor/vendor-ai.service.ts(1973,28): error TS2339: Property 'damageFreeMoves' does not exist on type 'VendorPerformance'.
+../../../../ai/vendor/vendor-ai.service.ts(1977,28): error TS2339: Property 'damageFreeMoves' does not exist on type 'VendorPerformance'.
+../../../../ai/vendor/vendor-ai.service.ts(1981,28): error TS2339: Property 'damageFreeMoves' does not exist on type 'VendorPerformance'.
+../../../../ai/vendor/vendor-ai.service.ts(1997,21): error TS2339: Property 'cancellationRate' does not exist on type 'VendorPerformance'.
+../../../../ai/vendor/vendor-ai.service.ts(2001,28): error TS2339: Property 'cancellationRate' does not exist on type 'VendorPerformance'.
+../../../../ai/vendor/vendor-ai.service.ts(2005,28): error TS2339: Property 'cancellationRate' does not exist on type 'VendorPerformance'.
+../../../../ai/vendor/vendor-ai.service.ts(2009,28): error TS2339: Property 'cancellationRate' does not exist on type 'VendorPerformance'.
+../../../../ai/vendor/vendor-ai.service.ts(2204,14): error TS2304: Cannot find name 'AIJSONResponse'.
+../../../../ai/vendor/vendor-ai.service.ts(2238,17): error TS2304: Cannot find name 'AIResponseStatus'.
+../../../../ai/vendor/vendor-ai.service.ts(2270,23): error TS2339: Property 'generateJSON' does not exist on type 'AIService'.
+../../../../ai/vendor/vendor-ai.service.ts(2438,30): error TS2339: Property 'store' does not exist on type 'AIHistoryService'.
+../../../../ai/vendor/vendor-ai.service.ts(2508,28): error TS2554: Expected 4-5 arguments, but got 3.
+../../../../ai/vendor/vendor-ai.service.ts(2642,7): error TS2353: Object literal may only specify known properties, and 'recommendation' does not exist in type 'VendorAIResponse'.
+../../../../ai/vendor/vendor-ai.service.ts(3145,7): error TS2322: Type 'string[]' is not assignable to type 'VendorStrength[]'.
+  Type 'string' is not assignable to type 'VendorStrength'.
+../../../../ai/vendor/vendor-ai.service.ts(3147,7): error TS2322: Type 'string[]' is not assignable to type 'VendorWeakness[]'.
+  Type 'string' is not assignable to type 'VendorWeakness'.
+../../../../ai/vendor/vendor-ai.service.ts(3159,7): error TS2322: Type '{ expectedDeliveryDays: number; expectedCustomerRating: number | undefined; expectedSuccessProbability: number; }' is not assignable to type 'VendorPrediction'.
+  Types of property 'expectedCustomerRating' are incompatible.
+    Type 'number | undefined' is not assignable to type 'number'.
+      Type 'undefined' is not assignable to type 'number'.
+../../../../ai/vendor/vendor-ai.service.ts(3785,6): error TS2304: Cannot find name 'VendorComparisonResult'.
+../../../../ai/vendor/vendor-ai.service.ts(3787,24): error TS2304: Cannot find name 'VendorComparisonResult'.
+../../../../ai/vendor/vendor-ai.service.ts(3831,6): error TS2304: Cannot find name 'VendorComparisonResult'.
+route.ts(25,10): error TS2724: '"@/ai/vendor/vendor-ai.service"' has no exported member named 'vendorAIService'. Did you mean 'VendorAIService'?
+route.ts(235,19): error TS2345: Argument of type '{ timestamp: Date; module: AILogModule.VENDOR; level: AILogLevel.INFO; message: string; referenceId: string; }' is not assignable to parameter of type 'AILogEntry'.
+  Property 'provider' is missing in type '{ timestamp: Date; module: AILogModule.VENDOR; level: AILogLevel.INFO; message: string; referenceId: string; }' but required in type 'AILogEntry'.
+route.ts(343,16): error TS2339: Property 'ratingSummary' does not exist on type '{ createdAt: Date; website: string | null; status: string; id: string; totalLabours: number | null; remarks: string | null; updatedAt: Date; city: string | null; companyName: string; ... 25 more ...; vendorCode: string; }'.
+route.ts(347,16): error TS2339: Property 'ratingSummary' does not exist on type '{ createdAt: Date; website: string | null; status: string; id: string; totalLabours: number | null; remarks: string | null; updatedAt: Date; city: string | null; companyName: string; ... 25 more ...; vendorCode: string; }'.
+route.ts(351,16): error TS2339: Property 'ratingSummary' does not exist on type '{ createdAt: Date; website: string | null; status: string; id: string; totalLabours: number | null; remarks: string | null; updatedAt: Date; city: string | null; companyName: string; ... 25 more ...; vendorCode: string; }'.
+route.ts(373,16): error TS2339: Property 'vehicles' does not exist on type '{ createdAt: Date; website: string | null; status: string; id: string; totalLabours: number | null; remarks: string | null; updatedAt: Date; city: string | null; companyName: string; ... 25 more ...; vendorCode: string; }'.
+route.ts(375,11): error TS7006: Parameter 'x' implicitly has an 'any' type.
+route.ts(385,16): error TS2339: Property 'vehicles' does not exist on type '{ createdAt: Date; website: string | null; status: string; id: string; totalLabours: number | null; remarks: string | null; updatedAt: Date; city: string | null; companyName: string; ... 25 more ...; vendorCode: string; }'.
+route.ts(387,11): error TS7006: Parameter 'x' implicitly has an 'any' type.
+route.ts(397,16): error TS2339: Property 'vehicles' does not exist on type '{ createdAt: Date; website: string | null; status: string; id: string; totalLabours: number | null; remarks: string | null; updatedAt: Date; city: string | null; companyName: string; ... 25 more ...; vendorCode: string; }'.
+route.ts(399,11): error TS7006: Parameter 'x' implicitly has an 'any' type.
+route.ts(427,16): error TS2339: Property 'documents' does not exist on type '{ createdAt: Date; website: string | null; status: string; id: string; totalLabours: number | null; remarks: string | null; updatedAt: Date; city: string | null; companyName: string; ... 25 more ...; vendorCode: string; }'.
+route.ts(429,11): error TS7006: Parameter 'd' implicitly has an 'any' type.
+route.ts(439,16): error TS2339: Property 'documents' does not exist on type '{ createdAt: Date; website: string | null; status: string; id: string; totalLabours: number | null; remarks: string | null; updatedAt: Date; city: string | null; companyName: string; ... 25 more ...; vendorCode: string; }'.
+route.ts(441,11): error TS7006: Parameter 'd' implicitly has an 'any' type.
+route.ts(590,22): error TS2345: Argument of type '{ timestamp: Date; module: AILogModule.VENDOR; level: AILogLevel.ERROR; referenceId: string; message: any; }' is not assignable to parameter of type 'AILogEntry'.
+  Property 'provider' is missing in type '{ timestamp: Date; module: AILogModule.VENDOR; level: AILogLevel.ERROR; referenceId: string; message: any; }' but required in type 'AILogEntry'.
+route.ts(656,19): error TS2345: Argument of type '{ timestamp: Date; module: AILogModule.VENDOR; level: AILogLevel.INFO; referenceId: string; message: string; }' is not assignable to parameter of type 'AILogEntry'.
+  Property 'provider' is missing in type '{ timestamp: Date; module: AILogModule.VENDOR; level: AILogLevel.INFO; referenceId: string; message: string; }' but required in type 'AILogEntry'.
+route.ts(692,20): error TS2345: Argument of type '{ timestamp: Date; module: AILogModule.VENDOR; level: AILogLevel.ERROR; message: string; }' is not assignable to parameter of type 'AILogEntry'.
+  Property 'provider' is missing in type '{ timestamp: Date; module: AILogModule.VENDOR; level: AILogLevel.ERROR; message: string; }' but required in type 'AILogEntry'.
+../../vendors/[referenceId]/route.ts(21,10): error TS2724: '"@/ai/vendor/vendor-ai.service"' has no exported member named 'vendorAIService'. Did you mean 'VendorAIService'?
+../../vendors/[referenceId]/route.ts(139,19): error TS2345: Argument of type '{ timestamp: Date; module: AILogModule.VENDOR; level: AILogLevel.INFO; referenceId: string; message: string; }' is not assignable to parameter of type 'AILogEntry'.
+  Property 'provider' is missing in type '{ timestamp: Date; module: AILogModule.VENDOR; level: AILogLevel.INFO; referenceId: string; message: string; }' but required in type 'AILogEntry'.
