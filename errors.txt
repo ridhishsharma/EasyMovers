@@ -1,15 +1,20 @@
-app/api/ai/vendor/route.ts(343,16): error TS2339: Property 'ratingSummary' does not exist on type '{ status: string; id: string; createdAt: Date; remarks: string | null; updatedAt: Date; city: string | null; companyName: string; ownerName: string; gstNumber: string | null; ... 25 more ...; website: string | null; }'.
-app/api/ai/vendor/route.ts(347,16): error TS2339: Property 'ratingSummary' does not exist on type '{ status: string; id: string; createdAt: Date; remarks: string | null; updatedAt: Date; city: string | null; companyName: string; ownerName: string; gstNumber: string | null; ... 25 more ...; website: string | null; }'.
-app/api/ai/vendor/route.ts(351,16): error TS2339: Property 'ratingSummary' does not exist on type '{ status: string; id: string; createdAt: Date; remarks: string | null; updatedAt: Date; city: string | null; companyName: string; ownerName: string; gstNumber: string | null; ... 25 more ...; website: string | null; }'.
-app/api/ai/vendor/route.ts(373,16): error TS2339: Property 'vehicles' does not exist on type '{ status: string; id: string; createdAt: Date; remarks: string | null; updatedAt: Date; city: string | null; companyName: string; ownerName: string; gstNumber: string | null; ... 25 more ...; website: string | null; }'.
-app/api/ai/vendor/route.ts(375,11): error TS7006: Parameter 'x' implicitly has an 'any' type.
-app/api/ai/vendor/route.ts(385,16): error TS2339: Property 'vehicles' does not exist on type '{ status: string; id: string; createdAt: Date; remarks: string | null; updatedAt: Date; city: string | null; companyName: string; ownerName: string; gstNumber: string | null; ... 25 more ...; website: string | null; }'.
-app/api/ai/vendor/route.ts(387,11): error TS7006: Parameter 'x' implicitly has an 'any' type.
-app/api/ai/vendor/route.ts(397,16): error TS2339: Property 'vehicles' does not exist on type '{ status: string; id: string; createdAt: Date; remarks: string | null; updatedAt: Date; city: string | null; companyName: string; ownerName: string; gstNumber: string | null; ... 25 more ...; website: string | null; }'.
-app/api/ai/vendor/route.ts(399,11): error TS7006: Parameter 'x' implicitly has an 'any' type.
-app/api/ai/vendor/route.ts(427,16): error TS2339: Property 'documents' does not exist on type '{ status: string; id: string; createdAt: Date; remarks: string | null; updatedAt: Date; city: string | null; companyName: string; ownerName: string; gstNumber: string | null; ... 25 more ...; website: string | null; }'.
-app/api/ai/vendor/route.ts(429,11): error TS7006: Parameter 'd' implicitly has an 'any' type.
-app/api/ai/vendor/route.ts(439,16): error TS2339: Property 'documents' does not exist on type '{ status: string; id: string; createdAt: Date; remarks: string | null; updatedAt: Date; city: string | null; companyName: string; ownerName: string; gstNumber: string | null; ... 25 more ...; website: string | null; }'.
-app/api/ai/vendor/route.ts(441,11): error TS7006: Parameter 'd' implicitly has an 'any' type.
-app/api/ai/vendor/route.ts(566,9): error TS2345: Argument of type '{ vendorId: string; vendorCode: string; companyName: string; ownerName: string; city: string | null; state: string | null; pincode: string | null; website: string | null; companyLogo: string | null; serviceCities: string; householdService: boolean; officeService: boolean; vehicleService: boolean; }' is not assignable to parameter of type 'VendorProfile'.
-  Type '{ vendorId: string; vendorCode: string; companyName: string; ownerName: string; city: string | null; state: string | null; pincode: string | null; website: string | null; companyLogo: string | null; serviceCities: string; householdService: boolean; officeService: boolean; vehicleService: boolean; }' is missing the following properties from type 'VendorProfile': category, status
+.next/types/validator.ts(215,39): error TS2307: Cannot find module '../../app/api/track/route.js' or its corresponding type declarations.
+domains/booking/types/booking.types.ts(21,8): error TS2307: Cannot find module '../models/booking.model' or its corresponding type declarations.
+domains/booking/validators/booking.validator.ts(20,8): error TS2307: Cannot find module '../models/booking.model' or its corresponding type declarations.
+domains/booking/validators/booking.validator.ts(114,10): error TS2393: Duplicate function implementation.
+domains/booking/validators/booking.validator.ts(128,10): error TS2393: Duplicate function implementation.
+domains/booking/validators/booking.validator.ts(377,5): error TS2304: Cannot find name 'validateAddress'.
+domains/booking/validators/booking.validator.ts(383,5): error TS2304: Cannot find name 'validateAddress'.
+domains/booking/validators/booking.validator.ts(389,5): error TS2304: Cannot find name 'validateContact'.
+domains/booking/validators/booking.validator.ts(391,5): error TS2304: Cannot find name 'validateInventory'.
+domains/booking/validators/booking.validator.ts(393,5): error TS2304: Cannot find name 'validateSchedule'.
+domains/booking/validators/booking.validator.ts(685,5): error TS2304: Cannot find name 'validateAddress'.
+domains/booking/validators/booking.validator.ts(691,5): error TS2304: Cannot find name 'validateAddress'.
+domains/booking/validators/booking.validator.ts(697,5): error TS2304: Cannot find name 'validateContact'.
+domains/booking/validators/booking.validator.ts(699,5): error TS2304: Cannot find name 'validateInventory'.
+domains/booking/validators/booking.validator.ts(701,5): error TS2304: Cannot find name 'validateSchedule'.
+domains/booking/validators/booking.validator.ts(753,7): error TS2304: Cannot find name 'validateContact'.
+domains/booking/validators/booking.validator.ts(759,7): error TS2304: Cannot find name 'validateAddress'.
+domains/booking/validators/booking.validator.ts(769,7): error TS2304: Cannot find name 'validateAddress'.
+domains/booking/validators/booking.validator.ts(779,7): error TS2304: Cannot find name 'validateSchedule'.
+domains/booking/validators/booking.validator.ts(785,7): error TS2304: Cannot find name 'validateInventory'.

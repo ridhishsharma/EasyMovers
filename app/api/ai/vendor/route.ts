@@ -8,6 +8,17 @@
  * Validate the request, load the vendor, and create the
  * VendorAIRequest object.
  */
+import {
+  vendorAIService,
+  type VendorAIEvaluationResult,
+} from "@/ai/services/vendor-ai.service";
+
+import type {
+  VendorAIRequest,
+} from "@/ai/models/vendor.model";
+
+import { VendorRecommendationLevel } from "@/ai/models/vendor.model";
+
 
 import {
   NextRequest,
@@ -17,6 +28,13 @@ import {
 import {
   PrismaClient,
 } from "@prisma/client";
+
+
+import {
+  buildVendorEligibility,
+} from "@/ai/builders/vendor-eligibility.builder";
+
+const prisma = new PrismaClient();
 
 /**
  * In a later step, import VendorAIRequest from your existing
@@ -31,18 +49,6 @@ import {
  * For Module 1, it is defined here temporarily so this file
  * can compile without guessing your actual model import path.
  */
-interface VendorAIRequest {
-  referenceId: string;
-  vendorId: string;
-  leadId: string;
-  customerCity: string;
-  destinationCity: string;
-  moveDistance: number;
-  estimatedWeight: number;
-  moveDate: string;
-  isCorporateMove?: boolean;
-  isPremiumMove?: boolean;
-}
 
 /**
  * Incoming API request body.
@@ -63,21 +69,21 @@ interface VendorEvaluationBody {
 /**
  * Successful Module 1 response.
  */
-interface VendorAIRequestResponse {
+interface VendorAIEvaluationResponse {
   success: true;
   message: string;
-  data: VendorAIRequest;
+  data: VendorAIEvaluationResult;
 }
-
 /**
  * Error response.
  */
 interface VendorAIRouteErrorResponse {
   success: false;
   message: string;
+
 }
 
-const prisma = new PrismaClient();
+
 
 /**
  * ============================================================
@@ -89,9 +95,9 @@ export async function POST(
   request: NextRequest,
 ): Promise<
   NextResponse<
-    VendorAIRequestResponse |
-    VendorAIRouteErrorResponse
-  >
+  VendorAIEvaluationResponse |
+  VendorAIRouteErrorResponse
+>
 > {
   try {
     /**
@@ -132,53 +138,42 @@ export async function POST(
     /**
      * Build the VendorAIRequest.
      */
-    const aiRequest: VendorAIRequest = {
-      referenceId:
-        body.referenceId,
+ const aiRequest: VendorAIRequest = {
+  referenceId: body.referenceId,
+  vendorId: body.vendorId,
+  leadId: body.leadId,
 
-      vendorId:
-        vendor.id,
+  customerCity: body.customerCity,
+  destinationCity: body.destinationCity,
 
-      leadId:
-        body.leadId,
+  moveDistance: body.moveDistance,
+  estimatedWeight: body.estimatedWeight,
+  moveDate: body.moveDate,
 
-      customerCity:
-        body.customerCity,
+  isCorporateMove: body.isCorporateMove ?? false,
+  isPremiumMove: body.isPremiumMove ?? false,
+};
 
-      destinationCity:
-        body.destinationCity,
-
-      moveDistance:
-        body.moveDistance,
-
-      estimatedWeight:
-        body.estimatedWeight,
-
-      moveDate:
-        body.moveDate,
-
-      isCorporateMove:
-        body.isCorporateMove,
-
-      isPremiumMove:
-        body.isPremiumMove,
-    };
-
+const evaluation =
+  vendorAIService.evaluateVendor({
+    aiRequest,
+    vendor,
+  });
     /**
      * Temporary Module 1 response.
      */
-    return NextResponse.json(
-      {
-        success: true,
-        message:
-          "Vendor AI request created successfully.",
-        data:
-          aiRequest,
-      },
-      {
-        status: 200,
-      },
-    );
+return NextResponse.json(
+  {
+    success: true,
+    message:
+      "Vendor AI evaluation completed successfully.",
+    data: evaluation,
+  },
+  {
+    status: 200,
+  },
+);
+  
   } catch (error) {
     if (
       error instanceof
