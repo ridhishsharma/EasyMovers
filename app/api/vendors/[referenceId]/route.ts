@@ -163,53 +163,100 @@ export async function GET(
      * --------------------------------------------------------
      */
 
-    const recommendations = quotations.map((quotation) => {
+    const recommendations =
+  quotations.map(
+    (quotation) => {
+      const vendor =
+        quotation.vendor;
 
-      const vendor = quotation.vendor;
+      /**
+       * Prisma Decimal must be converted before arithmetic.
+       */
+      const quotationAmount =
+        quotation.totalAmount
+          .toNumber();
 
       const trustScore =
         Math.min(
           100,
           (vendor.rating * 20) +
-          Math.min(vendor.experienceYears ?? 0, 20) +
-          (vendor.insuranceAvailable ? 10 : 0)
+            Math.min(
+              vendor.experienceYears ??
+                0,
+              20
+            ) +
+            (
+              vendor.insuranceAvailable
+                ? 10
+                : 0
+            )
         );
 
       const fleetScore =
         Math.min(
           100,
-          (vendor.totalVehicles ?? 0) * 2
+          (
+            vendor.totalVehicles ??
+            0
+          ) * 2
         );
 
       const experienceScore =
         Math.min(
           100,
-          (vendor.experienceYears ?? 0) * 5
+          (
+            vendor.experienceYears ??
+            0
+          ) * 5
+        );
+
+      /**
+       * Prevent the price score from becoming negative
+       * or exceeding 100.
+       */
+      const priceScore =
+        Math.max(
+          0,
+          Math.min(
+            100,
+            100 -
+              quotationAmount /
+                1000
+          )
         );
 
       const overallScore =
         Math.round(
-          (trustScore * 0.40) +
-          (fleetScore * 0.20) +
-          (experienceScore * 0.20) +
-          ((100 - quotation.totalAmount / 1000) * 0.20)
+          (trustScore * 0.4) +
+            (fleetScore * 0.2) +
+            (experienceScore *
+              0.2) +
+            (priceScore * 0.2)
         );
 
       return {
+        vendorId:
+          vendor.id,
 
-        vendorId: vendor.id,
+        vendorCode:
+          vendor.vendorCode,
 
-        vendorCode: vendor.vendorCode,
+        companyName:
+          vendor.companyName,
 
-        companyName: vendor.companyName,
-
-        totalAmount: quotation.totalAmount,
+        /**
+         * Return a normal number in the API response.
+         */
+        totalAmount:
+          quotationAmount,
 
         trustScore,
 
         fleetScore,
 
         experienceScore,
+
+        priceScore,
 
         overallScore,
 
@@ -224,10 +271,9 @@ export async function GET(
 
         rating:
           vendor.rating,
-
       };
-
-    });
+    }
+  );
 
     /**
      * --------------------------------------------------------

@@ -1,26 +1,22 @@
-import { NextResponse } from "next/server"
+import { NextResponse } from "next/server";
 
-import { prisma } from "@/lib/prisma"
+import { prisma } from "@/lib/prisma";
 
 export async function POST(
-  req: Request
+  request: Request
 ) {
-
   try {
-
     const body =
-      await req.json()
+      await request.json();
 
     const destination =
       await prisma.destinationDetails.upsert({
-
         where: {
           referenceId:
-            body.referenceId
+            body.referenceId,
         },
 
         update: {
-
           propertyType:
             body.propertyType,
 
@@ -41,11 +37,9 @@ export async function POST(
 
           specialInstructions:
             body.specialInstructions,
-
         },
 
         create: {
-
           referenceId:
             body.referenceId,
 
@@ -69,93 +63,86 @@ export async function POST(
 
           specialInstructions:
             body.specialInstructions,
-
-        }
-
-      })
+        },
+      });
 
     return NextResponse.json({
-
       success: true,
-
-      destination
-
-    })
-
+      destination,
+    });
   } catch (error) {
-
-    console.error(error)
+    console.error(
+      "Destination POST error:",
+      error
+    );
 
     return NextResponse.json(
       {
-        success: false
+        success: false,
+        error:
+          "Unable to save destination details.",
       },
       {
-        status: 500
+        status: 500,
       }
-    )
-
+    );
   }
-
 }
 
 export async function GET(
-  req: Request
+  request: Request
 ) {
-
   try {
-
-    const { searchParams } =
-      new URL(req.url)
+    const {
+      searchParams,
+    } = new URL(
+      request.url
+    );
 
     const referenceId =
       searchParams.get(
         "referenceId"
-      )
+      );
 
     if (!referenceId) {
-
       return NextResponse.json(
         {
-          success: false
+          success: false,
+          error:
+            "referenceId is required.",
         },
         {
-          status: 400
+          status: 400,
         }
-      )
-
+      );
     }
 
     const destination =
       await prisma.destinationDetails.findFirst({
-
         where: {
-          referenceId
-        }
-
-      })
+          referenceId,
+        },
+      });
 
     return NextResponse.json({
-
       success: true,
-
-      destination
-
-    })
-
+      destination,
+    });
   } catch (error) {
-
-    console.error(error)
+    console.error(
+      "Destination GET error:",
+      error
+    );
 
     return NextResponse.json(
       {
-        success: false
+        success: false,
+        error:
+          "Unable to retrieve destination details.",
       },
       {
-        status: 500
+        status: 500,
       }
-    )
-
+    );
   }
-
 }

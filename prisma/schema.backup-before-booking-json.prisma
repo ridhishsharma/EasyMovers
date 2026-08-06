@@ -7,118 +7,37 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum LeadStatus {
-  NEW
-  CONTACTED
-  QUALIFIED
-  INVENTORY_PENDING
-  QUOTATION_REQUESTED
-  QUOTATION_RECEIVED
-  BOOKING_CREATED
-  CONVERTED
-  LOST
-  CLOSED
-}
-
-enum LeadSource {
-  WEBSITE
-  MOBILE_APP
-  WHATSAPP
-  CALL_CENTER
-  CORPORATE
-  REFERRAL
-  FRANCHISE
-  ADMIN
-  OTHER
-}
-
-enum QuotationStatus {
-  DRAFT
-  SUBMITTED
-  REVISED
-  SHORTLISTED
-  ACCEPTED
-  REJECTED
-  EXPIRED
-  WITHDRAWN
-  CANCELLED
-}
-
 model Lead {
-  id          String @id @default(cuid())
-  referenceId String @unique
-
-  // Customer enquiry snapshot
-  name   String
-  mobile String
-  email  String?
-
-  // Lead origin and workflow
-  source LeadSource @default(WEBSITE)
-  status LeadStatus @default(NEW)
-
-  // Relocation classification
-  shiftingType String?
-
-  // Pickup summary
-  pickupCity      String?
-  pickupState     String?
-  pickupPincode   String?
-  pickupFloor     String?
-  liftAvailable   String?
-  pickupDigipin   String?
-  pickupLatitude  Decimal? @db.Decimal(10, 7)
-  pickupLongitude Decimal? @db.Decimal(10, 7)
-
-  // Destination summary
-  destinationInput     String?
-  destinationCity      String?
-  destinationState     String?
-  destinationPincode   String?
-  destinationDigipin   String?
-  destinationLatitude  Decimal? @db.Decimal(10, 7)
-  destinationLongitude Decimal? @db.Decimal(10, 7)
-
-  // Move requirement summary
-  shiftingDate    String?
-  houseType       String?
-  officeSize      String?
-  packingRequired String?
-  plantsIncluded  Boolean?
-  bikeCount       Int?
-  carCount        Int?
-  vehicleCount    Int?
-  vehicleType     String?
-
-  notes String?
-
-  // Optional registered-customer relationship
-  userId String?
-  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  // Existing inventory relation
-  inventory Inventory?
-
-  // Marketplace workflow relations
-  bookings   Booking[]
-  quotations Quotation[]
-
-  createdAt     DateTime @default(now())
-  lastUpdatedAt DateTime @updatedAt
-
-  @@index([referenceId])
-  @@index([mobile])
-  @@index([email])
-  @@index([status])
-  @@index([source])
-  @@index([pickupCity])
-  @@index([destinationCity])
-  @@index([pickupPincode])
-  @@index([destinationPincode])
-  @@index([pickupDigipin])
-  @@index([destinationDigipin])
-  @@index([userId])
-  @@index([createdAt])
+  id                 String      @id @default(cuid())
+  referenceId        String      @unique
+  name               String
+  mobile             String
+  email              String?
+  pickupCity         String?
+  destinationCity    String?
+  shiftingType       String?
+  pickupFloor        String?
+  liftAvailable      String?
+  packingRequired    String?
+  notes              String?
+  status             String      @default("NEW")
+  createdAt          DateTime    @default(now())
+  bikeCount          Int?
+  carCount           Int?
+  destinationInput   String?
+  destinationPincode String?
+  destinationState   String?
+  houseType          String?
+  officeSize         String?
+  plantsIncluded     Boolean?
+  shiftingDate       String?
+  vehicleCount       Int?
+  vehicleType        String?
+  lastUpdatedAt      DateTime    @updatedAt
+  userId             String?
+  inventory          Inventory?
+  User               User?       @relation(fields: [userId], references: [id])
+  quotations         Quotation[]
 }
 
 model Vendor {
@@ -158,8 +77,6 @@ model Vendor {
   vendorCode             String              @unique
   website                String?
   quotations             Quotation[]
-  assignedBookings       Booking[]           @relation("AssignedVendorBookings")
-  payments               Payment[]
   User                   User[]
   bankAccounts           VendorBankAccount[]
   documents              VendorDocument[]
@@ -169,71 +86,29 @@ model Vendor {
 }
 
 model Quotation {
-  id              String @id @default(cuid())
-  quotationNumber String @unique
-  referenceId     String @unique
-
-  // Originating Lead
-  leadId String
-  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Restrict)
-
-  // Booking for which this quotation was submitted
-  bookingId String
-  booking   Booking @relation("BookingQuotations", fields: [bookingId], references: [id], onDelete: Cascade)
-
-  // Internal Vendor relationship
-  vendorId String
-  vendor   Vendor @relation(fields: [vendorId], references: [id], onDelete: Restrict)
-
-  // Optional user who created/submitted the quotation
-  userId String?
-  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  // Pricing breakdown
-  transportationCost Decimal @default(0) @db.Decimal(12, 2)
-  packingCost        Decimal @default(0) @db.Decimal(12, 2)
-  unpackingCost      Decimal @default(0) @db.Decimal(12, 2)
-  labourCost         Decimal @default(0) @db.Decimal(12, 2)
-  insuranceCost      Decimal @default(0) @db.Decimal(12, 2)
-  otherCost          Decimal @default(0) @db.Decimal(12, 2)
-  discountAmount     Decimal @default(0) @db.Decimal(12, 2)
-  taxAmount          Decimal @default(0) @db.Decimal(12, 2)
-  totalAmount        Decimal @db.Decimal(12, 2)
-  currency           String  @default("INR")
-
-  pickupDate   DateTime?
-  deliveryDate DateTime?
-  transitDays  Int?
-
-  status     QuotationStatus @default(SUBMITTED)
-  validUntil DateTime?
-
-  // Additional future-ready commercial details
-  pricingBreakdown Json?
-  termsJson        Json?
-  inclusionsJson   Json?
-  exclusionsJson   Json?
-
-  remarks         String?
-  internalRemarks String?
-
-  // Reverse side of Booking.selectedQuotation
-  selectedForBooking Booking? @relation("SelectedBookingQuotation")
-
-  payments Payment[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([quotationNumber])
-  @@index([referenceId])
-  @@index([leadId])
-  @@index([bookingId])
-  @@index([vendorId])
-  @@index([userId])
-  @@index([status])
-  @@index([validUntil])
-  @@index([createdAt])
+  id                 String   @id @default(cuid())
+  leadId             String
+  vendorId           String
+  transportationCost Float?   @default(0)
+  packingCost        Float?   @default(0)
+  unpackingCost      Float?   @default(0)
+  labourCost         Float?   @default(0)
+  insuranceCost      Float?   @default(0)
+  otherCost          Float?   @default(0)
+  totalAmount        Float
+  pickupDate         String?
+  deliveryDate       String?
+  transitDays        Int?
+  remarks            String?
+  status             String   @default("SUBMITTED")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  userId             String?
+  quotationNumber    String   @unique
+  referenceId        String   @unique
+  lead               Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  User               User?    @relation(fields: [userId], references: [id])
+  vendor             Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 }
 
 model InventoryItem {
@@ -311,126 +186,34 @@ model DestinationDetails {
 }
 
 model Booking {
-  id            String @id @default(cuid())
-  bookingNumber String @unique
-
-  // Required originating Lead
-  leadId          String
-  leadReferenceId String
-
-  lead Lead @relation(fields: [leadId], references: [id], onDelete: Restrict)
-
-  // Optional registered-customer relationship
-  userId String?
-  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  // Customer snapshot
-  customerName   String
-  customerMobile String
-  customerEmail  String?
-
-  // Core booking classification
-  serviceType String
-  moveType    String
-
-  // Schedule
-  moveDate     DateTime
-  deliveryDate DateTime?
-
-  // Searchable pickup fields
-  pickupCity      String
-  pickupState     String
-  pickupPincode   String
-  pickupDigipin   String?
-  pickupLatitude  Decimal? @db.Decimal(10, 7)
-  pickupLongitude Decimal? @db.Decimal(10, 7)
-
-  // Searchable destination fields
-  dropCity      String
-  dropState     String
-  dropPincode   String
-  dropDigipin   String?
-  dropLatitude  Decimal? @db.Decimal(10, 7)
-  dropLongitude Decimal? @db.Decimal(10, 7)
-
-  // Human-readable address snapshots
-  pickupAddress String
-  dropAddress   String
-
-  // Complete structured domain sections
-  contactJson          Json
-  pickupAddressJson    Json
-  dropAddressJson      Json
-  scheduleJson         Json
-  inventoryJson        Json
-  inventorySummaryJson Json
-  servicesJson         Json
-  requirementsJson     Json?
-  aiAnalysisJson       Json?
-
-  // Assigned Vendor
-  vendorId           String?
-  vendorName         String?
-  assignedVendorCode String?
-  vendorJson         Json?
-
-  assignedVendor Vendor? @relation("AssignedVendorBookings", fields: [vendorId], references: [id], onDelete: SetNull)
-
-  // All quotations received for this Booking
-  quotations Quotation[] @relation("BookingQuotations")
-
-  // Customer-selected quotation
-  selectedQuotationId String? @unique
-
-  selectedQuotation Quotation? @relation("SelectedBookingQuotation", fields: [selectedQuotationId], references: [id], onDelete: SetNull)
-
-  // Cached Booking-level summaries
-  quotationJson Json?
-  paymentJson   Json?
-  trackingJson  Json?
-
-  // Timeline and audit
-  timelineJson Json
-  auditJson    Json
-
-  // Operational summary
-  totalAmount Decimal @default(0) @db.Decimal(12, 2)
-  currency    String  @default("INR")
-
-  bookingStatus  String         @default("DRAFT")
-  paymentStatus  String         @default("PENDING")
-  trackingStatus TrackingStatus @default(BOOKING_CONFIRMED)
-
-  notes String?
-
-  payments         Payment[]
+  id               String            @id @default(cuid())
+  bookingNumber    String            @unique
+  quotationId      String?           @unique
+  customerName     String
+  customerMobile   String
+  customerEmail    String?
+  moveType         String
+  moveDate         DateTime
+  deliveryDate     DateTime?
+  pickupAddress    String
+  dropAddress      String
+  vendorId         String?
+  vendorName       String?
+  totalAmount      Decimal           @db.Decimal(12, 2)
+  currency         String            @default("INR")
+  bookingStatus    String            @default("Pending")
+  paymentStatus    String            @default("Pending")
+  notes            String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  trackingStatus   TrackingStatus
+  userId           String?
+  user             User?             @relation(fields: [userId], references: [id])
   bookingTrackings BookingTracking[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([bookingNumber])
-  @@index([leadId])
-  @@index([leadReferenceId])
-  @@index([userId])
-  @@index([vendorId])
-  @@index([selectedQuotationId])
   @@index([bookingStatus])
-  @@index([paymentStatus])
-  @@index([trackingStatus])
   @@index([customerMobile])
   @@index([moveDate])
-  @@index([serviceType])
-  @@index([moveType])
-  @@index([pickupCity])
-  @@index([pickupState])
-  @@index([pickupPincode])
-  @@index([pickupDigipin])
-  @@index([dropCity])
-  @@index([dropState])
-  @@index([dropPincode])
-  @@index([dropDigipin])
-  @@index([createdAt])
 }
 
 model CallbackRequest {
@@ -479,7 +262,6 @@ model User {
   notificationPreference NotificationPreference?
   quotations             Quotation[]
   vendor                 Vendor?                 @relation(fields: [vendorId], references: [id])
-  payments               Payment[]
 
   @@index([mobile])
   @@index([email])
@@ -717,56 +499,38 @@ model VendorReview {
 }
 
 model Payment {
-  id            String @id @default(cuid())
-  paymentNumber String @unique
-
-  bookingId String
-  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-
-  quotationId String?
-  quotation   Quotation? @relation(fields: [quotationId], references: [id], onDelete: SetNull)
-
-  userId String?
-  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  vendorId String?
-  vendor   Vendor? @relation(fields: [vendorId], references: [id], onDelete: SetNull)
-
-  amount   Decimal @db.Decimal(12, 2)
-  currency String  @default("INR")
-
-  paymentMethod PaymentMethod
-  paymentType   PaymentType
-  paymentStatus PaymentStatus @default(PENDING)
-
+  id                   String        @id @default(cuid())
+  paymentNumber        String        @unique
+  bookingId            String?
+  quotationId          String?
+  customerId           String?
+  vendorId             String?
+  amount               Decimal       @db.Decimal(12, 2)
+  currency             String        @default("INR")
+  paymentMethod        PaymentMethod
+  paymentType          PaymentType
+  paymentStatus        PaymentStatus @default(PENDING)
   transactionId        String?
   gatewayTransactionId String?
   gatewayOrderId       String?
   gatewayPaymentId     String?
   gatewaySignature     String?
   bankReference        String?
+  remarks              String?
+  paidAt               DateTime?
+  refundAmount         Decimal?      @db.Decimal(12, 2)
+  refundReason         String?
+  refundedAt           DateTime?
+  metadata             Json?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
 
-  remarks String?
-
-  paidAt DateTime?
-
-  refundAmount Decimal?  @db.Decimal(12, 2)
-  refundReason String?
-  refundedAt   DateTime?
-
-  metadata Json?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([paymentNumber])
   @@index([bookingId])
   @@index([quotationId])
-  @@index([userId])
+  @@index([customerId])
   @@index([vendorId])
   @@index([paymentStatus])
   @@index([paymentMethod])
-  @@index([createdAt])
 }
 
 model Invoice {

@@ -17,6 +17,7 @@ import {
   InventoryItem,
   UpdateBookingInput,
   UpdateBookingStatusInput,
+UnassignVendorInput,
 } from "../models/booking.model";
 
 /* -------------------------------------------------------------------------- */
@@ -88,6 +89,23 @@ export function validateAddress(
   }
 
   if (
+    address.digipin !== undefined &&
+    address.digipin.trim().length === 0
+  ) {
+    errors.push({
+      field:
+        `${fieldPrefix}.digipin`,
+
+      code:
+        ValidationErrorCode
+          .INVALID_FORMAT,
+
+      message:
+        "DIGIPIN cannot be blank when provided.",
+    });
+  }
+
+  if (
     address.floorNumber !== undefined &&
     (!Number.isInteger(address.floorNumber) || address.floorNumber < 0)
   ) {
@@ -133,26 +151,56 @@ export function validateAddress(
   }
 
   if (address.coordinates) {
-    const { latitude, longitude } = address.coordinates;
+    const {
+      latitude,
+      longitude,
+    } =
+      address.coordinates;
 
-    if (latitude < -90 || latitude > 90) {
+    if (
+      !Number.isFinite(
+        latitude
+      ) ||
+      latitude < -90 ||
+      latitude > 90
+    ) {
       errors.push({
-        field: `${fieldPrefix}.coordinates.latitude`,
-        code: ValidationErrorCode.OUT_OF_RANGE,
-        message: "Latitude must be between -90 and 90.",
+        field:
+          `${fieldPrefix}.coordinates.latitude`,
+
+        code:
+          ValidationErrorCode
+            .OUT_OF_RANGE,
+
+        message:
+          "Latitude must be a finite number between -90 and 90.",
       });
     }
 
-    if (longitude < -180 || longitude > 180) {
+    if (
+      !Number.isFinite(
+        longitude
+      ) ||
+      longitude < -180 ||
+      longitude > 180
+    ) {
       errors.push({
-        field: `${fieldPrefix}.coordinates.longitude`,
-        code: ValidationErrorCode.OUT_OF_RANGE,
-        message: "Longitude must be between -180 and 180.",
+        field:
+          `${fieldPrefix}.coordinates.longitude`,
+
+        code:
+          ValidationErrorCode
+            .OUT_OF_RANGE,
+
+        message:
+          "Longitude must be a finite number between -180 and 180.",
       });
     }
   }
 
-  return errors.length > 0 ? failure(errors) : success();
+  return errors.length > 0
+    ? failure(errors)
+    : success();
 }
 
 /* -------------------------------------------------------------------------- */
@@ -626,13 +674,40 @@ export function validateBooking(
     );
   }
 
-  if (isEmpty(booking.customerId)) {
+  if (!booking.customer) {
     bookingErrors.push(
       requiredError(
-        "customerId",
-        "Customer ID is required."
+        "customer",
+        "Booking customer reference is required."
       )
     );
+  } else {
+    if (
+      isEmpty(
+        booking.customer.leadId
+      )
+    ) {
+      bookingErrors.push(
+        requiredError(
+          "customer.leadId",
+          "Lead ID is required."
+        )
+      );
+    }
+
+    if (
+      isEmpty(
+        booking.customer
+          .leadReferenceId
+      )
+    ) {
+      bookingErrors.push(
+        requiredError(
+          "customer.leadReferenceId",
+          "Lead reference ID is required."
+        )
+      );
+    }
   }
 
   if (!booking.serviceType) {
@@ -804,6 +879,12 @@ const ALLOWED_STATUS_TRANSITIONS: Readonly<
   ],
 
   SUBMITTED: [
+    "UNDER_REVIEW",
+    "QUOTATION_PENDING",
+    "CANCELLED",
+  ],
+
+  UNDER_REVIEW: [
     "QUOTATION_PENDING",
     "CANCELLED",
   ],
@@ -814,19 +895,19 @@ const ALLOWED_STATUS_TRANSITIONS: Readonly<
   ],
 
   QUOTATION_RECEIVED: [
-    "CONFIRMED",
+    "VENDOR_SELECTED",
     "QUOTATION_PENDING",
     "CANCELLED",
   ],
 
-  CONFIRMED: [
-    "VENDOR_ASSIGNED",
+  VENDOR_SELECTED: [
+    "CONFIRMED",
+    "QUOTATION_RECEIVED",
     "CANCELLED",
   ],
 
-  VENDOR_ASSIGNED: [
+  CONFIRMED: [
     "IN_PROGRESS",
-    "CONFIRMED",
     "CANCELLED",
   ],
 
@@ -905,28 +986,48 @@ export function validateVendorAssignment(
 ): ValidationResult {
   const errors: ValidationError[] = [];
 
-  const currentStatus = normalizeStatus(booking.status);
+  const currentStatus =
+    normalizeStatus(
+      booking.status
+    );
 
   const assignableStatuses = [
-    "CONFIRMED",
-    "VENDOR_ASSIGNED",
+    "QUOTATION_RECEIVED",
+    "VENDOR_SELECTED",
   ];
 
-  if (!assignableStatuses.includes(currentStatus)) {
+  if (
+    !assignableStatuses.includes(
+      currentStatus
+    )
+  ) {
     errors.push({
-      field: "status",
-      code: ValidationErrorCode.BUSINESS_RULE,
+      field:
+        "status",
+
+      code:
+        ValidationErrorCode
+          .BUSINESS_RULE,
+
       message:
-        "A vendor can only be assigned after the booking is confirmed.",
+        "A Vendor can only be assigned after quotations have been received.",
     });
   }
 
-  if (!booking.quotation) {
+  if (
+    !booking.quotation
+      ?.selectedQuotationId
+  ) {
     errors.push({
-      field: "quotation",
-      code: ValidationErrorCode.BUSINESS_RULE,
+      field:
+        "quotation.selectedQuotationId",
+
+      code:
+        ValidationErrorCode
+          .BUSINESS_RULE,
+
       message:
-        "A quotation must be selected before assigning a vendor.",
+        "A quotation must be selected before assigning a Vendor.",
     });
   }
 
@@ -993,7 +1094,7 @@ export function validateBookingCancellation(
 /* -------------------------------------------------------------------------- */
 
 /**
- * Validates the customer-provided data required to create a booking.
+ * Validates the Lead-linked data required to create a Booking.
  *
  * System-generated fields are intentionally not validated here.
  */
@@ -1002,11 +1103,28 @@ export function validateCreateBookingInput(
 ): ValidationResult {
   const errors: ValidationError[] = [];
 
-  if (isEmpty(input.customerId)) {
+  if (
+    isEmpty(
+      input.leadId
+    )
+  ) {
     errors.push(
       requiredError(
-        "customerId",
-        "Customer ID is required."
+        "leadId",
+        "Lead ID is required."
+      )
+    );
+  }
+
+  if (
+    isEmpty(
+      input.leadReferenceId
+    )
+  ) {
+    errors.push(
+      requiredError(
+        "leadReferenceId",
+        "Lead reference ID is required."
       )
     );
   }
@@ -1229,6 +1347,7 @@ export function validateBookingEditability(
   const editableStatuses = [
     "DRAFT",
     "SUBMITTED",
+    "UNDER_REVIEW",
     "QUOTATION_PENDING",
     "QUOTATION_RECEIVED",
   ];
@@ -1385,6 +1504,67 @@ export function validateAssignVendorInput(
   return combineValidationResults(results);
 }
 
+/**
+ * Validates vendor unassignment.
+ */
+export function validateUnassignVendorInput(
+  input: UnassignVendorInput,
+  booking: BookingRequest
+): ValidationResult {
+  const errors: ValidationError[] = [];
+
+  if (isEmpty(input.bookingId)) {
+    errors.push(
+      requiredError(
+        "bookingId",
+        "Booking ID is required."
+      )
+    );
+  }
+
+  if (isEmpty(input.unassignedBy)) {
+    errors.push(
+      requiredError(
+        "unassignedBy",
+        "The user removing the vendor is required."
+      )
+    );
+  }
+
+  if (isEmpty(input.reason)) {
+    errors.push(
+      requiredError(
+        "reason",
+        "Reason for vendor removal is required."
+      )
+    );
+  }
+
+  if (
+    input.bookingId &&
+    input.bookingId !== booking.bookingId
+  ) {
+    errors.push({
+      field: "bookingId",
+      code: ValidationErrorCode.INVALID_VALUE,
+      message:
+        "Vendor unassignment booking ID does not match the booking.",
+    });
+  }
+
+  if (!booking.vendor) {
+    errors.push({
+      field: "vendor",
+      code: ValidationErrorCode.BUSINESS_RULE,
+      message:
+        "No vendor is currently assigned to this booking.",
+    });
+  }
+
+  return errors.length > 0
+    ? failure(errors)
+    : success();
+}
 /* -------------------------------------------------------------------------- */
 /*                        CANCELLATION INPUT VALIDATION                       */
 /* -------------------------------------------------------------------------- */
