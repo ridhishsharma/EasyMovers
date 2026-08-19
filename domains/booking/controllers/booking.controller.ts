@@ -34,6 +34,7 @@ import type {
 } from "../mappers/booking-request.mapper";
 
 import {
+BookingSearchMappingError,
   mapAIInventoryAnalysisRequest,
   mapAssignVendorRequest,
   mapBookingPaymentSummaryRequest,
@@ -44,7 +45,9 @@ import {
   mapCreateBookingRequest,
   mapUnassignVendorRequest,
   mapUpdateBookingRequest,
+mapBookingTrackingUpdateRequest,
   mapUpdateBookingStatusRequest,
+mapConfirmBookingFromQuotationRequest,
 } from "../mappers/booking-request.mapper";
 
 import {
@@ -945,7 +948,68 @@ export class BookingController {
       "Unable to update quotation."
     );
   }
+/**
+ * Confirms a Booking from an accepted quotation.
+ */
+async confirmFromQuotation(
+  bookingId: string,
+  payload: unknown
+): Promise<
+  BookingControllerResult<
+    BookingRequest
+  >
+> {
+  try {
+    const mapping =
+      mapConfirmBookingFromQuotationRequest(
+        bookingId,
+        payload
+      );
 
+    if (!mapping.success) {
+      return createControllerFailure(
+        "BOOKING_REQUEST_MAPPING_FAILED",
+        "Booking confirmation request mapping failed.",
+        {
+          mappingErrors:
+            mapping.errors,
+
+          warnings:
+            mapping.warnings,
+        }
+      );
+    }
+
+    const result =
+      await this.service
+        .confirmFromQuotation(
+          bookingId,
+          mapping.data
+        );
+
+    if (
+      !result.success ||
+      !result.booking
+    ) {
+      return mapServiceFailure(
+        result,
+        "BOOKING_UPDATE_FAILED",
+        "Unable to confirm Booking from quotation."
+      );
+    }
+
+    return createControllerSuccess(
+      result.booking,
+      result.message,
+      mapping.warnings
+    );
+  } catch (error) {
+    return mapUnknownControllerError(
+      error,
+      "Unable to confirm Booking from quotation."
+    );
+  }
+}
   /**
    * Updates Booking payment summary.
    */
@@ -991,7 +1055,7 @@ export class BookingController {
       bookingId,
       payload,
       "tracking",
-      mapBookingTrackingSummaryRequest,
+      mapBookingTrackingUpdateRequest,
       (
         data,
         updatedBy
@@ -1006,42 +1070,67 @@ export class BookingController {
     );
   }
 
-  /**
-   * Searches Bookings using URL search parameters.
-   */
-  async searchBookings(
-    input:
-      BookingControllerSearchInput
-  ): Promise<
-    BookingControllerResult<
-      PaginatedBookingResult
-    >
-  > {
-    try {
-      const criteria:
-        BookingSearchCriteria =
-        mapBookingSearchQuery(
-          input.searchParams
+ /**
+ * Searches Bookings using URL search parameters.
+ */
+async searchBookings(
+  input:
+    BookingControllerSearchInput
+): Promise<
+  BookingControllerResult<
+    PaginatedBookingResult
+  >
+> {
+  try {
+    const criteria:
+      BookingSearchCriteria =
+      mapBookingSearchQuery(
+        input.searchParams
+      );
+
+    const result =
+      await this.service
+        .searchBookings(
+          criteria
         );
 
-      const result =
-        await this.service
-          .searchBookings(
-            criteria
-          );
+    return createControllerSuccess(
+      result
+    );
+  } catch (error) {
+    if (
+      error instanceof
+        BookingSearchMappingError
+    ) {
+      return createControllerFailure(
+        "BOOKING_REQUEST_MAPPING_FAILED",
+        "Booking search request mapping failed.",
+        {
+          mappingErrors: [
+            {
+              field:
+                error.field,
 
-      return createControllerSuccess(
-        result
-      );
-    } catch (error) {
-      return mapUnknownControllerError(
-        error,
-        "Unable to search bookings."
+              code:
+                error.code as
+                  BookingRequestMappingError["code"],
+
+              message:
+                error.message,
+            },
+          ],
+        }
       );
     }
-  }
 
-  /**
+    return mapUnknownControllerError(
+      error,
+      "Unable to search bookings."
+    );
+  }
+}
+
+/**
    * Lists recent Bookings.
    */
   async listBookings(

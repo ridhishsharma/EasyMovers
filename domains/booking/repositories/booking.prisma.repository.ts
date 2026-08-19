@@ -1,6 +1,7 @@
 import {
   Booking as PrismaBooking,
   Prisma,
+  TrackingStatus,
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
@@ -15,7 +16,11 @@ import {
 } from "../models/booking.model";
 
 import { BookingMapper } from "../mappers/booking.mapper";
-import { BookingRepository } from "./booking.repository";
+import {
+  BookingRepository,
+  SaveBookingTrackingTransitionInput,
+  SaveBookingTrackingTransitionResult,
+} from "./booking.repository";
 
 export class BookingPrismaRepository
   implements BookingRepository
@@ -32,6 +37,36 @@ export class BookingPrismaRepository
     );
   }
 
+private toPrismaTrackingStatus(
+  stage:
+    SaveBookingTrackingTransitionInput[
+      "nextStage"
+    ]
+): TrackingStatus {
+  const normalized =
+    String(stage)
+      .trim()
+      .toUpperCase();
+
+  const values =
+    Object.values(
+      TrackingStatus
+    );
+
+  if (
+    !values.includes(
+      normalized as
+        TrackingStatus
+    )
+  ) {
+    throw new Error(
+      `Unsupported tracking stage: ${stage}.`
+    );
+  }
+
+  return normalized as
+    TrackingStatus;
+}
   /**
    * Creates a new booking.
    */
@@ -69,6 +104,114 @@ export class BookingPrismaRepository
     return this.toDomain(updatedBooking);
   }
 
+async saveTrackingTransition(
+  input:
+    SaveBookingTrackingTransitionInput
+): Promise<
+  SaveBookingTrackingTransitionResult
+> {
+  const bookingData =
+    BookingMapper.toPrisma(
+      input.booking
+    );
+
+  const trackingStatus =
+    this.toPrismaTrackingStatus(
+      input.nextStage
+    );
+
+  const estimatedArrival =
+    input.estimatedArrival
+      ? new Date(
+          input.estimatedArrival
+        )
+      : undefined;
+
+  const actualArrival =
+    input.actualArrival
+      ? new Date(
+          input.actualArrival
+        )
+      : undefined;
+
+  const result =
+    await prisma.$transaction(
+      async (
+        transaction
+      ) => {
+        const updatedBooking =
+          await transaction
+            .booking
+            .update({
+              where: {
+                id:
+                  input.booking
+                    .bookingId,
+              },
+
+              data:
+                bookingData,
+            });
+
+        const trackingRecord =
+          await transaction
+            .bookingTracking
+            .create({
+              data: {
+                bookingId:
+                  input.booking
+                    .bookingId,
+
+                trackingStatus,
+
+                updatedBy:
+                  input.updatedBy,
+
+                updatedByRole:
+                  input.updatedByRole,
+
+                remarks:
+                  input.remarks ??
+                  `Tracking changed from ${input.previousStage} to ${input.nextStage}.`,
+
+                location:
+                  input.location,
+
+                latitude:
+                  input.latitude,
+
+                longitude:
+                  input.longitude,
+
+                estimatedArrival,
+
+                actualArrival,
+
+                photoUrl:
+                  input.photoUrl,
+
+                signatureUrl:
+                  input.signatureUrl,
+              },
+            });
+
+        return {
+          updatedBooking,
+          trackingRecord,
+        };
+      }
+    );
+
+  return {
+    booking:
+      this.toDomain(
+        result.updatedBooking
+      ),
+
+    trackingRecordId:
+      result.trackingRecord.id,
+  };
+}
   /**
    * Deletes a booking by its internal ID.
    */
@@ -248,10 +391,24 @@ async search(
   criteria: BookingSearchCriteria
 ): Promise<PaginatedBookingResult> {
 
-  const page = 1;
-  const pageSize = 20;
+  const page =
+  Number.isInteger(
+    criteria.page
+  ) &&
+  (criteria.page ?? 0) > 0
+    ? criteria.page!
+    : 1;
 
-  const where: Prisma.BookingWhereInput = {};;
+const pageSize =
+  Number.isInteger(
+    criteria.pageSize
+  ) &&
+  (criteria.pageSize ?? 0) > 0 &&
+  (criteria.pageSize ?? 0) <= 100
+    ? criteria.pageSize!
+    : 20;
+
+  const where: Prisma.BookingWhereInput = {};
 
   if (criteria.bookingCode) {
     where.bookingNumber = {
@@ -265,7 +422,18 @@ async search(
       contains: criteria.mobileNumber,
     };
   }
-
+if (criteria.leadId) {
+  where.leadId =
+    criteria.leadId;
+}
+if (criteria.leadReferenceId) {
+  where.leadReferenceId =
+    criteria.leadReferenceId;
+}
+if (criteria.userId) {
+  where.userId =
+    criteria.userId;
+}
   if (criteria.bookingStatus) {
     where.bookingStatus = criteria.bookingStatus;
   }
@@ -274,6 +442,64 @@ async search(
     where.vendorId = criteria.vendorId;
   }
 
+if (criteria.city) {
+  where.OR = [
+    {
+      pickupCity: {
+        equals:
+          criteria.city,
+        mode:
+          "insensitive",
+      },
+    },
+    {
+      dropCity: {
+        equals:
+          criteria.city,
+        mode:
+          "insensitive",
+      },
+    },
+  ];
+}
+
+if (criteria.state) {
+  where.AND = [
+    ...(Array.isArray(where.AND)
+      ? where.AND
+      : []),
+    {
+      OR: [
+        {
+          pickupState: {
+            equals:
+              criteria.state,
+            mode:
+              "insensitive",
+          },
+        },
+        {
+          dropState: {
+            equals:
+              criteria.state,
+            mode:
+              "insensitive",
+          },
+        },
+      ],
+    },
+  ];
+}
+
+if (criteria.serviceType) {
+  where.serviceType =
+    criteria.serviceType;
+}
+
+if (criteria.moveType) {
+  where.moveType =
+    criteria.moveType;
+}
   if (
     criteria.moveDateFrom ||
     criteria.moveDateTo

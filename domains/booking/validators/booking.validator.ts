@@ -12,14 +12,189 @@ import {
   BookingRequest,
   BookingSchedule,
   BookingStatus,
+BookingQuotationSummary,
+  BookingTrackingStage,
   CancelBookingInput,
+  ConfirmBookingFromQuotationInput,
   CreateBookingInput,
   InventoryItem,
   UpdateBookingInput,
   UpdateBookingStatusInput,
-UnassignVendorInput,
+  UnassignVendorInput,
 } from "../models/booking.model";
 
+function isValidTrackingUrl(
+  value: string
+): boolean {
+  try {
+    const url =
+      new URL(
+        value
+      );
+
+    return (
+      url.protocol ===
+        "http:" ||
+      url.protocol ===
+        "https:"
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function validateBookingTrackingUpdateInput(
+  input: {
+    coordinates?: {
+      latitude: number;
+      longitude: number;
+    };
+
+    estimatedArrival?: string;
+    actualArrival?: string;
+
+    photoUrl?: string;
+    signatureUrl?: string;
+
+    updatedByRole?: string;
+    remarks?: string;
+    location?: string;
+  }
+): ValidationResult {
+  const errors:
+    ValidationError[] = [];
+
+  const coordinates =
+    input.coordinates;
+
+  if (coordinates) {
+    if (
+      !Number.isFinite(
+        coordinates.latitude
+      ) ||
+      coordinates.latitude < -90 ||
+      coordinates.latitude > 90
+    ) {
+      errors.push({
+        field:
+          "tracking.coordinates.latitude",
+
+        code:
+          ValidationErrorCode.OUT_OF_RANGE,
+
+        message:
+          "Latitude must be a finite number between -90 and 90.",
+      });
+    }
+
+    if (
+      !Number.isFinite(
+        coordinates.longitude
+      ) ||
+      coordinates.longitude < -180 ||
+      coordinates.longitude > 180
+    ) {
+      errors.push({
+        field:
+          "tracking.coordinates.longitude",
+
+        code:
+          ValidationErrorCode.OUT_OF_RANGE,
+
+        message:
+          "Longitude must be a finite number between -180 and 180.",
+      });
+    }
+  }
+
+  if (
+    input.estimatedArrival !==
+      undefined &&
+    Number.isNaN(
+      new Date(
+        input.estimatedArrival
+      ).getTime()
+    )
+  ) {
+    errors.push({
+      field:
+        "tracking.estimatedArrival",
+
+      code:
+        ValidationErrorCode.INVALID_VALUE,
+
+      message:
+        "Estimated arrival must contain a valid date and time.",
+    });
+  }
+
+  if (
+    input.actualArrival !==
+      undefined &&
+    Number.isNaN(
+      new Date(
+        input.actualArrival
+      ).getTime()
+    )
+  ) {
+    errors.push({
+      field:
+        "tracking.actualArrival",
+
+      code:
+        ValidationErrorCode.INVALID_VALUE,
+
+      message:
+        "Actual arrival must contain a valid date and time.",
+    });
+  }
+
+
+
+  if (
+    input.photoUrl !==
+      undefined &&
+    !isValidTrackingUrl(
+      input.photoUrl
+    )
+  ) {
+    errors.push({
+      field:
+        "tracking.photoUrl",
+
+      code:
+        ValidationErrorCode.INVALID_FORMAT,
+
+      message:
+        "Photo URL must be a valid HTTP or HTTPS URL.",
+    });
+  }
+
+  if (
+    input.signatureUrl !==
+      undefined &&
+    !isValidTrackingUrl(
+      input.signatureUrl
+    )
+  ) {
+    errors.push({
+      field:
+        "tracking.signatureUrl",
+
+      code:
+        ValidationErrorCode.INVALID_FORMAT,
+
+      message:
+        "Signature URL must be a valid HTTP or HTTPS URL.",
+    });
+  }
+
+  return errors.length > 0
+    ? failure(
+        errors
+      )
+    : success();
+}
 /* -------------------------------------------------------------------------- */
 /*                            ADDRESS VALIDATION                              */
 /* -------------------------------------------------------------------------- */
@@ -974,6 +1149,152 @@ export function validateStatusTransition(
 }
 
 /* -------------------------------------------------------------------------- */
+/*                     BOOKING TRACKING TRANSITION RULES                      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Allowed operational tracking transitions.
+ *
+ * Tracking is intentionally stricter than Booking status.
+ * Normal movement should progress forward through the operational lifecycle.
+ */
+const ALLOWED_TRACKING_TRANSITIONS: Readonly<
+  Record<
+    BookingTrackingStage,
+    readonly BookingTrackingStage[]
+  >
+> = {
+  [BookingTrackingStage.NOT_STARTED]: [
+    BookingTrackingStage.BOOKING_CONFIRMED,
+    BookingTrackingStage.CANCELLED,
+  ],
+
+  [BookingTrackingStage.BOOKING_CONFIRMED]: [
+    BookingTrackingStage.VENDOR_ASSIGNED,
+    BookingTrackingStage.CANCELLED,
+  ],
+
+  [BookingTrackingStage.VENDOR_ASSIGNED]: [
+    BookingTrackingStage.SURVEY_SCHEDULED,
+    BookingTrackingStage.PACKING_STARTED,
+    BookingTrackingStage.CANCELLED,
+  ],
+
+  [BookingTrackingStage.SURVEY_SCHEDULED]: [
+    BookingTrackingStage.SURVEY_COMPLETED,
+    BookingTrackingStage.CANCELLED,
+  ],
+
+  [BookingTrackingStage.SURVEY_COMPLETED]: [
+    BookingTrackingStage.PACKING_STARTED,
+    BookingTrackingStage.CANCELLED,
+  ],
+
+  [BookingTrackingStage.PACKING_STARTED]: [
+    BookingTrackingStage.PACKING_COMPLETED,
+    BookingTrackingStage.CANCELLED,
+  ],
+
+  [BookingTrackingStage.PACKING_COMPLETED]: [
+    BookingTrackingStage.LOADED,
+    BookingTrackingStage.CANCELLED,
+  ],
+
+  [BookingTrackingStage.LOADED]: [
+    BookingTrackingStage.IN_TRANSIT,
+    BookingTrackingStage.CANCELLED,
+  ],
+
+  [BookingTrackingStage.IN_TRANSIT]: [
+    BookingTrackingStage.ARRIVED_AT_DESTINATION,
+    BookingTrackingStage.CANCELLED,
+  ],
+
+  [BookingTrackingStage.ARRIVED_AT_DESTINATION]: [
+    BookingTrackingStage.UNLOADING_STARTED,
+    BookingTrackingStage.CANCELLED,
+  ],
+
+  [BookingTrackingStage.UNLOADING_STARTED]: [
+    BookingTrackingStage.UNLOADING_COMPLETED,
+    BookingTrackingStage.CANCELLED,
+  ],
+
+  [BookingTrackingStage.UNLOADING_COMPLETED]: [
+    BookingTrackingStage.DELIVERY_COMPLETED,
+    BookingTrackingStage.CANCELLED,
+  ],
+
+  [BookingTrackingStage.DELIVERY_COMPLETED]: [],
+
+  [BookingTrackingStage.CANCELLED]: [],
+};
+
+/**
+ * Validates one operational tracking-stage transition.
+ *
+ * Replaying the same stage is treated as idempotent and therefore valid.
+ * The service can later decide whether persistence/history work is required.
+ */
+export function validateTrackingTransition(
+  currentStage:
+    BookingTrackingStage,
+  nextStage:
+    BookingTrackingStage
+): ValidationResult {
+  if (
+    currentStage ===
+    nextStage
+  ) {
+    return success();
+  }
+
+  const allowedNextStages =
+    ALLOWED_TRACKING_TRANSITIONS[
+      currentStage
+    ];
+
+  if (
+    !allowedNextStages
+  ) {
+    return failure([
+      {
+        field:
+          "tracking.currentStage",
+
+        code:
+          ValidationErrorCode
+            .INVALID_VALUE,
+
+        message:
+          `Unknown current tracking stage: ${currentStage}.`,
+      },
+    ]);
+  }
+
+  if (
+    !allowedNextStages.includes(
+      nextStage
+    )
+  ) {
+    return failure([
+      {
+        field:
+          "tracking.currentStage",
+
+        code:
+          ValidationErrorCode
+            .BUSINESS_RULE,
+
+        message:
+          `Booking tracking cannot change from ${currentStage} to ${nextStage}.`,
+      },
+    ]);
+  }
+
+  return success();
+}
+/* -------------------------------------------------------------------------- */
 /*                      VENDOR ASSIGNMENT VALIDATION                          */
 /* -------------------------------------------------------------------------- */
 
@@ -1049,46 +1370,136 @@ export function validateBookingCancellation(
 ): ValidationResult {
   const errors: ValidationError[] = [];
 
-  const currentStatus = normalizeStatus(booking.status);
+  const currentStatus =
+    normalizeStatus(
+      booking.status
+    );
 
-  if (currentStatus === "COMPLETED") {
+  const currentTrackingStage =
+  String(
+    booking.tracking
+      ?.currentStage ??
+    ""
+  )
+    .trim()
+    .toUpperCase()
+    .replace(
+      /[\s-]+/g,
+      "_"
+    );
+
+  /* ------------------------------------------------------------------------
+   * Terminal Booking protection
+   * ------------------------------------------------------------------------
+   */
+
+  if (
+    currentStatus ===
+    "COMPLETED"
+  ) {
     errors.push({
-      field: "status",
-      code: ValidationErrorCode.BUSINESS_RULE,
+      field:
+        "status",
+
+      code:
+        ValidationErrorCode
+          .BUSINESS_RULE,
+
       message:
         "A completed booking cannot be cancelled.",
     });
   }
 
-  if (currentStatus === "CANCELLED") {
+  if (
+    currentStatus ===
+    "CANCELLED"
+  ) {
     errors.push({
-      field: "status",
-      code: ValidationErrorCode.DUPLICATE,
+      field:
+        "status",
+
+      code:
+        ValidationErrorCode
+          .DUPLICATE,
+
       message:
         "The booking has already been cancelled.",
     });
   }
 
-  if (isEmpty(cancellationReason)) {
+  /* ------------------------------------------------------------------------
+   * Terminal Tracking protection
+   * ------------------------------------------------------------------------
+   *
+   * A Booking whose operational tracking has already reached delivery
+   * completion must not be cancellable even when the Booking status itself
+   * is stale or inconsistent.
+   * ------------------------------------------------------------------------
+   */
+
+  if (
+    currentTrackingStage ===
+      "DELIVERY_COMPLETED" &&
+    currentStatus !==
+      "COMPLETED" &&
+    currentStatus !==
+      "CANCELLED"
+  ) {
+    errors.push({
+      field:
+        "tracking.currentStage",
+
+      code:
+        ValidationErrorCode
+          .BUSINESS_RULE,
+
+      message:
+        "A booking with completed delivery tracking cannot be cancelled.",
+    });
+  }
+
+  /* ------------------------------------------------------------------------
+   * Cancellation reason
+   * ------------------------------------------------------------------------
+   */
+
+  if (
+    isEmpty(
+      cancellationReason
+    )
+  ) {
     errors.push(
       requiredError(
         "cancellationReason",
         "A cancellation reason is required."
       )
     );
-  } else if (cancellationReason.trim().length < 5) {
+  } else if (
+    cancellationReason
+      .trim()
+      .length <
+    5
+  ) {
     errors.push({
-      field: "cancellationReason",
-      code: ValidationErrorCode.INVALID_LENGTH,
+      field:
+        "cancellationReason",
+
+      code:
+        ValidationErrorCode
+          .INVALID_LENGTH,
+
       message:
         "Cancellation reason must contain at least 5 characters.",
     });
   }
 
   return errors.length > 0
-    ? failure(errors)
+    ? failure(
+        errors
+      )
     : success();
 }
+
 /* -------------------------------------------------------------------------- */
 /*                         CREATE BOOKING VALIDATION                          */
 /* -------------------------------------------------------------------------- */
@@ -1428,7 +1839,295 @@ export function validateUpdateBookingStatusInput(
 
   return combineValidationResults(results);
 }
+/* -------------------------------------------------------------------------- */
+/*                     QUOTATION SUMMARY VALIDATION                           */
+/* -------------------------------------------------------------------------- */
 
+/**
+ * Validates a Booking quotation summary before it is persisted.
+ *
+ * Ensures:
+ * - quotation counts are valid;
+ * - quotation amounts are non-negative;
+ * - lowest/highest quote ranges are consistent;
+ * - selected quotation data is internally consistent;
+ * - a selected quotation cannot exist when no quotations are available.
+ */
+export function validateBookingQuotationSummary(
+  quotation: BookingQuotationSummary
+): ValidationResult {
+  const errors:
+    ValidationError[] = [];
+
+  /* ------------------------------------------------------------------------
+   * Total quotations
+   * ------------------------------------------------------------------------
+   */
+
+  if (
+    !Number.isInteger(
+      quotation.totalQuotations
+    ) ||
+    quotation.totalQuotations < 0
+  ) {
+    errors.push({
+      field:
+        "totalQuotations",
+
+      code:
+        ValidationErrorCode
+          .INVALID_VALUE,
+
+      message:
+        "Total quotations must be a non-negative integer.",
+    });
+  }
+
+  /* ------------------------------------------------------------------------
+   * Quote amounts
+   * ------------------------------------------------------------------------
+   */
+
+  if (
+    quotation.lowestQuote !==
+      undefined &&
+    (
+      !Number.isFinite(
+        quotation.lowestQuote
+      ) ||
+      quotation.lowestQuote < 0
+    )
+  ) {
+    errors.push({
+      field:
+        "lowestQuote",
+
+      code:
+        ValidationErrorCode
+          .INVALID_VALUE,
+
+      message:
+        "Lowest quote must be a non-negative finite number.",
+    });
+  }
+
+  if (
+    quotation.highestQuote !==
+      undefined &&
+    (
+      !Number.isFinite(
+        quotation.highestQuote
+      ) ||
+      quotation.highestQuote < 0
+    )
+  ) {
+    errors.push({
+      field:
+        "highestQuote",
+
+      code:
+        ValidationErrorCode
+          .INVALID_VALUE,
+
+      message:
+        "Highest quote must be a non-negative finite number.",
+    });
+  }
+
+  if (
+    quotation.selectedQuoteAmount !==
+      undefined &&
+    (
+      !Number.isFinite(
+        quotation.selectedQuoteAmount
+      ) ||
+      quotation.selectedQuoteAmount <
+        0
+    )
+  ) {
+    errors.push({
+      field:
+        "selectedQuoteAmount",
+
+      code:
+        ValidationErrorCode
+          .INVALID_VALUE,
+
+      message:
+        "Selected quote amount must be a non-negative finite number.",
+    });
+  }
+
+  /* ------------------------------------------------------------------------
+   * Lowest / highest consistency
+   * ------------------------------------------------------------------------
+   */
+
+  if (
+    quotation.lowestQuote !==
+      undefined &&
+    quotation.highestQuote !==
+      undefined &&
+    quotation.lowestQuote >
+      quotation.highestQuote
+  ) {
+    errors.push({
+      field:
+        "lowestQuote",
+
+      code:
+        ValidationErrorCode
+          .BUSINESS_RULE,
+
+      message:
+        "Lowest quote cannot be greater than highest quote.",
+    });
+  }
+
+  /* ------------------------------------------------------------------------
+   * Empty quotation state
+   * ------------------------------------------------------------------------
+   */
+
+  if (
+    quotation.totalQuotations === 0
+  ) {
+    if (
+      quotation.selectedQuotationId
+    ) {
+      errors.push({
+        field:
+          "selectedQuotationId",
+
+        code:
+          ValidationErrorCode
+            .BUSINESS_RULE,
+
+        message:
+          "A quotation cannot be selected when no quotations are available.",
+      });
+    }
+
+    if (
+      quotation.selectedQuoteAmount !==
+      undefined
+    ) {
+      errors.push({
+        field:
+          "selectedQuoteAmount",
+
+        code:
+          ValidationErrorCode
+            .BUSINESS_RULE,
+
+        message:
+          "A selected quote amount cannot exist when no quotations are available.",
+      });
+    }
+  }
+
+  /* ------------------------------------------------------------------------
+   * Selected quotation consistency
+   * ------------------------------------------------------------------------
+   */
+
+  const hasSelectedQuotation =
+    !isEmpty(
+      quotation
+        .selectedQuotationId
+    );
+
+  const hasSelectedAmount =
+    quotation.selectedQuoteAmount !==
+    undefined;
+
+  if (
+    hasSelectedQuotation &&
+    !hasSelectedAmount
+  ) {
+    errors.push({
+      field:
+        "selectedQuoteAmount",
+
+      code:
+        ValidationErrorCode
+          .BUSINESS_RULE,
+
+      message:
+        "Selected quote amount is required when a quotation is selected.",
+    });
+  }
+
+  if (
+    !hasSelectedQuotation &&
+    hasSelectedAmount
+  ) {
+    errors.push({
+      field:
+        "selectedQuotationId",
+
+      code:
+        ValidationErrorCode
+          .BUSINESS_RULE,
+
+      message:
+        "Selected quotation ID is required when a selected quote amount is provided.",
+    });
+  }
+
+  /* ------------------------------------------------------------------------
+   * Selected amount must remain inside quotation range
+   * ------------------------------------------------------------------------
+   */
+
+  if (
+    quotation.selectedQuoteAmount !==
+      undefined &&
+    quotation.lowestQuote !==
+      undefined &&
+    quotation.selectedQuoteAmount <
+      quotation.lowestQuote
+  ) {
+    errors.push({
+      field:
+        "selectedQuoteAmount",
+
+      code:
+        ValidationErrorCode
+          .BUSINESS_RULE,
+
+      message:
+        "Selected quote amount cannot be lower than the lowest quotation.",
+    });
+  }
+
+  if (
+    quotation.selectedQuoteAmount !==
+      undefined &&
+    quotation.highestQuote !==
+      undefined &&
+    quotation.selectedQuoteAmount >
+      quotation.highestQuote
+  ) {
+    errors.push({
+      field:
+        "selectedQuoteAmount",
+
+      code:
+        ValidationErrorCode
+          .BUSINESS_RULE,
+
+      message:
+        "Selected quote amount cannot be higher than the highest quotation.",
+    });
+  }
+
+  return errors.length > 0
+    ? failure(
+        errors
+      )
+    : success();
+}
 /* -------------------------------------------------------------------------- */
 /*                       ASSIGN VENDOR INPUT VALIDATION                       */
 /* -------------------------------------------------------------------------- */
@@ -1481,17 +2180,38 @@ export function validateAssignVendorInput(
     });
   }
 
+ if (
+  booking.vendor?.vendorId
+) {
   if (
-    booking.vendor?.vendorId &&
-    booking.vendor.vendorId === input.vendorId
+    booking.vendor.vendorId ===
+    input.vendorId
   ) {
     errors.push({
-      field: "vendorId",
-      code: ValidationErrorCode.DUPLICATE,
+      field:
+        "vendorId",
+
+      code:
+        ValidationErrorCode
+          .DUPLICATE,
+
       message:
-        "This vendor is already assigned to the booking.",
+        "This Vendor is already assigned to the Booking.",
+    });
+  } else {
+    errors.push({
+      field:
+        "vendorId",
+
+      code:
+        ValidationErrorCode
+          .BUSINESS_RULE,
+
+      message:
+        "A different Vendor is already assigned to the Booking. Unassign the existing Vendor before assigning another Vendor.",
     });
   }
+}
 
   const results: ValidationResult[] = [
     errors.length > 0
@@ -1503,17 +2223,32 @@ export function validateAssignVendorInput(
 
   return combineValidationResults(results);
 }
+/* -------------------------------------------------------------------------- */
+/*              BOOKING CONFIRMATION FROM QUOTATION VALIDATION                */
+/* -------------------------------------------------------------------------- */
 
 /**
- * Validates vendor unassignment.
+ * Validates the command that confirms a Booking from an accepted quotation.
  */
-export function validateUnassignVendorInput(
-  input: UnassignVendorInput,
-  booking: BookingRequest
+export function validateConfirmBookingFromQuotationInput(
+  input:
+    ConfirmBookingFromQuotationInput,
+  booking:
+    BookingRequest
 ): ValidationResult {
-  const errors: ValidationError[] = [];
+  const errors:
+    ValidationError[] = [];
 
-  if (isEmpty(input.bookingId)) {
+  /* ------------------------------------------------------------------------
+   * Required identifiers
+   * ------------------------------------------------------------------------
+   */
+
+  if (
+    isEmpty(
+      input.bookingId
+    )
+  ) {
     errors.push(
       requiredError(
         "bookingId",
@@ -1522,7 +2257,328 @@ export function validateUnassignVendorInput(
     );
   }
 
-  if (isEmpty(input.unassignedBy)) {
+  if (
+    isEmpty(
+      input.quotationId
+    )
+  ) {
+    errors.push(
+      requiredError(
+        "quotationId",
+        "Quotation ID is required."
+      )
+    );
+  }
+
+  if (
+    isEmpty(
+      input.vendorId
+    )
+  ) {
+    errors.push(
+      requiredError(
+        "vendorId",
+        "Vendor ID is required."
+      )
+    );
+  }
+
+  if (
+    isEmpty(
+      input.confirmedBy
+    )
+  ) {
+    errors.push(
+      requiredError(
+        "confirmedBy",
+        "The user confirming the booking is required."
+      )
+    );
+  }
+
+  if (
+    isEmpty(
+      input.currency
+    )
+  ) {
+    errors.push(
+      requiredError(
+        "currency",
+        "Quotation currency is required."
+      )
+    );
+  }
+
+  /* ------------------------------------------------------------------------
+   * Booking identity
+   * ------------------------------------------------------------------------
+   */
+
+  if (
+    input.bookingId &&
+    input.bookingId !==
+      booking.bookingId
+  ) {
+    errors.push({
+      field:
+        "bookingId",
+
+      code:
+        ValidationErrorCode
+          .INVALID_VALUE,
+
+      message:
+        "Confirmation booking ID does not match the booking.",
+    });
+  }
+
+  /* ------------------------------------------------------------------------
+   * Commercial values
+   * ------------------------------------------------------------------------
+   */
+
+  if (
+    !Number.isInteger(
+      input.totalQuotations
+    ) ||
+    input.totalQuotations <=
+      0
+  ) {
+    errors.push({
+      field:
+        "totalQuotations",
+
+      code:
+        ValidationErrorCode
+          .OUT_OF_RANGE,
+
+      message:
+        "Total quotations must be a positive whole number.",
+    });
+  }
+
+  if (
+    !Number.isFinite(
+      input.selectedQuoteAmount
+    ) ||
+    input.selectedQuoteAmount <=
+      0
+  ) {
+    errors.push({
+      field:
+        "selectedQuoteAmount",
+
+      code:
+        ValidationErrorCode
+          .OUT_OF_RANGE,
+
+      message:
+        "Selected quotation amount must be greater than zero.",
+    });
+  }
+
+  /* ------------------------------------------------------------------------
+   * Currency
+   * ------------------------------------------------------------------------
+   */
+
+  if (
+    input.currency &&
+    input.currency
+      .trim()
+      .toUpperCase() !==
+        "INR"
+  ) {
+    errors.push({
+      field:
+        "currency",
+
+      code:
+        ValidationErrorCode
+          .BUSINESS_RULE,
+
+      message:
+        "Only INR quotations can currently confirm an EasyMovers booking.",
+    });
+  }
+
+  /* ------------------------------------------------------------------------
+   * Optional quotation expiry
+   * ------------------------------------------------------------------------
+   */
+
+  if (
+    input.quotationExpiryDate
+  ) {
+    const expiryDate =
+      new Date(
+        input
+          .quotationExpiryDate
+      );
+
+    if (
+      Number.isNaN(
+        expiryDate.getTime()
+      )
+    ) {
+      errors.push({
+        field:
+          "quotationExpiryDate",
+
+        code:
+          ValidationErrorCode
+            .INVALID_VALUE,
+
+        message:
+          "Quotation expiry date must be a valid date.",
+      });
+    }
+  }
+
+  /* ------------------------------------------------------------------------
+   * Terminal Booking protection
+   * ------------------------------------------------------------------------
+   */
+
+  const currentStatus =
+    normalizeStatus(
+      booking.status
+    );
+
+  if (
+    currentStatus ===
+      "CANCELLED"
+  ) {
+    errors.push({
+      field:
+        "status",
+
+      code:
+        ValidationErrorCode
+          .BUSINESS_RULE,
+
+      message:
+        "A cancelled booking cannot be confirmed from a quotation.",
+    });
+  }
+
+  if (
+    currentStatus ===
+      "COMPLETED"
+  ) {
+    errors.push({
+      field:
+        "status",
+
+      code:
+        ValidationErrorCode
+          .BUSINESS_RULE,
+
+      message:
+        "A completed booking cannot be confirmed from a quotation.",
+    });
+  }
+
+  /* ------------------------------------------------------------------------
+   * Conflicting quotation protection
+   * ------------------------------------------------------------------------
+   */
+
+  const existingQuotationId =
+    booking.quotation
+      ?.selectedQuotationId;
+
+  if (
+    existingQuotationId &&
+    existingQuotationId !==
+      input.quotationId
+  ) {
+    errors.push({
+      field:
+        "quotationId",
+
+      code:
+        ValidationErrorCode
+          .BUSINESS_RULE,
+
+      message:
+        "Booking already contains a different selected quotation.",
+    });
+  }
+
+  /* ------------------------------------------------------------------------
+   * Conflicting Vendor protection
+   * ------------------------------------------------------------------------
+   */
+
+  const existingVendorId =
+    booking.vendor
+      ?.vendorId;
+
+  if (
+    existingVendorId &&
+    existingVendorId !==
+      input.vendorId
+  ) {
+    errors.push({
+      field:
+        "vendorId",
+
+      code:
+        ValidationErrorCode
+          .BUSINESS_RULE,
+
+      message:
+        "Booking already contains a different assigned vendor.",
+    });
+  }
+
+  /* ------------------------------------------------------------------------
+   * Idempotent confirmation compatibility
+   * ------------------------------------------------------------------------
+   *
+   * A Booking that is already CONFIRMED is allowed through validation only
+   * when its existing quotation/vendor do not conflict with this command.
+   *
+   * The service will later decide whether this is an idempotent no-op.
+   * ------------------------------------------------------------------------
+   */
+
+  return errors.length >
+    0
+    ? failure(
+        errors
+      )
+    : success();
+}
+/**
+ * Validates vendor unassignment.
+ */
+export function validateUnassignVendorInput(
+  input: UnassignVendorInput,
+  booking: BookingRequest
+): ValidationResult {
+  const errors:
+    ValidationError[] = [];
+
+  if (
+    isEmpty(
+      input.bookingId
+    )
+  ) {
+    errors.push(
+      requiredError(
+        "bookingId",
+        "Booking ID is required."
+      )
+    );
+  }
+
+  if (
+    isEmpty(
+      input.unassignedBy
+    )
+  ) {
     errors.push(
       requiredError(
         "unassignedBy",
@@ -1531,7 +2587,11 @@ export function validateUnassignVendorInput(
     );
   }
 
-  if (isEmpty(input.reason)) {
+  if (
+    isEmpty(
+      input.reason
+    )
+  ) {
     errors.push(
       requiredError(
         "reason",
@@ -1542,27 +2602,104 @@ export function validateUnassignVendorInput(
 
   if (
     input.bookingId &&
-    input.bookingId !== booking.bookingId
+    input.bookingId !==
+      booking.bookingId
   ) {
     errors.push({
-      field: "bookingId",
-      code: ValidationErrorCode.INVALID_VALUE,
+      field:
+        "bookingId",
+
+      code:
+        ValidationErrorCode
+          .INVALID_VALUE,
+
       message:
         "Vendor unassignment booking ID does not match the booking.",
     });
   }
 
-  if (!booking.vendor) {
+  if (
+    !booking.vendor
+  ) {
     errors.push({
-      field: "vendor",
-      code: ValidationErrorCode.BUSINESS_RULE,
+      field:
+        "vendor",
+
+      code:
+        ValidationErrorCode
+          .BUSINESS_RULE,
+
       message:
         "No vendor is currently assigned to this booking.",
     });
   }
 
-  return errors.length > 0
-    ? failure(errors)
+  const currentStatus =
+    normalizeStatus(
+      booking.status
+    );
+
+  const unassignableStatuses =
+    [
+      "QUOTATION_RECEIVED",
+      "VENDOR_SELECTED",
+    ];
+
+  if (
+    !unassignableStatuses.includes(
+      currentStatus
+    )
+  ) {
+    errors.push({
+      field:
+        "status",
+
+      code:
+        ValidationErrorCode
+          .BUSINESS_RULE,
+
+      message:
+        "A Vendor can only be unassigned before the Booking is confirmed.",
+    });
+  }
+
+  const currentTrackingStage =
+    booking.tracking
+      ?.currentStage ??
+    BookingTrackingStage
+      .NOT_STARTED;
+
+  const unassignableTrackingStages:
+    readonly BookingTrackingStage[] =
+    [
+      BookingTrackingStage
+        .NOT_STARTED,
+    ];
+
+  if (
+    !unassignableTrackingStages
+      .includes(
+        currentTrackingStage
+      )
+  ) {
+    errors.push({
+      field:
+        "tracking.currentStage",
+
+      code:
+        ValidationErrorCode
+          .BUSINESS_RULE,
+
+      message:
+        "A Vendor cannot be unassigned after the operational tracking lifecycle has started.",
+    });
+  }
+
+  return errors.length >
+    0
+    ? failure(
+        errors
+      )
     : success();
 }
 /* -------------------------------------------------------------------------- */

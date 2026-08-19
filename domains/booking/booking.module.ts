@@ -42,6 +42,25 @@ import {
   createBookingController,
 } from "./controllers/booking.controller";
 
+import type {
+  BookingQuotationSummaryProvider,
+} from "./models/booking.model";
+
+import {
+  QuotationBookingSummaryProvider,
+} from "./providers/booking-quotation-summary.provider";
+import {
+  prisma,
+} from "@/lib/prisma";
+
+import {
+  getOrCreateQuotationService,
+} from "@/domains/quotation/quotation.module";
+
+import type {
+  BookingSelectedQuotationProvider,
+} from "./services/booking.service";
+
 /* ============================================================================
  * Module contracts
  * ============================================================================
@@ -56,6 +75,9 @@ import {
 export interface BookingModuleDependencies {
   repository?:
     BookingRepository;
+
+  quotationSummaryProvider?:
+    BookingQuotationSummaryProvider;
 }
 
 /**
@@ -131,10 +153,56 @@ export function createBookingRepository(
  */
 export function createBookingService(
   repository:
-    BookingRepository
+    BookingRepository,
+
+  quotationSummaryProvider?:
+    BookingQuotationSummaryProvider
 ): BookingService {
+  const quotationService =
+    getOrCreateQuotationService({
+      prisma,
+    });
+
+  const selectedQuotationProvider:
+    BookingSelectedQuotationProvider = {
+    async getSelectedQuotationVendor(
+      bookingId: string,
+      quotationId: string
+    ) {
+      const result =
+        await quotationService
+          .getById(
+            quotationId
+          );
+
+      if (!result.success) {
+        return null;
+      }
+
+      const quotation =
+        result.data;
+
+      if (
+        quotation.booking.bookingId !==
+        bookingId
+      ) {
+        return null;
+      }
+
+      return {
+        quotationId:
+          quotation.quotationId,
+
+        vendorId:
+          quotation.vendor.vendorId,
+      };
+    },
+  };
+
   return new BookingService(
-    repository
+    repository,
+    quotationSummaryProvider,
+    selectedQuotationProvider
   );
 }
 
@@ -181,9 +249,17 @@ export function createBookingModule(
       options.dependencies
     );
 
+  const quotationSummaryProvider =
+    options.dependencies
+      ?.quotationSummaryProvider ??
+    new QuotationBookingSummaryProvider({
+      prisma,
+    });
+
   const service =
     createBookingService(
-      repository
+      repository,
+      quotationSummaryProvider
     );
 
   const controller =
@@ -193,16 +269,13 @@ export function createBookingModule(
 
   return {
     repository,
-
     service,
-
     controller,
 
     createdAt:
       new Date(),
   };
 }
-
 /**
  * Creates the Booking module without throwing.
  */

@@ -11,11 +11,15 @@ import {
   BookingService,
 } from "@/domains/booking/services/booking.service";
 
-const repository =
-  new BookingPrismaRepository();
+import {
+  createBookingModule,
+} from "@/domains/booking/booking.module";
+
+const bookingModule =
+  createBookingModule();
 
 const bookingService =
-  new BookingService(repository);
+  bookingModule.service;
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

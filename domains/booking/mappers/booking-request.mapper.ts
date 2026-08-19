@@ -25,6 +25,7 @@ import {
   AddressType,
   BookingSource,
   BookingStatus,
+  BookingTrackingStage,
   ContactPreference,
   InventoryCategory,
   LiftAvailability,
@@ -47,7 +48,9 @@ import type {
   BookingSearchCriteria,
   BookingServices,
   BookingTrackingSummary,
-  CancelBookingInput,
+UpdateBookingTrackingInput,
+CancelBookingInput,
+  ConfirmBookingFromQuotationInput,
   CreateBookingInput,
   InventoryItem,
   InventorySummary,
@@ -107,7 +110,19 @@ export interface BookingRequestMappingFailure {
 export type BookingRequestMappingResult<T> =
   | BookingRequestMappingSuccess<T>
   | BookingRequestMappingFailure;
+export class BookingSearchMappingError
+  extends Error {
+  constructor(
+    public readonly field: string,
+    public readonly code: string,
+    message: string
+  ) {
+    super(message);
 
+    this.name =
+      "BookingSearchMappingError";
+  }
+}
 /* ============================================================================
  * Public mapping functions
  * ============================================================================
@@ -805,31 +820,37 @@ export function mapBookingQuotationSummaryRequest(
   }
 
   return context.success({
-    totalQuotations,
+  totalQuotations,
 
-    lowestQuote:
-      context.optionalNumber(
-        context.record.lowestQuote
-      ),
+  lowestQuote:
+    context.optionalNumber(
+      context.record.lowestQuote
+    ),
 
-    highestQuote:
-      context.optionalNumber(
-        context.record.highestQuote
-      ),
+  highestQuote:
+    context.optionalNumber(
+      context.record.highestQuote
+    ),
 
-    selectedQuoteAmount:
-      context.optionalNumber(
-        context.record
-          .selectedQuoteAmount
-      ),
+  selectedQuotationId:
+    context.optionalString(
+      context.record
+        .selectedQuotationId
+    ),
 
-    quotationExpiryDate:
-      context.optionalDateString(
-        context.record
-          .quotationExpiryDate,
-        "quotationExpiryDate"
-      ),
-  });
+  selectedQuoteAmount:
+    context.optionalNumber(
+      context.record
+        .selectedQuoteAmount
+    ),
+
+  quotationExpiryDate:
+    context.optionalDateString(
+      context.record
+        .quotationExpiryDate,
+      "quotationExpiryDate"
+    ),
+});
 }
 
 /**
@@ -878,6 +899,13 @@ export function mapBookingPaymentSummaryRequest(
   });
 }
 
+export type BookingTrackingUpdateRequest =
+  Omit<
+    UpdateBookingTrackingInput,
+    "bookingId" |
+    "updatedBy"
+  >;
+
 /**
  * Maps a raw tracking-summary request.
  */
@@ -911,9 +939,12 @@ export function mapBookingTrackingSummaryRequest(
 
   return context.success({
     currentStage:
-      context.optionalString(
-        context.record.currentStage
-      ),
+  context.optionalEnum(
+    context.record
+      .currentStage,
+    BookingTrackingStage,
+    "currentStage"
+  ),
 
     expectedPickupTime:
       context.optionalDateString(
@@ -933,6 +964,163 @@ export function mapBookingTrackingSummaryRequest(
   });
 }
 
+/**
+ * Maps one operational Booking tracking-transition payload.
+ *
+ * bookingId and updatedBy are supplied by the controller and are therefore
+ * intentionally excluded from this nested tracking payload.
+ */
+export function mapBookingTrackingUpdateRequest(
+  payload: unknown
+): BookingRequestMappingResult<
+  BookingTrackingUpdateRequest
+> {
+  const context =
+    createMappingContext(
+      payload
+    );
+
+  if (!context.record) {
+    return context.failure();
+  }
+
+  const currentStage =
+    context.requiredEnum(
+      context.record.currentStage,
+      BookingTrackingStage,
+      "currentStage"
+    );
+
+  if (!currentStage) {
+    return context.failure();
+  }
+
+  const updatedByRole =
+    context.optionalString(
+      context.record.updatedByRole
+    );
+
+  const remarks =
+    context.optionalString(
+      context.record.remarks
+    );
+
+  const location =
+    context.optionalString(
+      context.record.location
+    );
+
+  const latitude =
+    context.optionalNumber(
+      context.record.latitude
+    );
+
+  const longitude =
+    context.optionalNumber(
+      context.record.longitude
+    );
+if (
+  (latitude === undefined) !==
+  (longitude === undefined)
+) {
+  context.addError({
+    field:
+      "coordinates",
+
+    code:
+      "INVALID_FIELD_TYPE",
+
+    message:
+      "latitude and longitude must be provided together.",
+  });
+}
+
+const coordinates =
+  latitude !== undefined &&
+  longitude !== undefined
+    ? {
+        latitude,
+        longitude,
+      }
+    : undefined;
+  const expectedPickupTime =
+    context.optionalDateString(
+      context.record
+        .expectedPickupTime,
+      "expectedPickupTime"
+    );
+
+  const expectedDeliveryTime =
+    context.optionalDateString(
+      context.record
+        .expectedDeliveryTime,
+      "expectedDeliveryTime"
+    );
+
+  const estimatedArrival =
+  context.optionalDateTimeString(
+    context.record
+      .estimatedArrival,
+    "estimatedArrival"
+  );
+
+const actualArrival =
+  context.optionalDateTimeString(
+    context.record
+      .actualArrival,
+    "actualArrival"
+  );
+
+  const photoUrl =
+    context.optionalString(
+      context.record.photoUrl
+    );
+
+  const signatureUrl =
+    context.optionalString(
+      context.record.signatureUrl
+    );
+
+  const liveTrackingEnabled =
+    context.record
+      .liveTrackingEnabled ===
+      undefined
+      ? undefined
+      : context.optionalBoolean(
+          context.record
+            .liveTrackingEnabled
+        );
+if (
+  context.hasErrors()
+) {
+  return context.failure();
+}
+  return context.success({
+  currentStage,
+
+  updatedByRole,
+
+  remarks,
+
+  location,
+
+  coordinates,
+
+  expectedPickupTime,
+
+  expectedDeliveryTime,
+
+  estimatedArrival,
+
+  actualArrival,
+
+  liveTrackingEnabled,
+
+  photoUrl,
+
+  signatureUrl,
+});
+}
 /**
  * Maps URLSearchParams into BookingSearchCriteria.
  */
@@ -1007,61 +1195,209 @@ export function mapBookingSearchQuery(
     )
   );
 
+  const rawBookingStatus =
+  searchParams.get(
+    "bookingStatus"
+  );
+
+if (
+  rawBookingStatus !== null &&
+  rawBookingStatus.trim().length > 0
+) {
   const bookingStatus =
     normalizeEnumValue(
-      searchParams.get(
-        "bookingStatus"
-      ),
+      rawBookingStatus,
       BookingStatus
     );
 
-  if (bookingStatus) {
-    criteria.bookingStatus =
-      bookingStatus;
-  }
+ if (!bookingStatus) {
+  throw new BookingSearchMappingError(
+    "bookingStatus",
+    "INVALID_ENUM_VALUE",
+    "bookingStatus contains an unsupported value."
+  );
+}
+  criteria.bookingStatus =
+    bookingStatus;
+}
 
+  const rawServiceType =
+  searchParams.get(
+    "serviceType"
+  );
+
+if (
+  rawServiceType !== null &&
+  rawServiceType.trim().length > 0
+) {
   const serviceType =
     normalizeEnumValue(
-      searchParams.get(
-        "serviceType"
-      ),
+      rawServiceType,
       ServiceType
     );
 
-  if (serviceType) {
-    criteria.serviceType =
-      serviceType;
-  }
+  if (!serviceType) {
+  throw new BookingSearchMappingError(
+    "serviceType",
+    "INVALID_ENUM_VALUE",
+    "serviceType contains an unsupported value."
+  );
+}
 
+  criteria.serviceType =
+    serviceType;
+}
+
+const rawMoveType =
+  searchParams.get(
+    "moveType"
+  );
+
+if (
+  rawMoveType !== null &&
+  rawMoveType.trim().length > 0
+) {
   const moveType =
     normalizeEnumValue(
-      searchParams.get(
-        "moveType"
-      ),
+      rawMoveType,
       MoveType
     );
 
-  if (moveType) {
-    criteria.moveType =
-      moveType;
+  if (!moveType) {
+  throw new BookingSearchMappingError(
+    "moveType",
+    "INVALID_ENUM_VALUE",
+    "moveType contains an unsupported value."
+  );
+}
+
+  criteria.moveType =
+    moveType;
+}
+
+const rawMoveDateFrom =
+  searchParams.get(
+    "moveDateFrom"
+  );
+
+if (
+  rawMoveDateFrom !== null &&
+  rawMoveDateFrom.trim().length > 0
+) {
+  const parsedMoveDateFrom =
+    new Date(
+      rawMoveDateFrom
+    );
+
+  if (
+    Number.isNaN(
+      parsedMoveDateFrom.getTime()
+    )
+  ) {
+    throw new BookingSearchMappingError(
+      "moveDateFrom",
+      "INVALID_DATE_VALUE",
+      "moveDateFrom contains an invalid date value."
+    );
   }
 
-  assignOptionalString(
-    criteria,
-    "moveDateFrom",
-    searchParams.get(
-      "moveDateFrom"
-    )
+  criteria.moveDateFrom =
+    rawMoveDateFrom.trim();
+}
+
+  const rawMoveDateTo =
+  searchParams.get(
+    "moveDateTo"
   );
 
-  assignOptionalString(
-    criteria,
-    "moveDateTo",
-    searchParams.get(
-      "moveDateTo"
+if (
+  rawMoveDateTo !== null &&
+  rawMoveDateTo.trim().length > 0
+) {
+  const parsedMoveDateTo =
+    new Date(
+      rawMoveDateTo
+    );
+
+  if (
+    Number.isNaN(
+      parsedMoveDateTo.getTime()
     )
+  ) {
+    throw new BookingSearchMappingError(
+      "moveDateTo",
+      "INVALID_DATE_VALUE",
+      "moveDateTo contains an invalid date value."
+    );
+  }
+
+  criteria.moveDateTo =
+    rawMoveDateTo.trim();
+}
+
+if (
+  criteria.moveDateFrom &&
+  criteria.moveDateTo
+) {
+  const moveDateFrom =
+    new Date(
+      criteria.moveDateFrom
+    );
+
+  const moveDateTo =
+    new Date(
+      criteria.moveDateTo
+    );
+
+  if (
+    moveDateFrom.getTime() >
+    moveDateTo.getTime()
+  ) {
+    throw new BookingSearchMappingError(
+      "moveDateFrom",
+      "INVALID_DATE_VALUE",
+      "moveDateFrom cannot be later than moveDateTo."
+    );
+  }
+}
+const rawPage =
+  searchParams.get(
+    "page"
   );
 
+if (
+  rawPage !== null &&
+  rawPage.trim().length > 0
+) {
+  const page =
+    Number(rawPage);
+
+  criteria.page =
+    Number.isInteger(page) &&
+    page > 0
+      ? page
+      : 1;
+}
+
+const rawPageSize =
+  searchParams.get(
+    "pageSize"
+  );
+
+if (
+  rawPageSize !== null &&
+  rawPageSize.trim().length > 0
+) {
+  const pageSize =
+    Number(rawPageSize);
+
+  criteria.pageSize =
+    Number.isInteger(pageSize) &&
+    pageSize > 0 &&
+    pageSize <= 100
+      ? pageSize
+      : 20;
+}
   return criteria;
 }
 
@@ -1910,11 +2246,16 @@ interface BookingMappingContext {
     field: string
   ): string | undefined;
 
+optionalDateTimeString(
+  value: unknown,
+  field: string
+): string | undefined;
   requiredEnum<T extends StringEnum>(
     value: unknown,
     values: T,
     field: string
   ): T[keyof T] | undefined;
+
 
   optionalEnum<T extends StringEnum>(
     value: unknown,
@@ -2228,7 +2569,7 @@ function createMappingContext(
       }
 
       const result =
-        normalizeDateString(
+        normalizeDateTimeString(
           value
         );
 
@@ -2240,13 +2581,43 @@ function createMappingContext(
             "INVALID_DATE_VALUE",
 
           message:
-            `${field} must contain a valid date.`,
+            `${field} must contain a valid date & time`,
         });
       }
 
       return result;
     },
+optionalDateTimeString(
+  value,
+  field
+) {
+  if (
+    value === undefined ||
+    value === null ||
+    value === ""
+  ) {
+    return undefined;
+  }
 
+  const result =
+    normalizeDateTimeString(
+      value
+    );
+
+  if (!result) {
+    errors.push({
+      field,
+
+      code:
+        "INVALID_DATE_VALUE",
+
+      message:
+        `${field} must contain a valid date and time.`,
+    });
+  }
+
+  return result;
+},
     requiredEnum<T extends StringEnum>(
       value: unknown,
       values: T,
@@ -2603,6 +2974,43 @@ function normalizeDateString(
           10
         );
 }
+function normalizeDateTimeString(
+  value: unknown
+): string | undefined {
+  if (
+    value instanceof Date
+  ) {
+    return Number.isNaN(
+      value.getTime()
+    )
+      ? undefined
+      : value.toISOString();
+  }
+
+  const normalized =
+    normalizeString(
+      value
+    );
+
+  if (!normalized) {
+    return undefined;
+  }
+
+  const parsed =
+    new Date(
+      normalized
+    );
+
+  if (
+    Number.isNaN(
+      parsed.getTime()
+    )
+  ) {
+    return undefined;
+  }
+
+  return parsed.toISOString();
+}
 
 function normalizeEnumValue<
   T extends StringEnum
@@ -2767,4 +3175,105 @@ function assignOptionalString<
       normalized as
         T[K];
   }
+}
+export function mapConfirmBookingFromQuotationRequest(
+  bookingId: string,
+  payload: unknown
+): BookingRequestMappingResult<
+  ConfirmBookingFromQuotationInput
+> {
+  const context =
+    createMappingContext(
+      payload
+    );
+
+  if (!context.record) {
+    return context.failure();
+  }
+
+  const quotationId =
+    context.requiredString(
+      context.record.quotationId,
+      "quotationId"
+    );
+
+  const vendorId =
+    context.requiredString(
+      context.record.vendorId,
+      "vendorId"
+    );
+
+  const totalQuotations =
+    context.requiredInteger(
+      context.record.totalQuotations,
+      "totalQuotations"
+    );
+
+  const selectedQuoteAmount =
+    context.requiredNumber(
+      context.record.selectedQuoteAmount,
+      "selectedQuoteAmount"
+    );
+
+  const currency =
+    context.requiredString(
+      context.record.currency,
+      "currency"
+    );
+
+  const confirmedBy =
+    context.requiredString(
+      context.record.confirmedBy,
+      "confirmedBy"
+    );
+
+  if (
+    !quotationId ||
+    !vendorId ||
+    totalQuotations ===
+      undefined ||
+    selectedQuoteAmount ===
+      undefined ||
+    !currency ||
+    !confirmedBy
+  ) {
+    return context.failure();
+  }
+
+  return context.success({
+    bookingId:
+      bookingId.trim(),
+
+    quotationId,
+
+    vendorId,
+
+    vendorCode:
+      context.optionalString(
+        context.record.vendorCode
+      ),
+
+    vendorName:
+      context.optionalString(
+        context.record.vendorName
+      ),
+
+    totalQuotations,
+
+    selectedQuoteAmount,
+
+    currency:
+      currency
+        .trim()
+        .toUpperCase(),
+
+    quotationExpiryDate:
+      context.optionalDateString(
+        context.record
+          .quotationExpiryDate,
+        "quotationExpiryDate"
+      ),
+
+    confirmedBy,
+  });
 }

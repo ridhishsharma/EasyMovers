@@ -130,7 +130,77 @@ export async function GET(
     } = new URL(
       request.url
     );
+    const hasBookingId =
+      searchParams.has(
+        "bookingId"
+      );
 
+    const rawBookingId =
+      searchParams.get(
+        "bookingId"
+      );
+
+    if (
+      hasBookingId &&
+      (
+        rawBookingId === null ||
+        rawBookingId.trim()
+          .length === 0
+      )
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+
+          error: {
+            code:
+              "BOOKING_REQUEST_MAPPING_FAILED",
+
+            message:
+              "bookingId is required when the bookingId parameter is supplied.",
+          },
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const hasBookingCode =
+      searchParams.has(
+        "bookingCode"
+      );
+
+    const rawBookingCode =
+      searchParams.get(
+        "bookingCode"
+      );
+
+    if (
+      hasBookingCode &&
+      (
+        rawBookingCode === null ||
+        rawBookingCode.trim()
+          .length === 0
+      )
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+
+          error: {
+            code:
+              "BOOKING_REQUEST_MAPPING_FAILED",
+
+            message:
+              "bookingCode is required when the bookingCode parameter is supplied.",
+          },
+        },
+        {
+          status: 400,
+        }
+      );
+    }
     const bookingId =
       cleanString(
         searchParams.get(
@@ -470,7 +540,10 @@ function shouldSearch(
   }
 
   const searchKeys = [
-    "customerId",
+    "bookingCode",
+    "leadId",
+    "leadReferenceId",
+    "userId",
     "vendorId",
     "mobileNumber",
     "city",
@@ -492,7 +565,6 @@ function shouldSearch(
       undefined
   );
 }
-
 /* ============================================================================
  * Failure handling
  * ============================================================================

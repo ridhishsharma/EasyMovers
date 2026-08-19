@@ -24,7 +24,8 @@
 import crypto from "crypto";
 
 import {
-  BookingStatus,
+BookingStatus,
+  BookingTrackingStage,
 } from "../models/booking.model";
 
 import type {
@@ -38,12 +39,17 @@ import type {
   BookingTrackingSummary,
   CancelBookingInput,
   CreateBookingInput,
+ConfirmBookingFromQuotationInput,
   UnassignVendorInput,
   UpdateBookingInput,
   UpdateBookingStatusInput,
   VendorAssignment,
 } from "../models/booking.model";
 
+import {
+
+  TrackingStatus,
+} from "@prisma/client";
 /* ============================================================================
  * Internal helpers
  * ============================================================================
@@ -385,11 +391,36 @@ export function applyBookingStatusUpdate(
       ? `Booking status changed to ${input.status}. Reason: ${input.reason}`
       : `Booking status changed to ${input.status}.`;
 
+  const trackingStage:
+    BookingTrackingStage =
+      input.status ===
+        BookingStatus.COMPLETED
+        ? BookingTrackingStage
+            .DELIVERY_COMPLETED
+        : input.status ===
+            BookingStatus.CANCELLED
+          ? BookingTrackingStage
+              .CANCELLED
+          : booking.tracking
+              ?.currentStage ??
+            BookingTrackingStage
+              .NOT_STARTED;
+
   return {
     ...booking,
 
     status:
       input.status,
+
+    tracking: {
+      ...(booking.tracking ?? {
+        liveTrackingEnabled:
+          false,
+      }),
+
+      currentStage:
+        trackingStage,
+    },
 
     timeline: [
       ...(booking.timeline ??
@@ -413,7 +444,6 @@ export function applyBookingStatusUpdate(
     },
   };
 }
-
 /* ============================================================================
  * Vendor assignment
  * ============================================================================
@@ -459,6 +489,17 @@ export function applyVendorAssignment(
       BookingStatus
         .VENDOR_SELECTED,
 
+    tracking: {
+      ...(booking.tracking ?? {
+        liveTrackingEnabled:
+          false,
+      }),
+
+      currentStage:
+        BookingTrackingStage
+          .VENDOR_ASSIGNED,
+    },
+
     timeline: [
       ...(booking.timeline ??
         []),
@@ -481,7 +522,6 @@ export function applyVendorAssignment(
     },
   };
 }
-
 export function applyVendorUnassignment(
   booking:
     BookingRequest,
@@ -567,35 +607,46 @@ export function applyBookingCancellation(
   }
 
   return {
-    ...booking,
+  ...booking,
 
-    status:
-      BookingStatus.CANCELLED,
+  status:
+    BookingStatus.CANCELLED,
 
-    timeline: [
-      ...(booking.timeline ??
-        []),
+  tracking: {
+    ...(booking.tracking ?? {
+      currentStage:
+        BookingTrackingStage.NOT_STARTED,
 
-      buildTimelineEvent(
-        "BOOKING_CANCELLED",
-        descriptionParts.join(
-          " "
-        ),
-        input.cancelledBy
+      liveTrackingEnabled:
+        false,
+    }),
+
+    currentStage:
+      BookingTrackingStage.CANCELLED,
+  },
+
+  timeline: [
+    ...(booking.timeline ?? []),
+
+    buildTimelineEvent(
+      "BOOKING_CANCELLED",
+      descriptionParts.join(
+        " "
       ),
-    ],
+      input.cancelledBy
+    ),
+  ],
 
-    audit: {
-      ...booking.audit,
+  audit: {
+    ...booking.audit,
 
-      updatedAt,
+    updatedAt,
 
-      updatedBy:
-        input.cancelledBy,
-    },
-  };
+    updatedBy:
+      input.cancelledBy,
+  },
+};
 }
-
 /* ============================================================================
  * AI analysis
  * ============================================================================
@@ -691,7 +742,144 @@ export function applyQuotationSummary(
     },
   };
 }
+/* ============================================================================
+ * Booking confirmation from accepted quotation
+ * ============================================================================
+ */
 
+/**
+ * Confirms a Booking from an accepted quotation in one aggregate update.
+ *
+ * This operation synchronizes:
+ * - selected quotation
+ * - assigned vendor
+ * - confirmed amount
+ * - payment summary
+ * - tracking summary
+ * - Booking status
+ * - timeline
+ * - audit
+ */
+export function applyBookingConfirmationFromQuotation(
+  booking:
+    BookingRequest,
+  input:
+    ConfirmBookingFromQuotationInput
+): BookingRequest {
+  const confirmedAt =
+    now();
+
+  const normalizedCurrency =
+    input.currency
+      .trim()
+      .toUpperCase();
+
+  const vendor:
+    VendorAssignment = {
+    vendorId:
+      input.vendorId,
+
+    vendorCode:
+      input.vendorCode,
+
+    vendorName:
+      input.vendorName,
+
+    assignedAt:
+      confirmedAt,
+
+    assignedBy:
+      input.confirmedBy,
+  };
+
+  const quotation:
+    BookingQuotationSummary = {
+    totalQuotations:
+      input.totalQuotations,
+
+    selectedQuotationId:
+      input.quotationId,
+
+    selectedQuoteAmount:
+      input.selectedQuoteAmount,
+
+    quotationExpiryDate:
+      input.quotationExpiryDate,
+  };
+
+  const payment:
+    BookingPaymentSummary = {
+    totalAmount:
+      input.selectedQuoteAmount,
+
+    paidAmount:
+      0,
+
+    balanceAmount:
+      input.selectedQuoteAmount,
+
+    paymentPending:
+      input.selectedQuoteAmount,
+  };
+
+  const tracking:
+    BookingTrackingSummary = {
+    currentStage:
+  BookingTrackingStage
+    .BOOKING_CONFIRMED,
+
+    liveTrackingEnabled:
+      false,
+  };
+
+  const vendorDescription =
+    input.vendorName
+      ? input.vendorName
+      : input.vendorCode
+        ? input.vendorCode
+        : input.vendorId;
+
+  const description =
+    `Booking confirmed from quotation ${input.quotationId} ` +
+    `with Vendor ${vendorDescription} for ` +
+    `${normalizedCurrency} ${input.selectedQuoteAmount}.`;
+
+  return {
+    ...booking,
+
+    vendor,
+
+    quotation,
+
+    payment,
+
+    tracking,
+
+    status:
+      BookingStatus.CONFIRMED,
+
+    timeline: [
+      ...(booking.timeline ??
+        []),
+
+      buildTimelineEvent(
+        "BOOKING_CONFIRMED_FROM_QUOTATION",
+        description,
+        input.confirmedBy
+      ),
+    ],
+
+    audit: {
+      ...booking.audit,
+
+      updatedAt:
+        confirmedAt,
+
+      updatedBy:
+        input.confirmedBy,
+    },
+  };
+}
 /* ============================================================================
  * Payment summary
  * ============================================================================
@@ -824,6 +1012,91 @@ export function appendTimelineEvent(
 
       updatedBy:
         performedBy,
+    },
+  };
+}
+export function applyTrackingTransition(
+  booking: BookingRequest,
+  nextStage: BookingTrackingStage,
+  updatedBy: string,
+  options?: {
+    expectedPickupTime?: string;
+    expectedDeliveryTime?: string;
+    liveTrackingEnabled?: boolean;
+    remarks?: string;
+  }
+): BookingRequest {
+  const timestamp =
+    now();
+
+  const currentTracking =
+    booking.tracking ?? {
+      currentStage:
+        BookingTrackingStage.NOT_STARTED,
+
+      liveTrackingEnabled:
+        false,
+    };
+
+  if (
+    currentTracking.currentStage ===
+    nextStage
+  ) {
+    return booking;
+  }
+
+  const nextTracking:
+    BookingTrackingSummary = {
+    currentStage:
+      nextStage,
+
+    expectedPickupTime:
+      options?.expectedPickupTime ??
+      currentTracking.expectedPickupTime,
+
+    expectedDeliveryTime:
+      options?.expectedDeliveryTime ??
+      currentTracking.expectedDeliveryTime,
+
+    liveTrackingEnabled:
+      options?.liveTrackingEnabled ??
+      currentTracking.liveTrackingEnabled,
+  };
+
+  const nextTimelineEvent:
+    BookingTimelineEvent = {
+    event:
+      "BOOKING_TRACKING_UPDATED",
+
+    description:
+      options?.remarks
+        ? `Tracking changed from ${currentTracking.currentStage ?? BookingTrackingStage.NOT_STARTED} to ${nextStage}. ${options.remarks}`
+        : `Tracking changed from ${currentTracking.currentStage ?? BookingTrackingStage.NOT_STARTED} to ${nextStage}.`,
+
+    timestamp,
+
+    performedBy:
+      updatedBy,
+  };
+
+  return {
+    ...booking,
+
+    tracking:
+      nextTracking,
+
+    timeline: [
+      ...(booking.timeline ?? []),
+      nextTimelineEvent,
+    ],
+
+    audit: {
+      ...booking.audit,
+
+      updatedAt:
+        timestamp,
+
+      updatedBy,
     },
   };
 }

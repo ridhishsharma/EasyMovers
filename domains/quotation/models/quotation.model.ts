@@ -533,8 +533,6 @@ export interface CustomerSafeQuotation {
   exclusions?:
     QuotationExclusions;
 
-  remarks?: string;
-
   selectedForBooking:
     boolean;
 

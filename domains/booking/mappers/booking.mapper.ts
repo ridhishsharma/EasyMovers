@@ -11,6 +11,7 @@ import {
   AddressType,
   BookingSource,
   BookingStatus,
+BookingTrackingStage,
   ContactPreference,
   LiftAvailability,
   MoveType,
@@ -472,7 +473,10 @@ leadReferenceId:
         booking.trackingJson
       ) ?? {
         currentStage:
-          booking.trackingStatus,
+  BookingMapper
+    .toBookingTrackingStage(
+      booking.trackingStatus
+    ),
 
         expectedDeliveryTime:
           booking.deliveryDate
@@ -930,37 +934,63 @@ leadReferenceId:
   }
 
   private static resolveTrackingStatus(
-    stage?: string
-  ): TrackingStatus {
-    if (!stage) {
-      return TrackingStatus
-        .BOOKING_CONFIRMED;
-    }
-
-    const normalizedStage =
-      stage
-        .trim()
-        .toUpperCase()
-        .replace(
-          /[\s-]+/g,
-          "_"
-        );
-
-    const values =
-      Object.values(
-        TrackingStatus
-      );
-
-    return values.includes(
-      normalizedStage as
-        TrackingStatus
-    )
-      ? normalizedStage as
-          TrackingStatus
-      : TrackingStatus
-          .BOOKING_CONFIRMED;
+  stage?: string
+): TrackingStatus {
+  if (!stage) {
+    return TrackingStatus
+      .NOT_STARTED;
   }
 
+  const normalizedStage =
+    stage
+      .trim()
+      .toUpperCase()
+      .replace(
+        /[\s-]+/g,
+        "_"
+      );
+
+  const values =
+    Object.values(
+      TrackingStatus
+    );
+
+  return values.includes(
+    normalizedStage as
+      TrackingStatus
+  )
+    ? normalizedStage as
+        TrackingStatus
+    : TrackingStatus
+        .NOT_STARTED;
+}
+private static toBookingTrackingStage(
+  value:
+    TrackingStatus
+): BookingTrackingStage {
+  const normalizedValue =
+    String(value)
+      .trim()
+      .toUpperCase()
+      .replace(
+        /[\s-]+/g,
+        "_"
+      );
+
+  const values =
+    Object.values(
+      BookingTrackingStage
+    );
+
+  return values.includes(
+    normalizedValue as
+      BookingTrackingStage
+  )
+    ? normalizedValue as
+        BookingTrackingStage
+    : BookingTrackingStage
+        .NOT_STARTED;
+}
   private static toServiceType(
     value: string
   ): ServiceType {

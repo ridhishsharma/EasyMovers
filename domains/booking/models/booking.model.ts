@@ -27,6 +27,49 @@ export enum BookingStatus {
   CANCELLED = "CANCELLED",
 }
 
+export enum BookingTrackingStage {
+  NOT_STARTED =
+    "NOT_STARTED",
+
+  BOOKING_CONFIRMED =
+    "BOOKING_CONFIRMED",
+
+  VENDOR_ASSIGNED =
+    "VENDOR_ASSIGNED",
+
+  SURVEY_SCHEDULED =
+    "SURVEY_SCHEDULED",
+
+  SURVEY_COMPLETED =
+    "SURVEY_COMPLETED",
+
+  PACKING_STARTED =
+    "PACKING_STARTED",
+
+  PACKING_COMPLETED =
+    "PACKING_COMPLETED",
+
+  LOADED =
+    "LOADED",
+
+  IN_TRANSIT =
+    "IN_TRANSIT",
+
+  ARRIVED_AT_DESTINATION =
+    "ARRIVED_AT_DESTINATION",
+
+  UNLOADING_STARTED =
+    "UNLOADING_STARTED",
+
+  UNLOADING_COMPLETED =
+    "UNLOADING_COMPLETED",
+
+  DELIVERY_COMPLETED =
+    "DELIVERY_COMPLETED",
+
+  CANCELLED =
+    "CANCELLED",
+}
 export enum ServiceType {
   HOUSEHOLD_SHIFTING = "HOUSEHOLD_SHIFTING",
   LOCAL_GOODS_TRANSPORT = "LOCAL_GOODS_TRANSPORT",
@@ -261,7 +304,11 @@ export interface BookingQuotationSummary {
   selectedQuoteAmount?: number;
   quotationExpiryDate?: string;
 }
-
+export interface BookingQuotationSummaryProvider {
+  getBookingQuotationSummary(
+    bookingId: string
+  ): Promise<BookingQuotationSummary>;
+}
 export interface BookingPaymentSummary {
   totalAmount?: number;
   advanceAmount?: number;
@@ -271,10 +318,69 @@ export interface BookingPaymentSummary {
 }
 
 export interface BookingTrackingSummary {
-  currentStage?: string;
-  expectedPickupTime?: string;
-  expectedDeliveryTime?: string;
-  liveTrackingEnabled: boolean;
+  currentStage?:
+    BookingTrackingStage;
+
+  expectedPickupTime?:
+    string;
+
+  expectedDeliveryTime?:
+    string;
+
+  liveTrackingEnabled:
+    boolean;
+}
+
+/**
+ * Represents one operational Booking tracking transition.
+ *
+ * The Booking service uses this command to:
+ * - validate the requested stage transition
+ * - update the cached Booking tracking summary
+ * - create an immutable BookingTracking history record
+ */
+export interface UpdateBookingTrackingInput {
+  bookingId:
+    BookingId;
+
+  currentStage:
+    BookingTrackingStage;
+
+  updatedBy:
+    string;
+
+  updatedByRole?:
+    string;
+
+  remarks?:
+    string;
+
+  location?:
+    string;
+
+  coordinates?:
+    GeoCoordinates;
+
+  expectedPickupTime?:
+    string;
+
+  expectedDeliveryTime?:
+    string;
+
+  estimatedArrival?:
+    string;
+
+  actualArrival?:
+    string;
+
+  liveTrackingEnabled?:
+    boolean;
+
+  photoUrl?:
+    string;
+
+  signatureUrl?:
+    string;
 }
 
 export interface BookingAudit {
@@ -332,6 +438,9 @@ export interface BookingSearchCriteria {
   moveType?: MoveType;
   moveDateFrom?: string;
   moveDateTo?: string;
+
+  page?: number;
+  pageSize?: number;
 }
 
 export interface BookingStatistics {
@@ -402,7 +511,73 @@ export interface CancelBookingInput {
   customerRemarks?: string;
   internalRemarks?: string;
 }
+/* ============================================================================
+ * Booking confirmation from accepted Quotation
+ * ============================================================================
+ */
 
+/**
+ * Represents the complete commercial information required to confirm
+ * a Booking from an accepted Quotation.
+ *
+ * This command intentionally carries the accepted quotation and vendor
+ * snapshot required by the Booking domain so that confirmation can be
+ * applied as one aggregate operation.
+ */
+export interface ConfirmBookingFromQuotationInput {
+  /**
+   * Booking being confirmed.
+   */
+  bookingId: BookingId;
+
+  /**
+   * Accepted and selected quotation.
+   */
+  quotationId: QuotationId;
+
+  /**
+   * Vendor belonging to the accepted quotation.
+   */
+  vendorId: VendorId;
+
+  /**
+   * Optional public/internal Vendor snapshot fields.
+   */
+  vendorCode?: string;
+  vendorName?: string;
+
+  /**
+   * Number of quotations received for this Booking at confirmation time.
+   */
+  totalQuotations: number;
+
+  /**
+   * Final accepted commercial amount.
+   *
+   * This becomes the Booking-level confirmed amount and initial
+   * payment balance.
+   */
+  selectedQuoteAmount: number;
+
+  /**
+   * Currency of the accepted quotation.
+   *
+   * Booking persistence currently defaults to INR, but keeping currency
+   * in the domain command prevents the confirmation workflow from
+   * silently assuming a currency.
+   */
+  currency: string;
+
+  /**
+   * Optional expiry date of the accepted quotation.
+   */
+  quotationExpiryDate?: string;
+
+  /**
+   * Actor/system that confirmed the Booking.
+   */
+  confirmedBy: string;
+}
 export interface BookingListItem {
   bookingId: BookingId;
   bookingCode: BookingCode;

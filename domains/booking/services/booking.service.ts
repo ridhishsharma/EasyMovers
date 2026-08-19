@@ -8,6 +8,7 @@ import {
   BookingSearchCriteria,
   PaginatedBookingResult,
   CreateBookingInput,
+ConfirmBookingFromQuotationInput,
   UpdateBookingInput,
   UpdateBookingStatusInput,
   AssignVendorInput,
@@ -17,7 +18,13 @@ import {
   BookingQuotationSummary,
   BookingPaymentSummary,
   BookingTrackingSummary,
+BookingQuotationSummaryProvider,
 BookingListItem,
+} from "../models/booking.model";
+
+import {
+  BookingStatus,
+  BookingTrackingStage,
 } from "../models/booking.model";
 
 import { BookingRepository } from "../repositories/booking.repository";
@@ -30,9 +37,11 @@ import {
   applyVendorUnassignment,
   applyBookingCancellation,
   applyAIAnalysis,
+applyBookingConfirmationFromQuotation,
   applyQuotationSummary,
   applyPaymentSummary,
   applyTrackingSummary,
+applyTrackingTransition,
 } from "../builders/booking.builder";
 
 import {
@@ -40,9 +49,17 @@ import {
   validateUpdateBookingInput,
   validateUpdateBookingStatusInput,
   validateAssignVendorInput,
+validateConfirmBookingFromQuotationInput,
   validateCancelBookingInput,
     validateUnassignVendorInput,
+validateTrackingTransition,
+validateBookingTrackingUpdateInput,
+validateBookingQuotationSummary,
 } from "../validators/booking.validator";
+
+import type {
+  BookingTrackingUpdateRequest,
+} from "../mappers/booking-request.mapper";
 
 /**
  * Booking Service
@@ -55,10 +72,85 @@ import {
  *
  * Does NOT contain persistence logic.
  */
+
+function resolveBookingStatusFromTrackingStage(
+  stage: BookingTrackingStage
+): BookingStatus {
+  switch (stage) {
+    case BookingTrackingStage
+      .DELIVERY_COMPLETED:
+      return BookingStatus
+        .COMPLETED;
+
+    case BookingTrackingStage
+      .CANCELLED:
+      return BookingStatus
+        .CANCELLED;
+
+    case BookingTrackingStage
+      .PACKING_STARTED:
+
+    case BookingTrackingStage
+      .PACKING_COMPLETED:
+
+    case BookingTrackingStage
+      .LOADED:
+
+    case BookingTrackingStage
+      .IN_TRANSIT:
+
+    case BookingTrackingStage
+      .ARRIVED_AT_DESTINATION:
+
+    case BookingTrackingStage
+      .UNLOADING_STARTED:
+
+    case BookingTrackingStage
+      .UNLOADING_COMPLETED:
+      return BookingStatus
+        .IN_PROGRESS;
+
+    case BookingTrackingStage
+      .NOT_STARTED:
+
+    case BookingTrackingStage
+      .BOOKING_CONFIRMED:
+
+    case BookingTrackingStage
+      .VENDOR_ASSIGNED:
+
+    case BookingTrackingStage
+      .SURVEY_SCHEDULED:
+
+    case BookingTrackingStage
+      .SURVEY_COMPLETED:
+
+    default:
+      return BookingStatus
+        .CONFIRMED;
+  }
+}
+
+export interface BookingSelectedQuotationProvider {
+  getSelectedQuotationVendor(
+    bookingId: string,
+    quotationId: string
+  ): Promise<{
+    quotationId: string;
+    vendorId: string;
+  } | null>;
+}
 export class BookingService {
-  constructor(
-    private readonly repository: BookingRepository
-  ) {}
+ constructor(
+  private readonly repository:
+    BookingRepository,
+
+  private readonly quotationSummaryProvider?:
+    BookingQuotationSummaryProvider,
+
+  private readonly selectedQuotationProvider?:
+    BookingSelectedQuotationProvider
+) {}
 
   /**
    * Returns booking by id or throws an Error.
@@ -126,37 +218,95 @@ async updateBooking(
   input: UpdateBookingInput,
   updatedBy: string
 ): Promise<BookingOperationResult> {
-  const booking = await this.getExistingBooking(bookingId);
+  const booking =
+    await this.getExistingBooking(
+      bookingId
+    );
+
+  /* ------------------------------------------------------------------------
+   * Terminal Booking protection
+   * ------------------------------------------------------------------------
+   *
+   * Completed and cancelled Bookings are historical terminal records.
+   * Generic Booking details must not be modified after reaching a
+   * terminal state.
+   * ------------------------------------------------------------------------
+   */
+
+  if (
+    booking.status ===
+    BookingStatus.COMPLETED
+  ) {
+    return {
+      success: false,
+
+      message:
+        "Completed Booking details cannot be modified.",
+
+      errorCode:
+        "BOOKING_COMPLETED",
+    };
+  }
+
+  if (
+    booking.status ===
+    BookingStatus.CANCELLED
+  ) {
+    return {
+      success: false,
+
+      message:
+        "Cancelled Booking details cannot be modified.",
+
+      errorCode:
+        "BOOKING_CANCELLED",
+    };
+  }
 
   const validation =
     validateUpdateBookingInput(
-        input,
-        booking
+      input,
+      booking
     );
 
   if (!validation.valid) {
     return {
       success: false,
-      message: validation.errors
-        .map((error) => error.message)
-        .join(", "),
-      errorCode: validation.errors[0]?.code,
+
+      message:
+        validation.errors
+          .map(
+            (error) =>
+              error.message
+          )
+          .join(", "),
+
+      errorCode:
+        validation.errors[0]
+          ?.code,
     };
   }
 
-  const updatedBooking = applyBookingUpdate(
-    booking,
-    input,
-    updatedBy
-  );
+  const updatedBooking =
+    applyBookingUpdate(
+      booking,
+      input,
+      updatedBy
+    );
 
   const savedBooking =
-    await this.repository.update(updatedBooking);
+    await this.repository.update(
+      updatedBooking
+    );
 
   return {
     success: true,
-    booking: savedBooking,
-    message: "Booking updated successfully.",
+
+    booking:
+      savedBooking,
+
+    message:
+      "Booking updated successfully.",
   };
 }
 /**
@@ -211,7 +361,9 @@ async assignVendor(
   input: AssignVendorInput
 ): Promise<BookingOperationResult> {
   const booking =
-    await this.getExistingBooking(bookingId);
+    await this.getExistingBooking(
+      bookingId
+    );
 
   const validation =
     validateAssignVendorInput(
@@ -222,10 +374,83 @@ async assignVendor(
   if (!validation.valid) {
     return {
       success: false,
-      message: validation.errors
-        .map(error => error.message)
-        .join(", "),
-      errorCode: validation.errors[0]?.code,
+
+      message:
+        validation.errors
+          .map(
+            error =>
+              error.message
+          )
+          .join(", "),
+
+      errorCode:
+        validation.errors[0]
+          ?.code,
+    };
+  }
+
+  const selectedQuotationId =
+    booking.quotation
+      ?.selectedQuotationId;
+
+  if (!selectedQuotationId) {
+    return {
+      success: false,
+
+      message:
+        "A quotation must be selected before assigning a Vendor.",
+
+      errorCode:
+        "BUSINESS_RULE",
+    };
+  }
+
+  if (
+    !this.selectedQuotationProvider
+  ) {
+    return {
+      success: false,
+
+      message:
+        "Selected quotation validation is unavailable for Vendor assignment.",
+
+      errorCode:
+        "BUSINESS_RULE",
+    };
+  }
+
+  const selectedQuotation =
+    await this
+      .selectedQuotationProvider
+      .getSelectedQuotationVendor(
+        booking.bookingId,
+        selectedQuotationId
+      );
+
+  if (!selectedQuotation) {
+    return {
+      success: false,
+
+      message:
+        "The selected quotation could not be resolved for Vendor assignment.",
+
+      errorCode:
+        "BUSINESS_RULE",
+    };
+  }
+
+  if (
+    selectedQuotation.vendorId !==
+    input.vendorId
+  ) {
+    return {
+      success: false,
+
+      message:
+        "Assigned Vendor must match the Vendor of the selected quotation.",
+
+      errorCode:
+        "BUSINESS_RULE",
     };
   }
 
@@ -236,14 +461,21 @@ async assignVendor(
     );
 
   const savedBooking =
-    await this.repository.update(updatedBooking);
+    await this.repository.update(
+      updatedBooking
+    );
 
   return {
     success: true,
-    booking: savedBooking,
-    message: "Vendor assigned successfully.",
+
+    booking:
+      savedBooking,
+
+    message:
+      "Vendor assigned successfully.",
   };
 }
+
 /**
  * Removes the assigned vendor from a booking.
  */
@@ -311,20 +543,47 @@ async cancelBooking(
     };
   }
 
-  const cancelledBooking =
-    applyBookingCancellation(
-      booking,
-      input
-    );
+  const previousStage =
+  booking.tracking
+    ?.currentStage ??
+  BookingTrackingStage
+    .NOT_STARTED;
 
-  const savedBooking =
-    await this.repository.update(cancelledBooking);
+const cancelledBooking =
+  applyBookingCancellation(
+    booking,
+    input
+  );
 
-  return {
-    success: true,
-    booking: savedBooking,
-    message: "Booking cancelled successfully.",
-  };
+const savedTransition =
+  await this.repository
+    .saveTrackingTransition({
+      booking:
+        cancelledBooking,
+
+      previousStage,
+
+      nextStage:
+        BookingTrackingStage
+          .CANCELLED,
+
+      updatedBy:
+        input.cancelledBy,
+
+      remarks:
+        input.cancellationReason,
+    });
+
+return {
+  success:
+    true,
+
+  booking:
+    savedTransition.booking,
+
+  message:
+    "Booking cancelled successfully.",
+};
 }
 /**
  * Applies AI inventory analysis to an existing booking.
@@ -379,7 +638,33 @@ async updateQuotation(
       errorCode: "UPDATED_BY_REQUIRED",
     };
   }
+const quotationValidation =
+  validateBookingQuotationSummary(
+    quotation
+  );
 
+if (
+  !quotationValidation.valid
+) {
+  return {
+    success:
+      false,
+
+    message:
+      quotationValidation.errors
+        .map(
+          (error) =>
+            error.message
+        )
+        .join(
+          ", "
+        ),
+
+    errorCode:
+      quotationValidation.errors[0]
+        ?.code,
+  };
+}
   const updatedBooking =
     applyQuotationSummary(
       booking,
@@ -397,6 +682,128 @@ async updateQuotation(
   };
 }
 /**
+ * Confirms a Booking from an accepted quotation.
+ *
+ * This operation:
+ * - validates the confirmation command
+ * - protects against conflicting quotation/vendor assignments
+ * - supports idempotent replay
+ * - applies the complete confirmed Booking aggregate
+ * - persists the Booking in one repository update
+ */
+async confirmFromQuotation(
+  bookingId:
+    string,
+  input:
+    ConfirmBookingFromQuotationInput
+): Promise<
+  BookingOperationResult
+> {
+  const booking =
+    await this.getExistingBooking(
+      bookingId
+    );
+
+  const validation =
+    validateConfirmBookingFromQuotationInput(
+      input,
+      booking
+    );
+
+  if (
+    !validation.valid
+  ) {
+    return {
+      success:
+        false,
+
+      message:
+        validation.errors
+          .map(
+            (
+              error
+            ) =>
+              error.message
+          )
+          .join(
+            ", "
+          ),
+
+      errorCode:
+        validation.errors[0]
+          ?.code,
+    };
+  }
+
+  /* ------------------------------------------------------------------------
+   * Idempotency
+   * ------------------------------------------------------------------------
+   *
+   * If the Booking is already confirmed with the same quotation,
+   * same Vendor and same amount, return the existing Booking without
+   * writing another timeline event.
+   * ------------------------------------------------------------------------
+   */
+
+  const sameQuotation =
+    booking.quotation
+      ?.selectedQuotationId ===
+    input.quotationId;
+
+  const sameVendor =
+    booking.vendor
+      ?.vendorId ===
+    input.vendorId;
+
+  const sameAmount =
+    booking.quotation
+      ?.selectedQuoteAmount ===
+    input.selectedQuoteAmount;
+
+  const alreadyConfirmed =
+    booking.status ===
+      BookingStatus.CONFIRMED &&
+    sameQuotation &&
+    sameVendor &&
+    sameAmount;
+
+  if (
+    alreadyConfirmed
+  ) {
+    return {
+      success:
+        true,
+
+      booking,
+
+      message:
+        "Booking is already confirmed from this quotation.",
+    };
+  }
+
+  const confirmedBooking =
+    applyBookingConfirmationFromQuotation(
+      booking,
+      input
+    );
+
+  const savedBooking =
+    await this.repository.update(
+      confirmedBooking
+    );
+
+  return {
+    success:
+      true,
+
+    booking:
+      savedBooking,
+
+    message:
+      "Booking confirmed successfully from accepted quotation.",
+  };
+}
+/**
  * Updates the payment summary for a booking.
  */
 async updatePayment(
@@ -405,30 +812,286 @@ async updatePayment(
   updatedBy: string
 ): Promise<BookingOperationResult> {
   const booking =
-    await this.getExistingBooking(bookingId);
+    await this.getExistingBooking(
+      bookingId
+    );
 
-  if (!updatedBy.trim()) {
+  const normalizedUpdatedBy =
+    updatedBy.trim();
+
+  if (!normalizedUpdatedBy) {
     return {
       success: false,
-      message: "The user updating the payment is required.",
-      errorCode: "UPDATED_BY_REQUIRED",
+      message:
+        "The user updating the payment is required.",
+      errorCode:
+        "UPDATED_BY_REQUIRED",
     };
   }
+
+  /* ------------------------------------------------------------------------
+   * Resolve authoritative Booking amount
+   * ------------------------------------------------------------------------
+   *
+   * The selected quotation / existing Booking payment amount is the source
+   * of truth. A caller must not be able to change the commercial value of
+   * the Booking through the payment endpoint.
+   * ------------------------------------------------------------------------
+   */
+
+  const authoritativeTotalAmount =
+    booking.quotation
+      ?.selectedQuoteAmount ??
+    booking.payment
+      ?.totalAmount ??
+    payment.totalAmount;
+
+  if (
+    authoritativeTotalAmount ===
+      undefined ||
+    !Number.isFinite(
+      authoritativeTotalAmount
+    ) ||
+    authoritativeTotalAmount < 0
+  ) {
+    return {
+      success:
+        false,
+
+      message:
+        "A valid Booking total amount is required before payment can be updated.",
+
+      errorCode:
+        "PAYMENT_TOTAL_AMOUNT_INVALID",
+    };
+  }
+
+  /* ------------------------------------------------------------------------
+   * Prevent total amount manipulation
+   * ------------------------------------------------------------------------
+   */
+
+  if (
+    payment.totalAmount !==
+      undefined &&
+    (
+      !Number.isFinite(
+        payment.totalAmount
+      ) ||
+      payment.totalAmount < 0
+    )
+  ) {
+    return {
+      success:
+        false,
+
+      message:
+        "totalAmount must be a valid non-negative number.",
+
+      errorCode:
+        "PAYMENT_TOTAL_AMOUNT_INVALID",
+    };
+  }
+
+  if (
+    payment.totalAmount !==
+      undefined &&
+    payment.totalAmount !==
+      authoritativeTotalAmount
+  ) {
+    return {
+      success:
+        false,
+
+      message:
+        "Payment totalAmount must match the Booking total amount.",
+
+      errorCode:
+        "PAYMENT_TOTAL_AMOUNT_MISMATCH",
+    };
+  }
+
+  /* ------------------------------------------------------------------------
+   * Resolve paid amount
+   * ------------------------------------------------------------------------
+   */
+
+  const paidAmount =
+    payment.paidAmount ??
+    booking.payment
+      ?.paidAmount ??
+    0;
+
+  if (
+    !Number.isFinite(
+      paidAmount
+    ) ||
+    paidAmount < 0
+  ) {
+    return {
+      success:
+        false,
+
+      message:
+        "paidAmount must be a valid non-negative number.",
+
+      errorCode:
+        "PAYMENT_PAID_AMOUNT_INVALID",
+    };
+  }
+
+  if (
+    paidAmount >
+      authoritativeTotalAmount
+  ) {
+    return {
+      success:
+        false,
+
+      message:
+        "paidAmount cannot exceed the Booking total amount.",
+
+      errorCode:
+        "PAYMENT_OVERPAYMENT_NOT_ALLOWED",
+    };
+  }
+
+  /* ------------------------------------------------------------------------
+   * Resolve advance amount
+   * ------------------------------------------------------------------------
+   */
+
+  const advanceAmount =
+    payment.advanceAmount ??
+    booking.payment
+      ?.advanceAmount ??
+    0;
+
+  if (
+    !Number.isFinite(
+      advanceAmount
+    ) ||
+    advanceAmount < 0
+  ) {
+    return {
+      success:
+        false,
+
+      message:
+        "advanceAmount must be a valid non-negative number.",
+
+      errorCode:
+        "PAYMENT_ADVANCE_AMOUNT_INVALID",
+    };
+  }
+
+  if (
+    advanceAmount >
+      paidAmount
+  ) {
+    return {
+      success:
+        false,
+
+      message:
+        "advanceAmount cannot exceed paidAmount.",
+
+      errorCode:
+        "PAYMENT_ADVANCE_EXCEEDS_PAID_AMOUNT",
+    };
+  }
+
+  /* ------------------------------------------------------------------------
+   * Derive financial values
+   * ------------------------------------------------------------------------
+   *
+   * Do not trust balanceAmount or paymentPending supplied by the caller.
+   * Both are derived from the authoritative total and paid amount.
+   * ------------------------------------------------------------------------
+   */
+
+  const balanceAmount =
+    Math.max(
+      0,
+      authoritativeTotalAmount -
+        paidAmount
+    );
+
+  const normalizedPayment:
+    BookingPaymentSummary = {
+      totalAmount:
+        authoritativeTotalAmount,
+
+      advanceAmount,
+
+      paidAmount,
+
+      balanceAmount,
+
+      paymentPending:
+        balanceAmount,
+    };
+
+  /* ------------------------------------------------------------------------
+   * Idempotency / no-op protection
+   * ------------------------------------------------------------------------
+   *
+   * Do not persist another PAYMENT_UPDATED event when the normalized
+   * payment state is already identical to the Booking payment state.
+   * ------------------------------------------------------------------------
+   */
+
+  const currentPayment =
+    booking.payment;
+
+  const paymentUnchanged =
+    currentPayment?.totalAmount ===
+      normalizedPayment.totalAmount &&
+    currentPayment?.advanceAmount ===
+      normalizedPayment.advanceAmount &&
+    currentPayment?.paidAmount ===
+      normalizedPayment.paidAmount &&
+    currentPayment?.balanceAmount ===
+      normalizedPayment.balanceAmount &&
+    currentPayment?.paymentPending ===
+      normalizedPayment.paymentPending;
+
+  if (paymentUnchanged) {
+    return {
+      success: true,
+
+      booking,
+
+      message:
+        "Payment information is already up to date.",
+    };
+  }
+  /* ------------------------------------------------------------------------
+   * Persist
+   * ------------------------------------------------------------------------
+   */
 
   const updatedBooking =
     applyPaymentSummary(
       booking,
-      payment,
-      updatedBy
+      normalizedPayment,
+      normalizedUpdatedBy
     );
 
   const savedBooking =
-    await this.repository.update(updatedBooking);
+    await this.repository.update(
+      updatedBooking
+    );
 
   return {
-    success: true,
-    booking: savedBooking,
-    message: "Payment updated successfully.",
+    success:
+      true,
+
+    booking:
+      savedBooking,
+
+    message:
+      "Payment updated successfully.",
   };
 }
 /**
@@ -436,35 +1099,242 @@ async updatePayment(
  */
 async updateTracking(
   bookingId: string,
-  tracking: BookingTrackingSummary,
+  tracking:
+  BookingTrackingUpdateRequest,
   updatedBy: string
-): Promise<BookingOperationResult> {
+): Promise<
+  BookingOperationResult
+> {
   const booking =
-    await this.getExistingBooking(bookingId);
+  await this.getExistingBooking(
+    bookingId
+  );
 
-  if (!updatedBy.trim()) {
+/* ------------------------------------------------------------------------
+ * Terminal Booking protection
+ * ------------------------------------------------------------------------
+ *
+ * A completed or cancelled Booking must not be reopened indirectly by
+ * updating its tracking stage.
+ *
+ * Tracking-stage synchronization can otherwise map stages such as
+ * VENDOR_ASSIGNED back to CONFIRMED.
+ * ------------------------------------------------------------------------
+ */
+
+if (
+  booking.status ===
+    BookingStatus.COMPLETED
+) {
+  return {
+    success:
+      false,
+
+    message:
+      "Tracking cannot be updated for a completed booking.",
+
+    errorCode:
+      "BOOKING_COMPLETED",
+  };
+}
+
+if (
+  booking.status ===
+    BookingStatus.CANCELLED
+) {
+  return {
+    success:
+      false,
+
+    message:
+      "Tracking cannot be updated for a cancelled booking.",
+
+    errorCode:
+      "BOOKING_CANCELLED",
+  };
+}
+
+const normalizedUpdatedBy =
+  updatedBy.trim();
+  if (!normalizedUpdatedBy) {
+    return {
+      success:
+        false,
+
+      message:
+        "The user updating the tracking is required.",
+
+      errorCode:
+        "UPDATED_BY_REQUIRED",
+    };
+  }
+  const trackingValidation =
+    validateBookingTrackingUpdateInput(
+      tracking
+    );
+
+  if (
+    !trackingValidation.valid
+  ) {
     return {
       success: false,
-      message: "The user updating the tracking is required.",
-      errorCode: "UPDATED_BY_REQUIRED",
+      message:
+        trackingValidation.errors
+          .map(
+            (error) =>
+              error.message
+          )
+          .join(" "),
+      errorCode:
+        "TRACKING_VALIDATION_FAILED",
+    };
+  }
+  const currentStage =
+    booking.tracking
+      ?.currentStage ??
+    BookingTrackingStage
+      .NOT_STARTED;
+
+  const nextStage =
+    tracking.currentStage;
+
+  if (!nextStage) {
+    return {
+      success:
+        false,
+
+      message:
+        "The next tracking stage is required.",
+
+      errorCode:
+        "TRACKING_STAGE_REQUIRED",
     };
   }
 
-  const updatedBooking =
-    applyTrackingSummary(
-      booking,
-      tracking,
-      updatedBy
+  const transitionValidation =
+    validateTrackingTransition(
+      currentStage,
+      nextStage
     );
 
-  const savedBooking =
-    await this.repository.update(updatedBooking);
+  if (
+    !transitionValidation.valid
+  ) {
+    return {
+      success:
+        false,
 
-  return {
-    success: true,
-    booking: savedBooking,
-    message: "Tracking updated successfully.",
-  };
+      message:
+        transitionValidation
+          .errors[0]
+          ?.message ??
+        "The requested tracking transition is not allowed.",
+
+      errorCode:
+        "TRACKING_TRANSITION_INVALID",
+    };
+  }
+
+  if (
+    currentStage ===
+    nextStage
+  ) {
+    return {
+      success:
+        true,
+
+      booking,
+
+      message:
+        "Booking is already in the requested tracking stage.",
+    };
+  }
+
+  const trackingUpdatedBooking =
+  applyTrackingTransition(
+    booking,
+    nextStage,
+    normalizedUpdatedBy,
+    {
+      expectedPickupTime:
+        tracking
+          .expectedPickupTime,
+
+      expectedDeliveryTime:
+        tracking
+          .expectedDeliveryTime,
+
+      liveTrackingEnabled:
+        tracking
+          .liveTrackingEnabled,
+    }
+  );
+
+const synchronizedStatus =
+  resolveBookingStatusFromTrackingStage(
+    nextStage
+  );
+
+const updatedBooking = {
+  ...trackingUpdatedBooking,
+
+  status:
+    synchronizedStatus,
+};
+
+const savedTransition =
+  await this.repository
+    .saveTrackingTransition({
+      booking:
+        updatedBooking,
+      previousStage:
+        currentStage,
+
+      nextStage,
+
+      updatedBy:
+        normalizedUpdatedBy,
+
+      updatedByRole:
+        tracking.updatedByRole,
+
+      remarks:
+        tracking.remarks,
+
+      location:
+        tracking.location,
+
+latitude:
+  tracking.coordinates
+    ?.latitude,
+
+longitude:
+  tracking.coordinates
+    ?.longitude,
+
+      estimatedArrival:
+        tracking.estimatedArrival,
+
+      actualArrival:
+        tracking.actualArrival,
+
+      photoUrl:
+        tracking.photoUrl,
+
+      signatureUrl:
+        tracking.signatureUrl,
+    });
+
+return {
+  success:
+    true,
+
+  booking:
+    savedTransition.booking,
+
+  message:
+    "Tracking updated successfully.",
+};
 }
 /**
  * Returns a booking by its internal ID.
@@ -472,7 +1342,37 @@ async updateTracking(
 async getBooking(
   bookingId: string
 ): Promise<BookingRequest | null> {
-  return this.repository.findById(bookingId);
+  const booking =
+    await this.repository
+      .findById(
+        bookingId
+      );
+
+  if (!booking) {
+    return null;
+  }
+
+  if (
+    !this.quotationSummaryProvider
+  ) {
+    return booking;
+  }
+
+  const quotationSummary =
+    await this
+      .quotationSummaryProvider
+      .getBookingQuotationSummary(
+        bookingId
+      );
+
+  return {
+    ...booking,
+
+    quotation: {
+      ...booking.quotation,
+      ...quotationSummary,
+    },
+  };
 }
 /**
  * Returns a booking by its public booking code.
@@ -480,9 +1380,37 @@ async getBooking(
 async getBookingByCode(
   bookingCode: string
 ): Promise<BookingRequest | null> {
-  return this.repository.findByBookingCode(
-    bookingCode
-  );
+  const booking =
+    await this.repository
+      .findByBookingCode(
+        bookingCode
+      );
+
+  if (!booking) {
+    return null;
+  }
+
+  if (
+    !this.quotationSummaryProvider
+  ) {
+    return booking;
+  }
+
+  const quotationSummary =
+    await this
+      .quotationSummaryProvider
+      .getBookingQuotationSummary(
+        booking.bookingId
+      );
+
+  return {
+    ...booking,
+
+    quotation: {
+      ...booking.quotation,
+      ...quotationSummary,
+    },
+  };
 }
 /**
  * Searches bookings using the supplied criteria.

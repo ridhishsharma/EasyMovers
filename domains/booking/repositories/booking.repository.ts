@@ -8,8 +8,59 @@ import {
   BookingRequest,
   BookingSearchCriteria,
   BookingListItem,
+  BookingTrackingStage,
   PaginatedBookingResult,
 } from "../models/booking.model";
+
+
+export interface SaveBookingTrackingTransitionInput {
+  booking:
+    BookingRequest;
+
+  previousStage:
+    BookingTrackingStage;
+
+  nextStage:
+    BookingTrackingStage;
+
+  updatedBy:
+    string;
+
+  updatedByRole?:
+    string;
+
+  remarks?:
+    string;
+
+  location?:
+    string;
+
+  latitude?:
+    number;
+
+  longitude?:
+    number;
+
+  estimatedArrival?:
+    string;
+
+  actualArrival?:
+    string;
+
+  photoUrl?:
+    string;
+
+  signatureUrl?:
+    string;
+}
+
+export interface SaveBookingTrackingTransitionResult {
+  booking:
+    BookingRequest;
+
+  trackingRecordId:
+    string;
+}
 
 /**
  * Repository abstraction for Booking persistence.
@@ -31,7 +82,12 @@ export interface BookingRepository {
   update(
     booking: BookingRequest
   ): Promise<BookingRequest>;
-
+saveTrackingTransition(
+  input:
+    SaveBookingTrackingTransitionInput
+): Promise<
+  SaveBookingTrackingTransitionResult
+>;
   /**
    * Deletes a booking.
    */
