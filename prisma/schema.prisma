@@ -235,8 +235,8 @@ model DestinationDetails {
 }
 
 model Booking {
-  id                   String            @id @default(cuid())
-  bookingNumber        String            @unique
+  id                   String               @id @default(cuid())
+  bookingNumber        String               @unique
   leadId               String
   leadReferenceId      String
   userId               String?
@@ -251,14 +251,14 @@ model Booking {
   pickupState          String
   pickupPincode        String
   pickupDigipin        String?
-  pickupLatitude       Decimal?          @db.Decimal(10, 7)
-  pickupLongitude      Decimal?          @db.Decimal(10, 7)
+  pickupLatitude       Decimal?             @db.Decimal(10, 7)
+  pickupLongitude      Decimal?             @db.Decimal(10, 7)
   dropCity             String
   dropState            String
   dropPincode          String
   dropDigipin          String?
-  dropLatitude         Decimal?          @db.Decimal(10, 7)
-  dropLongitude        Decimal?          @db.Decimal(10, 7)
+  dropLatitude         Decimal?             @db.Decimal(10, 7)
+  dropLongitude        Decimal?             @db.Decimal(10, 7)
   pickupAddress        String
   dropAddress          String
   contactJson          Json
@@ -274,27 +274,28 @@ model Booking {
   vendorName           String?
   assignedVendorCode   String?
   vendorJson           Json?
-  selectedQuotationId  String?           @unique
+  selectedQuotationId  String?              @unique
   quotationJson        Json?
   paymentJson          Json?
   trackingJson         Json?
   timelineJson         Json
   auditJson            Json
-  totalAmount          Decimal           @default(0) @db.Decimal(12, 2)
-  currency             String            @default("INR")
-  bookingStatus        String            @default("DRAFT")
-  paymentStatus        String            @default("PENDING")
-  trackingStatus       TrackingStatus    @default(NOT_STARTED)
+  totalAmount          Decimal              @default(0) @db.Decimal(12, 2)
+  currency             String               @default("INR")
+  bookingStatus        String               @default("DRAFT")
+  paymentStatus        String               @default("PENDING")
+  trackingStatus       TrackingStatus       @default(NOT_STARTED)
   notes                String?
-  createdAt            DateTime          @default(now())
-  updatedAt            DateTime          @updatedAt
-  lead                 Lead              @relation(fields: [leadId], references: [id])
-  selectedQuotation    Quotation?        @relation("SelectedBookingQuotation", fields: [selectedQuotationId], references: [id])
-  user                 User?             @relation(fields: [userId], references: [id])
-  assignedVendor       Vendor?           @relation("AssignedVendorBookings", fields: [vendorId], references: [id])
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  lead                 Lead                 @relation(fields: [leadId], references: [id])
+  selectedQuotation    Quotation?           @relation("SelectedBookingQuotation", fields: [selectedQuotationId], references: [id])
+  user                 User?                @relation(fields: [userId], references: [id])
+  assignedVendor       Vendor?              @relation("AssignedVendorBookings", fields: [vendorId], references: [id])
   bookingTrackings     BookingTracking[]
-  payments             Payment[]
-  quotations           Quotation[]       @relation("BookingQuotations")
+  payments             Payment?
+  paymentBookingSyncs  PaymentBookingSync[]
+  quotations           Quotation[]          @relation("BookingQuotations")
 
   @@index([bookingNumber])
   @@index([leadId])
@@ -604,43 +605,467 @@ model VendorReview {
 }
 
 model Payment {
-  id                   String        @id @default(cuid())
-  paymentNumber        String        @unique
-  bookingId            String
-  quotationId          String?
-  userId               String?
-  vendorId             String?
-  amount               Decimal       @db.Decimal(12, 2)
-  currency             String        @default("INR")
-  paymentMethod        PaymentMethod
-  paymentType          PaymentType
-  paymentStatus        PaymentStatus @default(PENDING)
-  transactionId        String?
-  gatewayTransactionId String?
-  gatewayOrderId       String?
-  gatewayPaymentId     String?
-  gatewaySignature     String?
-  bankReference        String?
-  remarks              String?
-  paidAt               DateTime?
-  refundAmount         Decimal?      @db.Decimal(12, 2)
-  refundReason         String?
-  refundedAt           DateTime?
-  metadata             Json?
-  createdAt            DateTime      @default(now())
-  updatedAt            DateTime      @updatedAt
-  booking              Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  quotation            Quotation?    @relation(fields: [quotationId], references: [id])
-  user                 User?         @relation(fields: [userId], references: [id])
-  vendor               Vendor?       @relation(fields: [vendorId], references: [id])
+  /// *
+  ///    * --------------------------------------------------------------------------
+  ///    * Identity
+  ///    * --------------------------------------------------------------------------
+  id                            String                  @id @default(cuid())
+  paymentNumber                 String                  @unique
+  /// *
+  ///    * --------------------------------------------------------------------------
+  ///    * Marketplace relations
+  ///    * --------------------------------------------------------------------------
+  bookingId                     String                  @unique
+  quotationId                   String?
+  userId                        String?
+  vendorId                      String?
+  /// *
+  ///    * --------------------------------------------------------------------------
+  ///    * Legacy Payment value
+  ///    * KEEP during transition.
+  ///    * Existing Payment records and existing code may still depend on amount.
+  ///    * New aggregate code should use totalAmount / paidAmount / balanceAmount.
+  ///    * --------------------------------------------------------------------------
+  amount                        Decimal                 @db.Decimal(12, 2)
+  currency                      String                  @default("INR")
+  /// *
+  ///    * --------------------------------------------------------------------------
+  ///    * Legacy classification
+  ///    * paymentMethod and paymentType are now optional because an aggregate can
+  ///    * exist before a customer chooses a method or executes a transaction.
+  ///    * The normalized PaymentTransaction records become the authoritative source
+  ///    * for transaction-specific method and purpose.
+  ///    * --------------------------------------------------------------------------
+  paymentMethod                 PaymentMethod?
+  paymentType                   PaymentType?
+  /// *
+  ///    * --------------------------------------------------------------------------
+  ///    * Aggregate workflow
+  ///    * --------------------------------------------------------------------------
+  paymentStatus                 PaymentStatus           @default(PENDING)
+  /// *
+  ///    * --------------------------------------------------------------------------
+  ///    * Legacy transaction/gateway fields
+  ///    * KEEP temporarily for backward compatibility.
+  ///    * New transaction attempts should be stored in PaymentTransaction.
+  ///    * --------------------------------------------------------------------------
+  transactionId                 String?
+  gatewayTransactionId          String?
+  gatewayOrderId                String?
+  gatewayPaymentId              String?
+  gatewaySignature              String?
+  bankReference                 String?
+  /// *
+  ///    * --------------------------------------------------------------------------
+  ///    * Operational notes
+  ///    * --------------------------------------------------------------------------
+  remarks                       String?
+  /// *
+  ///    * --------------------------------------------------------------------------
+  ///    * Legacy/operational timestamps
+  ///    * --------------------------------------------------------------------------
+  paidAt                        DateTime?
+  /// *
+  ///    * --------------------------------------------------------------------------
+  ///    * Refund summary
+  ///    * Legacy refund fields remain alongside the new summary.
+  ///    * --------------------------------------------------------------------------
+  refundAmount                  Decimal?                @db.Decimal(12, 2)
+  refundReason                  String?
+  refundedAt                    DateTime?
+  /// *
+  ///    * --------------------------------------------------------------------------
+  ///    * Flexible metadata / audit
+  ///    * --------------------------------------------------------------------------
+  metadata                      Json?
+  /// *
+  ///    * --------------------------------------------------------------------------
+  ///    * Audit timestamps
+  ///    * --------------------------------------------------------------------------
+  createdAt                     DateTime                @default(now())
+  updatedAt                     DateTime                @updatedAt
+  advanceAmount                 Decimal?                @db.Decimal(12, 2)
+  auditJson                     Json?
+  balanceAmount                 Decimal                 @default(0) @db.Decimal(12, 2)
+  /// *
+  ///    * Snapshot/reference to the commercial calculation that produced the
+  ///    * customer payable amount.
+  ///    * Expected values may include:
+  ///    * quotationId
+  ///    * quotationNumber
+  ///    * customerPayableAmount
+  ///    * vendorQuotedAmount
+  ///    * platformMarkupAmount
+  ///    * platformCommissionAmount
+  ///    * currency
+  commercialReference           Json?
+  internalRemarks               String?
+  /// *
+  ///    * Fast pointer only.
+  ///    * The actual transaction remains in PaymentTransaction.
+  latestSuccessfulTransactionId String?
+  paidAmount                    Decimal                 @default(0) @db.Decimal(12, 2)
+  /// *
+  ///    * Optional persisted copy of the aggregate payable summary.
+  ///    * Numeric columns above remain searchable/reportable source fields.
+  payableJson                   Json?
+  paymentPending                Decimal                 @default(0) @db.Decimal(12, 2)
+  /// *
+  ///    * New canonical Payment-domain reference.
+  ///    * Kept optional during the migration phase so existing Payment rows do not
+  ///    * prevent migration. New PaymentService operations will always populate it.
+  ///    * After old records are backfilled, this can become required.
+  referenceId                   String?                 @unique
+  refundPendingAmount           Decimal                 @default(0) @db.Decimal(12, 2)
+  refundSummaryJson             Json?
+  source                        PaymentSource           @default(API)
+  /// *
+  ///    * --------------------------------------------------------------------------
+  ///    * Canonical aggregate financial summary
+  ///    * --------------------------------------------------------------------------
+  totalAmount                   Decimal                 @default(0) @db.Decimal(12, 2)
+  booking                       Booking                 @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  quotation                     Quotation?              @relation(fields: [quotationId], references: [id])
+  user                          User?                   @relation(fields: [userId], references: [id])
+  vendor                        Vendor?                 @relation(fields: [vendorId], references: [id])
+  gatewayOrders                 PaymentGatewayOrder[]
+  reconciliations               PaymentReconciliation[]
+  bookingSync                   PaymentBookingSync?
+  transactions                  PaymentTransaction[]
+  webhooks                      PaymentWebhook[]
 
   @@index([paymentNumber])
-  @@index([bookingId])
+  @@index([referenceId])
   @@index([quotationId])
   @@index([userId])
   @@index([vendorId])
   @@index([paymentStatus])
   @@index([paymentMethod])
+  @@index([source])
+  @@index([gatewayOrderId])
+  @@index([gatewayPaymentId])
+  @@index([createdAt])
+}
+
+model PaymentTransaction {
+  id                 String                   @id @default(cuid())
+  paymentId          String
+  transactionType    PaymentTransactionType
+  purpose            PaymentPurpose?
+  amount             Decimal                  @db.Decimal(12, 2)
+  currency           String                   @default("INR")
+  status             PaymentTransactionStatus @default(INITIATED)
+  method             PaymentMethod?
+  provider           PaymentProvider          @default(OTHER)
+  gatewayOrderId     String?
+  gatewayPaymentId   String?                  @unique
+  gatewayReferenceId String?
+  bankReference      String?
+  failureReason      String?
+  failureMessage     String?
+  providerErrorCode  String?
+  initiatedAt        DateTime                 @default(now())
+  authorizedAt       DateTime?
+  capturedAt         DateTime?
+  completedAt        DateTime?
+  failedAt           DateTime?
+  remarks            String?
+  recordedByType     PaymentActorType?
+  recordedById       String?
+  recordedByName     String?
+  metadata           Json?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+  payment            Payment                  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([paymentId])
+  @@index([transactionType])
+  @@index([purpose])
+  @@index([status])
+  @@index([method])
+  @@index([provider])
+  @@index([gatewayOrderId])
+  @@index([gatewayPaymentId])
+  @@index([bankReference])
+  @@index([initiatedAt])
+  @@index([createdAt])
+}
+
+model PaymentGatewayOrder {
+  /// *
+  ///    * --------------------------------------------------------------------------
+  ///    * Identity
+  ///    * --------------------------------------------------------------------------
+  id               String                    @id @default(cuid())
+  paymentId        String
+  /// *
+  ///    * --------------------------------------------------------------------------
+  ///    * Gateway identity
+  ///    * --------------------------------------------------------------------------
+  provider         PaymentProvider
+  /// *
+  ///    * Provider-side order ID.
+  ///    * A gateway order must never be processed as two separate orders.
+  gatewayOrderId   String                    @unique
+  /// *
+  ///    * --------------------------------------------------------------------------
+  ///    * Financial information
+  ///    * --------------------------------------------------------------------------
+  amount           Decimal                   @db.Decimal(12, 2)
+  currency         String                    @default("INR")
+  /// *
+  ///    * --------------------------------------------------------------------------
+  ///    * Lifecycle
+  ///    * --------------------------------------------------------------------------
+  status           PaymentGatewayOrderStatus @default(CREATED)
+  receiptReference String?
+  /// *
+  ///    * --------------------------------------------------------------------------
+  ///    * Provider-safe metadata
+  ///    * --------------------------------------------------------------------------
+  metadata         Json?
+  /// *
+  ///    * --------------------------------------------------------------------------
+  ///    * Audit
+  ///    * --------------------------------------------------------------------------
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+  payment          Payment                   @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([paymentId])
+  @@index([provider])
+  @@index([status])
+  @@index([receiptReference])
+  @@index([createdAt])
+}
+
+model PaymentWebhook {
+  /// *
+  ///    * --------------------------------------------------------------------------
+  ///    * Internal identity
+  ///    * --------------------------------------------------------------------------
+  id               String          @id @default(cuid())
+  /// *
+  ///    * EasyMovers webhook processing identity.
+  webhookId        String          @unique
+  /// *
+  ///    * --------------------------------------------------------------------------
+  ///    * Provider event identity
+  ///    * --------------------------------------------------------------------------
+  provider         PaymentProvider
+  /// *
+  ///    * Normalized or provider event name.
+  ///    * Kept as String intentionally because providers may introduce new event
+  ///    * types without requiring a database enum migration.
+  eventType        String
+  providerEventId  String?
+  /// *
+  ///    * Optional payload fingerprint.
+  ///    * This can be used for additional duplicate protection where a gateway does
+  ///    * not provide a reliable providerEventId.
+  payloadHash      String?
+  /// *
+  ///    * --------------------------------------------------------------------------
+  ///    * Gateway references
+  ///    * --------------------------------------------------------------------------
+  gatewayOrderId   String?
+  gatewayPaymentId String?
+  /// *
+  ///    * --------------------------------------------------------------------------
+  ///    * Processing state
+  ///    * --------------------------------------------------------------------------
+  processed        Boolean         @default(false)
+  duplicate        Boolean         @default(false)
+  receivedAt       DateTime        @default(now())
+  processedAt      DateTime?
+  /// *
+  ///    * --------------------------------------------------------------------------
+  ///    * Result references
+  ///    * transactionId remains an identifier rather than a Prisma relation for now.
+  ///    * This avoids coupling webhook persistence to transaction deletion/history.
+  ///    * --------------------------------------------------------------------------
+  paymentId        String?
+  transactionId    String?
+  /// *
+  ///    * --------------------------------------------------------------------------
+  ///    * Failure information
+  ///    * --------------------------------------------------------------------------
+  errorCode        String?
+  errorMessage     String?
+  /// *
+  ///    * --------------------------------------------------------------------------
+  ///    * Audit
+  ///    * --------------------------------------------------------------------------
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  payment          Payment?        @relation(fields: [paymentId], references: [id])
+
+  @@unique([provider, providerEventId])
+  @@index([paymentId])
+  @@index([provider])
+  @@index([eventType])
+  @@index([gatewayOrderId])
+  @@index([gatewayPaymentId])
+  @@index([providerEventId])
+  @@index([payloadHash])
+  @@index([processed])
+  @@index([receivedAt])
+}
+
+model PaymentReconciliation {
+  /// *
+  ///    * --------------------------------------------------------------------------
+  ///    * Identity
+  ///    * --------------------------------------------------------------------------
+  id                      String          @id @default(cuid())
+  reconciliationId        String          @unique
+  paymentId               String
+  provider                PaymentProvider
+  expectedCollectedAmount Decimal         @db.Decimal(12, 2)
+  expectedRefundedAmount  Decimal         @default(0) @db.Decimal(12, 2)
+  /// *
+  ///    * --------------------------------------------------------------------------
+  ///    * Values observed from gateway/bank
+  ///    * --------------------------------------------------------------------------
+  observedCollectedAmount Decimal         @db.Decimal(12, 2)
+  observedRefundedAmount  Decimal         @default(0) @db.Decimal(12, 2)
+  /// *
+  ///    * --------------------------------------------------------------------------
+  ///    * Currency
+  ///    * --------------------------------------------------------------------------
+  currency                String          @default("INR")
+  /// *
+  ///    * --------------------------------------------------------------------------
+  ///    * Result
+  ///    * --------------------------------------------------------------------------
+  reconciled              Boolean         @default(false)
+  /// *
+  ///    * Normalized differences such as:
+  ///    * [
+  ///    * {
+  ///    * "field": "collectedAmount",
+  ///    * "expected": 23010,
+  ///    * "observed": 22510,
+  ///    * "difference": -500
+  ///    * }
+  ///    * ]
+  differences             Json
+  /// *
+  ///    * --------------------------------------------------------------------------
+  ///    * External reference
+  ///    * --------------------------------------------------------------------------
+  providerReference       String?
+  /// *
+  ///    * --------------------------------------------------------------------------
+  ///    * Reconciliation timestamps/audit
+  ///    * --------------------------------------------------------------------------
+  observedAt              DateTime
+  reconciledAt            DateTime        @default(now())
+  reconciledBy            String?
+  /// *
+  ///    * --------------------------------------------------------------------------
+  ///    * Record audit
+  ///    * --------------------------------------------------------------------------
+  createdAt               DateTime        @default(now())
+  updatedAt               DateTime        @updatedAt
+  expectedBalanceAmount   Decimal?        @db.Decimal(12, 2)
+  /// *
+  ///    * --------------------------------------------------------------------------
+  ///    * Expected EasyMovers values
+  ///    * --------------------------------------------------------------------------
+  ///    * These fields preserve the Payment financial snapshot exactly as it existed
+  ///    * when reconciliation was performed.
+  ///    * expectedTotalAmount and expectedBalanceAmount are nullable so existing
+  ///    * reconciliation rows can be migrated safely without inventing historical
+  ///    * values. All new reconciliation records must populate them.
+  ///    * --------------------------------------------------------------------------
+  expectedTotalAmount     Decimal?        @db.Decimal(12, 2)
+  payment                 Payment         @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([paymentId])
+  @@index([provider])
+  @@index([reconciled])
+  @@index([providerReference])
+  @@index([observedAt])
+  @@index([reconciledAt])
+  @@index([createdAt])
+}
+
+model PaymentBookingSync {
+  /**
+   * Identity
+   */
+  id String @id @default(cuid())
+
+  /**
+   * One current synchronization state per Payment.
+   */
+  paymentId String @unique
+
+  bookingId String
+
+  /**
+   * Current delivery state.
+   */
+  status PaymentBookingSyncStatus @default(PENDING)
+
+  /**
+   * Payment.updatedAt captured when this synchronization projection was
+   * created. It prevents an older synchronization attempt from marking a
+   * newer Payment projection as synchronized.
+   */
+  paymentUpdatedAt DateTime
+
+  /**
+   * Latest authoritative Payment financial projection.
+   */
+  paymentSnapshotJson Json
+
+  /**
+   * Latest Booking projection observed after a synchronization attempt.
+   */
+  bookingSnapshotJson Json?
+
+  /**
+   * Retry state.
+   */
+  attemptCount Int @default(0)
+
+  lastAttemptAt DateTime?
+
+  nextRetryAt DateTime?
+
+  synchronizedAt DateTime?
+
+  /**
+   * Sanitized failure information only.
+   * Never persist raw Prisma, Booking repository or stack-trace objects.
+   */
+  lastErrorCode String?
+
+  lastErrorMessage String?
+
+  /**
+   * Audit actor that requested or last attempted synchronization.
+   */
+  requestedBy String
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  /**
+   * Relations
+   */
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+  @@index([status])
+  @@index([nextRetryAt])
+  @@index([lastAttemptAt])
+  @@index([paymentUpdatedAt])
   @@index([createdAt])
 }
 
@@ -979,6 +1404,10 @@ enum RecommendationType {
   NO
 }
 
+/// *
+///  * Payment method used by a customer or recorded operationally.
+///  * Legacy values are intentionally retained because existing records may
+///  * already depend on them.
 enum PaymentMethod {
   CASH
   UPI
@@ -991,8 +1420,23 @@ enum PaymentMethod {
   CHEQUE
   WALLET
   RAZORPAY
+  CARD
+  BANK_TRANSFER
+  OTHER
 }
 
+/// *
+///  * Overall Payment aggregate status.
+///  * Legacy statuses INITIATED, SUCCESS and PARTIAL_REFUND are retained.
+///  * New Payment-domain code should primarily use:
+///  * PENDING
+///  * PARTIALLY_PAID
+///  * PAID
+///  * FAILED
+///  * CANCELLED
+///  * REFUND_PENDING
+///  * PARTIALLY_REFUNDED
+///  * REFUNDED
 enum PaymentStatus {
   PENDING
   INITIATED
@@ -1001,13 +1445,103 @@ enum PaymentStatus {
   CANCELLED
   REFUNDED
   PARTIAL_REFUND
+  PARTIALLY_PAID
+  PAID
+  REFUND_PENDING
+  PARTIALLY_REFUNDED
 }
 
+/// *
+///  * Lifecycle of a provider-side payment order.
+enum PaymentGatewayOrderStatus {
+  CREATED
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+  EXPIRED
+}
+
+/// *
+///  * Legacy/high-level Payment classification.
+///  * Existing values remain available.
+///  * New values align the schema with the Payment domain.
 enum PaymentType {
   ADVANCE
   PARTIAL
   FINAL
   REFUND
+  BALANCE
+  FULL_PAYMENT
+  ADDITIONAL
+}
+
+/// *
+///  * Why an individual collection transaction is being made.
+enum PaymentPurpose {
+  ADVANCE
+  BALANCE
+  FULL_PAYMENT
+  ADDITIONAL
+}
+
+/// *
+///  * Financial direction of an individual Payment transaction.
+enum PaymentTransactionType {
+  COLLECTION
+  REFUND
+  ADJUSTMENT
+}
+
+/// *
+///  * Lifecycle of one individual transaction attempt.
+enum PaymentTransactionStatus {
+  INITIATED
+  PENDING
+  AUTHORIZED
+  CAPTURED
+  SUCCESS
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+/// *
+///  * Payment processing provider/channel.
+enum PaymentProvider {
+  RAZORPAY
+  MANUAL
+  BANK
+  OTHER
+}
+
+/// *
+///  * EasyMovers channel from which the Payment originated.
+enum PaymentSource {
+  WEB
+  ANDROID
+  IOS
+  ADMIN
+  CORPORATE
+  API
+  WEBHOOK
+}
+
+enum PaymentBookingSyncStatus {
+  PENDING
+  RETRY_PENDING
+  SYNCHRONIZED
+  FAILED
+}
+
+/// *
+///  * Actor responsible for recording or initiating a Payment action.
+enum PaymentActorType {
+  CUSTOMER
+  CORPORATE
+  ADMIN
+  VENDOR
+  SYSTEM
 }
 
 enum InvoiceType {

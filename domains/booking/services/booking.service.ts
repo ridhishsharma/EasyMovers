@@ -806,6 +806,19 @@ async confirmFromQuotation(
 /**
  * Updates the payment summary for a booking.
  */
+/**
+ * Updates the payment summary for a booking.
+ *
+ * Financial semantics:
+ *
+ * - paidAmount is the gross amount successfully collected.
+ * - Refunds do NOT reduce paidAmount.
+ * - refundedAmount is the amount successfully returned.
+ * - refundPendingAmount is the amount requested for refund but not yet
+ *   completed.
+ * - balanceAmount/paymentPending represent collection balance only and are
+ *   derived from totalAmount - paidAmount.
+ */
 async updatePayment(
   bookingId: string,
   payment: BookingPaymentSummary,
@@ -816,14 +829,22 @@ async updatePayment(
       bookingId
     );
 
+  /* ------------------------------------------------------------------------
+   * Actor validation
+   * ------------------------------------------------------------------------
+   */
+
   const normalizedUpdatedBy =
     updatedBy.trim();
 
   if (!normalizedUpdatedBy) {
     return {
-      success: false,
+      success:
+        false,
+
       message:
         "The user updating the payment is required.",
+
       errorCode:
         "UPDATED_BY_REQUIRED",
     };
@@ -834,8 +855,10 @@ async updatePayment(
    * ------------------------------------------------------------------------
    *
    * The selected quotation / existing Booking payment amount is the source
-   * of truth. A caller must not be able to change the commercial value of
-   * the Booking through the payment endpoint.
+   * of truth.
+   *
+   * A caller must not be able to change the commercial value of the Booking
+   * through the payment synchronization endpoint.
    * ------------------------------------------------------------------------
    */
 
@@ -912,7 +935,14 @@ async updatePayment(
   }
 
   /* ------------------------------------------------------------------------
-   * Resolve paid amount
+   * Resolve gross paid amount
+   * ------------------------------------------------------------------------
+   *
+   * paidAmount represents successful collections before refunds.
+   *
+   * IMPORTANT:
+   *
+   * A refund must never reduce paidAmount.
    * ------------------------------------------------------------------------
    */
 
@@ -1002,11 +1032,141 @@ async updatePayment(
   }
 
   /* ------------------------------------------------------------------------
-   * Derive financial values
+   * Resolve successfully refunded amount
+   * ------------------------------------------------------------------------
+   *
+   * Backward compatibility:
+   *
+   * Existing Booking records may not yet contain refundedAmount.
+   * Missing refund values therefore normalize to zero.
+   * ------------------------------------------------------------------------
+   */
+
+  const refundedAmount =
+    payment.refundedAmount ??
+    booking.payment
+      ?.refundedAmount ??
+    0;
+
+  if (
+    !Number.isFinite(
+      refundedAmount
+    ) ||
+    refundedAmount < 0
+  ) {
+    return {
+      success:
+        false,
+
+      message:
+        "refundedAmount must be a valid non-negative number.",
+
+      errorCode:
+        "PAYMENT_REFUNDED_AMOUNT_INVALID",
+    };
+  }
+
+  if (
+    refundedAmount >
+      paidAmount
+  ) {
+    return {
+      success:
+        false,
+
+      message:
+        "refundedAmount cannot exceed paidAmount.",
+
+      errorCode:
+        "PAYMENT_REFUNDED_AMOUNT_EXCEEDS_PAID",
+    };
+  }
+
+  /* ------------------------------------------------------------------------
+   * Resolve pending refund amount
+   * ------------------------------------------------------------------------
+   */
+
+  const refundPendingAmount =
+    payment.refundPendingAmount ??
+    booking.payment
+      ?.refundPendingAmount ??
+    0;
+
+  if (
+    !Number.isFinite(
+      refundPendingAmount
+    ) ||
+    refundPendingAmount < 0
+  ) {
+    return {
+      success:
+        false,
+
+      message:
+        "refundPendingAmount must be a valid non-negative number.",
+
+      errorCode:
+        "PAYMENT_REFUND_PENDING_AMOUNT_INVALID",
+    };
+  }
+
+  /* ------------------------------------------------------------------------
+   * Refund exposure protection
+   * ------------------------------------------------------------------------
+   *
+   * The amount already refunded plus the amount still pending refund must
+   * never exceed gross successful collections.
+   *
+   * Example:
+   *
+   * paidAmount          = 23,364
+   * refundedAmount      =  5,000
+   * refundPendingAmount = 18,364
+   *
+   * is valid.
+   *
+   * Any larger refund exposure would exceed money actually collected.
+   * ------------------------------------------------------------------------
+   */
+
+  if (
+    refundedAmount +
+      refundPendingAmount >
+    paidAmount
+  ) {
+    return {
+      success:
+        false,
+
+      message:
+        "refundedAmount plus refundPendingAmount cannot exceed paidAmount.",
+
+      errorCode:
+        "PAYMENT_REFUND_EXCEEDS_PAID_AMOUNT",
+    };
+  }
+
+  /* ------------------------------------------------------------------------
+   * Derive collection financial values
    * ------------------------------------------------------------------------
    *
    * Do not trust balanceAmount or paymentPending supplied by the caller.
-   * Both are derived from the authoritative total and paid amount.
+   *
+   * Collection balance is independent from refund state:
+   *
+   * balanceAmount =
+   *   totalAmount - gross paidAmount
+   *
+   * Example:
+   *
+   * totalAmount    = 23,364
+   * paidAmount     = 23,364
+   * refundedAmount =  5,000
+   *
+   * balanceAmount remains 0 because the full commercial amount was collected.
+   *
+   * Refund state is represented separately.
    * ------------------------------------------------------------------------
    */
 
@@ -1016,6 +1176,11 @@ async updatePayment(
       authoritativeTotalAmount -
         paidAmount
     );
+
+  /* ------------------------------------------------------------------------
+   * Build normalized Booking payment projection
+   * ------------------------------------------------------------------------
+   */
 
   const normalizedPayment:
     BookingPaymentSummary = {
@@ -1030,35 +1195,88 @@ async updatePayment(
 
       paymentPending:
         balanceAmount,
+
+      refundedAmount,
+
+      refundPendingAmount,
     };
 
   /* ------------------------------------------------------------------------
    * Idempotency / no-op protection
    * ------------------------------------------------------------------------
    *
-   * Do not persist another PAYMENT_UPDATED event when the normalized
-   * payment state is already identical to the Booking payment state.
+   * Do not persist another PAYMENT_UPDATED timeline event when every
+   * normalized financial field is already identical.
    * ------------------------------------------------------------------------
    */
 
   const currentPayment =
     booking.payment;
 
+  const currentRefundedAmount =
+    currentPayment
+      ?.refundedAmount ??
+    0;
+
+  const currentRefundPendingAmount =
+    currentPayment
+      ?.refundPendingAmount ??
+    0;
+
   const paymentUnchanged =
     currentPayment?.totalAmount ===
       normalizedPayment.totalAmount &&
-    currentPayment?.advanceAmount ===
-      normalizedPayment.advanceAmount &&
-    currentPayment?.paidAmount ===
-      normalizedPayment.paidAmount &&
-    currentPayment?.balanceAmount ===
-      normalizedPayment.balanceAmount &&
-    currentPayment?.paymentPending ===
-      normalizedPayment.paymentPending;
+    (
+      currentPayment
+        ?.advanceAmount ??
+      0
+    ) ===
+      (
+        normalizedPayment
+          .advanceAmount ??
+        0
+      ) &&
+    (
+      currentPayment
+        ?.paidAmount ??
+      0
+    ) ===
+      (
+        normalizedPayment
+          .paidAmount ??
+        0
+      ) &&
+    (
+      currentPayment
+        ?.balanceAmount ??
+      0
+    ) ===
+      (
+        normalizedPayment
+          .balanceAmount ??
+        0
+      ) &&
+    (
+      currentPayment
+        ?.paymentPending ??
+      0
+    ) ===
+      (
+        normalizedPayment
+          .paymentPending ??
+        0
+      ) &&
+    currentRefundedAmount ===
+      refundedAmount &&
+    currentRefundPendingAmount ===
+      refundPendingAmount;
 
-  if (paymentUnchanged) {
+  if (
+    paymentUnchanged
+  ) {
     return {
-      success: true,
+      success:
+        true,
 
       booking,
 
@@ -1066,6 +1284,7 @@ async updatePayment(
         "Payment information is already up to date.",
     };
   }
+
   /* ------------------------------------------------------------------------
    * Persist
    * ------------------------------------------------------------------------

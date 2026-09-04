@@ -808,19 +808,25 @@ export function applyBookingConfirmationFromQuotation(
   };
 
   const payment:
-    BookingPaymentSummary = {
-    totalAmount:
-      input.selectedQuoteAmount,
+  BookingPaymentSummary = {
+  totalAmount:
+    input.selectedQuoteAmount,
 
-    paidAmount:
-      0,
+  paidAmount:
+    0,
 
-    balanceAmount:
-      input.selectedQuoteAmount,
+  balanceAmount:
+    input.selectedQuoteAmount,
 
-    paymentPending:
-      input.selectedQuoteAmount,
-  };
+  paymentPending:
+    input.selectedQuoteAmount,
+
+  refundedAmount:
+    0,
+
+  refundPendingAmount:
+    0,
+};
 
   const tracking:
     BookingTrackingSummary = {

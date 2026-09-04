@@ -310,11 +310,52 @@ export interface BookingQuotationSummaryProvider {
   ): Promise<BookingQuotationSummary>;
 }
 export interface BookingPaymentSummary {
+  /**
+   * Confirmed commercial amount of the Booking.
+   */
   totalAmount?: number;
+
+  /**
+   * Amount classified as advance payment.
+   */
   advanceAmount?: number;
-  balanceAmount?: number;
+
+  /**
+   * Gross amount successfully collected from the customer.
+   *
+   * IMPORTANT:
+   * Refunds must NOT reduce this value.
+   */
   paidAmount?: number;
+
+  /**
+   * Remaining amount still to be collected against the Booking.
+   *
+   * Derived from:
+   *
+   * totalAmount - paidAmount
+   */
+  balanceAmount?: number;
+
+  /**
+   * Amount still pending collection.
+   *
+   * Normally equal to balanceAmount.
+   */
   paymentPending?: number;
+
+  /**
+   * Amount successfully returned to the customer.
+   *
+   * This is maintained independently from gross paidAmount.
+   */
+  refundedAmount?: number;
+
+  /**
+   * Amount for which a refund has been requested but has not yet
+   * successfully completed.
+   */
+  refundPendingAmount?: number;
 }
 
 export interface BookingTrackingSummary {

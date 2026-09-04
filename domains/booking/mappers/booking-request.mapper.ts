@@ -856,6 +856,9 @@ export function mapBookingQuotationSummaryRequest(
 /**
  * Maps a raw payment-summary request.
  */
+/**
+ * Maps a raw payment-summary request.
+ */
 export function mapBookingPaymentSummaryRequest(
   payload: unknown
 ): BookingRequestMappingResult<
@@ -893,8 +896,17 @@ export function mapBookingPaymentSummaryRequest(
 
     paymentPending:
       context.optionalNumber(
-        context.record
-          .paymentPending
+        context.record.paymentPending
+      ),
+
+    refundedAmount:
+      context.optionalNumber(
+        context.record.refundedAmount
+      ),
+
+    refundPendingAmount:
+      context.optionalNumber(
+        context.record.refundPendingAmount
       ),
   });
 }

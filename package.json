@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+"test:payment-sync": "tsx --test tests/payment-booking-sync/**/*.test.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
