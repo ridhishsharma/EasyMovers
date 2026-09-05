@@ -1,65 +1,30 @@
 /**
  * ============================================================================
  * EasyMovers
- * Payment -> Booking Synchronization Statistics Route
+ * Payment -> Booking Synchronization Retry Route
  * ============================================================================
  *
- * File:
- * app/api/payments/reconciliation/booking-sync-statistics/route.ts
+ * POST /api/payments/reconciliation/booking-sync-retries
  *
- * Endpoint:
+ * Processes durable PaymentBookingSync records whose nextRetryAt timestamp
+ * has arrived.
  *
- * GET /api/payments/reconciliation/booking-sync-statistics
- *
- * Purpose:
- *
- * Provide protected operational statistics for the durable
- * Payment -> Booking synchronization queue.
- *
- * IMPORTANT:
- *
- * - Operational data is protected by the internal synchronization secret.
- * - Secret verification uses the shared constant-time authorization helper.
- * - Payment and Booking financial data are not modified by this endpoint.
- * ============================================================================
- */
-
-/* ============================================================================
- * Payment API module
+ * The original Payment mutation is never repeated. Only the idempotent
+ * Payment -> Booking synchronization operation is retried.
  * ============================================================================
  */
 
 import {
-  requirePaymentApiRepository,
-  resolvePaymentApiApplicationModule,
+  resolvePaymentApiBookingSyncRetryService,
 } from "../../_lib/payment-api.module";
-
-/* ============================================================================
- * Request adapter
- * ============================================================================
- */
 
 import {
   PaymentApiRequest,
 } from "../../_lib/payment-api.request";
 
-/* ============================================================================
- * Response adapter
- * ============================================================================
- */
-
 import {
   PaymentApiResponse,
 } from "../../_lib/payment-api.response";
-
-/* ============================================================================
- * Shared internal authorization
- * ============================================================================
- */
-
-import {
-  authorizePaymentSyncRequest,
-} from "../../_lib/payment-api.internal-authorization";
 
 /* ============================================================================
  * Route configuration
@@ -69,98 +34,48 @@ import {
 export const dynamic =
   "force-dynamic";
 
-export const runtime =
-  "nodejs";
-
 /* ============================================================================
- * Resolve observation timestamp
+ * Request body
  * ============================================================================
  */
 
-function resolveObservedAt(
-  request:
-    Request
-):
-  | {
-      success:
-        true;
+interface PaymentBookingSyncRetryRouteBody {
+  processedBy?:
+    unknown;
 
-      value:
-        string;
-    }
-  | {
-      success:
-        false;
+  dueAt?:
+    unknown;
 
-      value:
-        unknown;
-    } {
-  const requestUrl =
-    new URL(
-      request.url
-    );
-
-  const suppliedObservedAt =
-    requestUrl
-      .searchParams
-      .get(
-        "observedAt"
-      );
-
-  if (
-    suppliedObservedAt ===
-      null ||
-    !suppliedObservedAt.trim()
-  ) {
-    return {
-      success:
-        true,
-
-      value:
-        new Date()
-          .toISOString(),
-    };
-  }
-
-  const observedAt =
-    new Date(
-      suppliedObservedAt
-    );
-
-  if (
-    Number.isNaN(
-      observedAt.getTime()
-    )
-  ) {
-    return {
-      success:
-        false,
-
-      value:
-        suppliedObservedAt,
-    };
-  }
-
-  return {
-    success:
-      true,
-
-    value:
-      observedAt
-        .toISOString(),
-  };
+  batchSize?:
+    unknown;
 }
 
 /* ============================================================================
- * End of Part A
- * ============================================================================
- */
-/* ============================================================================
- * GET /api/payments/reconciliation/booking-sync-statistics
+ * Helpers
  * ============================================================================
  */
 
-export async function GET(
+function isRequestBodyObject(
+  value:
+    unknown
+): value is PaymentBookingSyncRetryRouteBody {
+  return (
+    typeof value ===
+      "object" &&
+    value !==
+      null &&
+    !Array.isArray(
+      value
+    )
+  );
+}
+
+/* ============================================================================
+ * POST /api/payments/reconciliation/booking-sync-retries
+ * ============================================================================
+ */
+
+export async function POST(
   request:
     Request
 ) {
@@ -171,119 +86,230 @@ export async function GET(
       );
 
   try {
-    /* ----------------------------------------------------------------------
-     * Protect operational queue information
-     * ----------------------------------------------------------------------
+    /* ------------------------------------------------------------------------
+     * Require configured internal secret
+     * ------------------------------------------------------------------------
      */
 
-    const authorization =
-      authorizePaymentSyncRequest(
-        request
-      );
+    const configuredSecret =
+      process.env
+        .PAYMENT_SYNC_RETRY_SECRET
+        ?.trim();
 
     if (
-      !authorization.authorized
+      !configuredSecret
     ) {
       return PaymentApiResponse
-        .failure(
-          401,
-          "PAYMENT_SYNC_STATISTICS_UNAUTHORIZED",
-          "Valid Payment synchronization statistics authorization is required.",
+        .unavailable(
+          "PAYMENT_SYNC_RETRY_NOT_CONFIGURED",
+          "Payment synchronization retry processing is not configured.",
           requestId
         );
     }
 
-    /* ----------------------------------------------------------------------
-     * Validate optional observation timestamp
-     *
-     * When omitted, the current server timestamp is used.
-     * ----------------------------------------------------------------------
-     */
-
-    const observedAt =
-      resolveObservedAt(
-        request
-      );
+    const suppliedSecret =
+      request.headers
+        .get(
+          "x-payment-sync-retry-secret"
+        )
+        ?.trim();
 
     if (
-      !observedAt.success
+      !suppliedSecret ||
+      suppliedSecret !==
+        configuredSecret
+    ) {
+      return PaymentApiResponse
+        .failure(
+          401,
+          "PAYMENT_SYNC_RETRY_UNAUTHORIZED",
+          "Valid Payment synchronization retry authorization is required.",
+          requestId
+        );
+    }
+
+    /* ------------------------------------------------------------------------
+     * Parse request body
+     * ------------------------------------------------------------------------
+     */
+
+    let rawBody:
+      unknown;
+
+    try {
+      rawBody =
+        await request.json();
+    } catch {
+      return PaymentApiResponse
+        .badRequest(
+          "INVALID_REQUEST",
+          "Request body must contain valid JSON.",
+          requestId
+        );
+    }
+
+    if (
+      !isRequestBodyObject(
+        rawBody
+      )
     ) {
       return PaymentApiResponse
         .badRequest(
-          "PAYMENT_SYNC_STATISTICS_INVALID_OBSERVED_AT",
-          "observedAt must be a valid ISO timestamp.",
+          "INVALID_REQUEST",
+          "Request body must be a JSON object.",
+          requestId
+        );
+    }
+
+    /* ------------------------------------------------------------------------
+     * Resolve processing actor
+     * ------------------------------------------------------------------------
+     */
+
+    const headerActor =
+      request.headers
+        .get(
+          "x-updated-by"
+        )
+        ?.trim();
+
+    const bodyActor =
+      typeof rawBody
+        .processedBy ===
+          "string"
+        ? rawBody
+            .processedBy
+            .trim()
+        : "";
+
+    const processedBy =
+      bodyActor ||
+      headerActor ||
+      "";
+
+    if (
+      !processedBy
+    ) {
+      return PaymentApiResponse
+        .badRequest(
+          "INVALID_REQUEST",
+          "processedBy is required.",
           requestId,
           {
             field:
-              "observedAt",
-
-            value:
-              observedAt.value,
+              "processedBy",
           }
         );
     }
 
-    /* ----------------------------------------------------------------------
-     * Initialize the Payment application and repository
-     * ----------------------------------------------------------------------
+    /* ------------------------------------------------------------------------
+     * Validate optional dueAt
+     * ------------------------------------------------------------------------
      */
 
-    await resolvePaymentApiApplicationModule();
+    if (
+      rawBody.dueAt !==
+        undefined &&
+      (
+        typeof rawBody.dueAt !==
+          "string" ||
+        !rawBody.dueAt.trim() ||
+        Number.isNaN(
+          new Date(
+            rawBody.dueAt
+          )
+            .getTime()
+        )
+      )
+    ) {
+      return PaymentApiResponse
+        .badRequest(
+          "INVALID_REQUEST",
+          "dueAt must be a valid ISO timestamp.",
+          requestId,
+          {
+            field:
+              "dueAt",
 
-    const repository =
-      requirePaymentApiRepository();
+            value:
+              rawBody.dueAt,
+          }
+        );
+    }
 
-    /* ----------------------------------------------------------------------
-     * Read synchronization queue statistics
-     * ----------------------------------------------------------------------
+    /* ------------------------------------------------------------------------
+     * Validate optional batchSize
+     * ------------------------------------------------------------------------
      */
 
-    const statistics =
-      await repository
-        .getBookingSyncStatistics({
-          observedAt:
-            observedAt.value,
+    if (
+      rawBody.batchSize !==
+        undefined &&
+      (
+        typeof rawBody.batchSize !==
+          "number" ||
+        !Number.isInteger(
+          rawBody.batchSize
+        ) ||
+        rawBody.batchSize <
+          1 ||
+        rawBody.batchSize >
+          100
+      )
+    ) {
+      return PaymentApiResponse
+        .badRequest(
+          "INVALID_REQUEST",
+          "batchSize must be an integer between 1 and 100.",
+          requestId,
+          {
+            field:
+              "batchSize",
+
+            value:
+              rawBody.batchSize,
+          }
+        );
+    }
+
+    /* ------------------------------------------------------------------------
+     * Resolve shared retry processor
+     * ------------------------------------------------------------------------
+     */
+
+    const retryService =
+      await resolvePaymentApiBookingSyncRetryService();
+
+    /* ------------------------------------------------------------------------
+     * Process due synchronization records
+     * ------------------------------------------------------------------------
+     */
+
+    const result =
+      await retryService
+        .processRetries({
+          processedBy,
+
+          ...(typeof rawBody.dueAt ===
+            "string"
+            ? {
+                dueAt:
+                  rawBody.dueAt,
+              }
+            : {}),
+
+          ...(typeof rawBody.batchSize ===
+            "number"
+            ? {
+                batchSize:
+                  rawBody.batchSize,
+              }
+            : {}),
         });
-
-    const healthy =
-      statistics.failed ===
-        0 &&
-      statistics.due ===
-        0;
-
-    const requiresAttention =
-      statistics.failed >
-        0 ||
-      statistics.due >
-        0;
-
-    /* ----------------------------------------------------------------------
-     * Return operational queue snapshot
-     * ----------------------------------------------------------------------
-     */
 
     return PaymentApiResponse
       .success(
-        {
-          success:
-            true,
-
-          queue:
-            statistics,
-
-          healthy,
-
-          requiresAttention,
-
-          message:
-            statistics.failed >
-              0
-              ? "Payment synchronization contains terminal failures requiring attention."
-              : statistics.due >
-                  0
-                ? "Payment synchronization records are ready for retry processing."
-                : "Payment synchronization queue is healthy.",
-        },
+        result,
         200,
         requestId
       );
@@ -299,6 +325,6 @@ export async function GET(
 }
 
 /* ============================================================================
- * End of Payment -> Booking Synchronization Statistics Route
+ * End of Payment -> Booking Synchronization Retry Route
  * ============================================================================
  */
