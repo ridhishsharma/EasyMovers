@@ -1220,7 +1220,7 @@ export function normalizePrismaPaymentRepositoryError(
                 )
             : [];
 
-               if (
+        if (
           target.includes(
             "paymentNumber"
           )
@@ -1267,63 +1267,33 @@ export function normalizePrismaPaymentRepositoryError(
 
         return new PaymentRepositoryError(
           "DUPLICATE_PAYMENT",
-          "A duplicate Payment persistence record already exists.",
-          {}
-        );      }
+          "A duplicate Payment persistence record already exists."
+        );
+      }
 
       case "P2003":
         return new PaymentRepositoryError(
           "REPOSITORY_WRITE_FAILED",
-          "Payment relation constraint failed.",
-          {
-            cause:
-              error,
-          }
+          "Payment relation constraint failed."
         );
 
       case "P2025":
         return new PaymentRepositoryError(
           "PAYMENT_NOT_FOUND",
-          "Payment record was not found.",
-          {
-            cause:
-              error,
-          }
+          "Payment record was not found."
         );
 
       default:
         return new PaymentRepositoryError(
           fallbackCode,
-          `Prisma Payment repository operation failed (${error.code}).`,
-          {
-            cause:
-              error,
-          }
+          "Payment repository operation failed."
         );
     }
   }
 
-  if (
-    error instanceof
-      Error
-  ) {
-    return new PaymentRepositoryError(
-      fallbackCode,
-      error.message,
-      {
-        cause:
-          error,
-      }
-    );
-  }
-
   return new PaymentRepositoryError(
     fallbackCode,
-    "Unknown Prisma Payment repository error.",
-    {
-      cause:
-        error,
-    }
+    "Payment repository operation failed."
   );
 }
 
@@ -7317,14 +7287,9 @@ export async function checkPrismaPaymentRepositoryHealth(
       `;
 
     return createHealthyPaymentRepositoryResult();
-  } catch (
-    error
-  ) {
+    } catch {
     return createUnhealthyPaymentRepositoryResult(
-      error instanceof
-        Error
-        ? error.message
-        : "Payment repository health check failed."
+      "Payment repository health check failed."
     );
   }
 }

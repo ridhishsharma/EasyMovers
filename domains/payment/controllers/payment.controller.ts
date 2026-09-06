@@ -72,6 +72,9 @@ import type {
  * Generic controller record
  * ============================================================================
  */
+import {
+  isPaymentStatus,
+} from "../models/payment.model";
 
 /**
  * Generic object representation used for:
@@ -3988,12 +3991,42 @@ export function createPaymentSearchCriteria(
    * ------------------------------------------------------------------------
    */
 
-  assignPaymentControllerOptionalString(
-    criteria,
-    "status",
-    safeQuery.status ??
-      safeQuery.paymentStatus
+  const rawPaymentStatus =
+  safeQuery.status ??
+  safeQuery.paymentStatus;
+
+const paymentStatus =
+  normalizePaymentControllerOptionalString(
+    rawPaymentStatus
   );
+
+if (
+  paymentStatus !==
+    undefined
+) {
+  if (
+    !isPaymentStatus(
+      paymentStatus
+    )
+  ) {
+    errors.push({
+      field:
+        "status",
+
+      code:
+        "INVALID_ENUM_VALUE",
+
+      message:
+        "status must contain a valid Payment status.",
+
+      value:
+        rawPaymentStatus,
+    });
+  } else {
+    criteria.status =
+      paymentStatus;
+  }
+}
 
   assignPaymentControllerOptionalString(
     criteria,
