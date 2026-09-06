@@ -4851,6 +4851,175 @@ export function calculatePaymentAfterSuccessfulCollection(
 }
 
 /* ============================================================================
+ * Successful collection gateway-order synchronization
+ * ============================================================================
+ */
+
+export async function synchronizeSuccessfulCollectionGatewayOrder(
+  repository:
+    CompleteExtendedPaymentRepository,
+  payment:
+    Payment,
+  transaction:
+    PaymentTransaction
+): Promise<void> {
+  const gateway =
+    transaction.gateway;
+
+  const gatewayOrderId =
+    normalizePaymentServiceString(
+      gateway
+        ?.gatewayOrderId
+    );
+
+  if (
+    !gatewayOrderId
+  ) {
+    return;
+  }
+
+  const existingGatewayOrder =
+    await repository
+      .findGatewayOrderById(
+        gatewayOrderId
+      );
+
+  if (
+    !existingGatewayOrder
+  ) {
+    throw new PaymentServiceError(
+      "GATEWAY_OPERATION_FAILED",
+      "The successful collection references a gateway order that was not found.",
+      {
+        paymentId:
+          payment.paymentId,
+
+        gatewayOrderId,
+      }
+    );
+  }
+
+  if (
+    existingGatewayOrder
+      .paymentId !==
+      payment.paymentId
+  ) {
+    throw new PaymentServiceError(
+      "BUSINESS_RULE",
+      "The gateway order belongs to a different Payment.",
+      {
+        paymentId:
+          payment.paymentId,
+
+        gatewayOrderId,
+      }
+    );
+  }
+
+  if (
+    gateway?.provider &&
+    existingGatewayOrder
+      .provider !==
+      gateway.provider
+  ) {
+    throw new PaymentServiceError(
+      "BUSINESS_RULE",
+      "The gateway order provider does not match the successful collection provider.",
+      {
+        field:
+          "gateway.provider",
+
+        value:
+          gateway.provider,
+
+        paymentId:
+          payment.paymentId,
+
+        gatewayOrderId,
+      }
+    );
+  }
+
+  if (
+    existingGatewayOrder
+      .currency !==
+      transaction.amount
+        .currency
+  ) {
+    throw new PaymentServiceError(
+      "BUSINESS_RULE",
+      "The gateway order currency does not match the successful collection currency.",
+      {
+        field:
+          "currency",
+
+        value:
+          transaction.amount
+            .currency,
+
+        paymentId:
+          payment.paymentId,
+
+        gatewayOrderId,
+      }
+    );
+  }
+
+  if (
+    existingGatewayOrder
+      .amount !==
+      transaction.amount
+        .amount
+  ) {
+    throw new PaymentServiceError(
+      "BUSINESS_RULE",
+      "The gateway order amount does not match the successful collection amount.",
+      {
+        field:
+          "amount",
+
+        value:
+          transaction.amount
+            .amount,
+
+        paymentId:
+          payment.paymentId,
+
+        gatewayOrderId,
+      }
+    );
+  }
+
+  requireValidPaymentGatewayOrderTransition(
+    existingGatewayOrder.status,
+    "PAID"
+  );
+
+  if (
+    existingGatewayOrder
+      .status ===
+      "PAID"
+  ) {
+    return;
+  }
+
+  await repository
+    .updateGatewayOrder({
+      paymentId:
+        payment.paymentId,
+
+      gatewayOrderId,
+
+      status:
+        "PAID",
+
+      updatedAt:
+        transaction.completedAt ??
+        new Date()
+          .toISOString(),
+    });
+}
+/* ============================================================================
  * Successful collection persistence
  * ============================================================================
  */
@@ -4952,7 +5121,11 @@ await requirePaymentTransactionIdAvailable(
               .createTransaction({
                 transaction,
               });
-
+          await synchronizeSuccessfulCollectionGatewayOrder(
+            completeRepository,
+            payment,
+            createdTransaction
+          );
                    await completeRepository
             .updateFinancialSummary({
               paymentId,
@@ -7088,6 +7261,72 @@ export function resolveGatewayOrderCurrency(
 }
 
 /* ============================================================================
+ * Gateway-order status transition validation
+ * ============================================================================
+ */
+
+export function requireValidPaymentGatewayOrderTransition(
+  currentStatus:
+    PaymentGatewayOrderRepositoryRecord["status"],
+  nextStatus:
+    PaymentGatewayOrderRepositoryRecord["status"] |
+    undefined
+): void {
+  if (
+    nextStatus ===
+      undefined ||
+    nextStatus ===
+      currentStatus
+  ) {
+    return;
+  }
+
+  const transitionAllowed =
+    currentStatus ===
+      "CREATED"
+      ? (
+          nextStatus ===
+            "PENDING" ||
+          nextStatus ===
+            "PAID" ||
+          nextStatus ===
+            "FAILED" ||
+          nextStatus ===
+            "CANCELLED" ||
+          nextStatus ===
+            "EXPIRED"
+        )
+      : currentStatus ===
+          "PENDING"
+        ? (
+            nextStatus ===
+              "PAID" ||
+            nextStatus ===
+              "FAILED" ||
+            nextStatus ===
+              "CANCELLED" ||
+            nextStatus ===
+              "EXPIRED"
+          )
+        : false;
+
+  if (
+    !transitionAllowed
+  ) {
+    throw new PaymentServiceError(
+      "BUSINESS_RULE",
+      `Gateway order cannot transition from ${currentStatus} to ${nextStatus}.`,
+      {
+        field:
+          "status",
+
+        value:
+          nextStatus,
+      }
+    );
+  }
+}
+/* ============================================================================
  * Create gateway-order persistence record
  * ============================================================================
  */
@@ -7248,7 +7487,10 @@ export async function updatePaymentGatewayOrder(
         }
       );
     }
-
+    requireValidPaymentGatewayOrderTransition(
+      existing.status,
+      input.status
+    );
     return await repository
   .updateGatewayOrder({
     paymentId:

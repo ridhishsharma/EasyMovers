@@ -5596,6 +5596,19 @@ export const PAYMENT_CONTROLLER_PROVIDER_VALUES =
     "OTHER",
   ] as const;
 
+export const PAYMENT_CONTROLLER_GATEWAY_ORDER_STATUS_VALUES =
+  [
+    "CREATED",
+    "PENDING",
+    "PAID",
+    "FAILED",
+    "CANCELLED",
+    "EXPIRED",
+  ] as const;
+
+export type PaymentControllerGatewayOrderStatus =
+  typeof PAYMENT_CONTROLLER_GATEWAY_ORDER_STATUS_VALUES[number];
+
 export type PaymentControllerProvider =
   typeof PAYMENT_CONTROLLER_PROVIDER_VALUES[number];
 
@@ -5707,6 +5720,21 @@ export function normalizePaymentControllerProvider(
   );
 }
 
+/* ============================================================================
+ * Gateway-order status normalization
+ * ============================================================================
+ */
+
+export function normalizePaymentControllerGatewayOrderStatus(
+  value:
+    unknown
+): PaymentControllerGatewayOrderStatus | undefined {
+  return normalizePaymentControllerEnum(
+    value,
+    "status",
+    PAYMENT_CONTROLLER_GATEWAY_ORDER_STATUS_VALUES
+  );
+}
 /* ============================================================================
  * Successful collection input mapping
  * ============================================================================
@@ -7402,10 +7430,12 @@ export function createGatewayOrderControllerInput(
   body:
     CreatePaymentGatewayOrderControllerBody
 ): CreatePaymentGatewayOrderControllerInput {
-  const provider =
-    requirePaymentControllerBodyString(
-      body.provider,
-      "provider"
+    const provider =
+    normalizePaymentControllerProvider(
+      requirePaymentControllerBodyString(
+        body.provider,
+        "provider"
+      )
     );
 
   const gatewayOrderId =
@@ -7425,7 +7455,7 @@ export function createGatewayOrderControllerInput(
     );
 
   const status =
-    normalizePaymentControllerOptionalString(
+    normalizePaymentControllerGatewayOrderStatus(
       body.status
     );
 
@@ -7484,8 +7514,8 @@ export function createUpdateGatewayOrderControllerInput(
   body:
     UpdatePaymentGatewayOrderControllerBody
 ): UpdatePaymentGatewayOrderControllerInput {
-  const status =
-    normalizePaymentControllerOptionalString(
+    const status =
+    normalizePaymentControllerGatewayOrderStatus(
       body.status
     );
 
