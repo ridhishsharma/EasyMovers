@@ -73,7 +73,13 @@ import type {
  * ============================================================================
  */
 import {
+  isPaymentMethod,
+  isPaymentProvider,
+  isPaymentPurpose,
   isPaymentStatus,
+  isPaymentTransactionStatus,
+  isPaymentTransactionType,
+  isPaymentType,
 } from "../models/payment.model";
 
 /**
@@ -3749,6 +3755,61 @@ export function assignPaymentControllerOptionalString(
 }
 
 /* ============================================================================
+ * Optional enum assignment
+ * ============================================================================
+ */
+
+export function assignPaymentControllerOptionalEnum(
+  target:
+    PaymentControllerMutableCriteria,
+  field:
+    string,
+  value:
+    unknown,
+  validator:
+    (
+      value:
+        unknown
+    ) => boolean,
+  errors:
+    PaymentControllerSearchMappingIssue[]
+): void {
+  const normalized =
+    normalizePaymentControllerOptionalString(
+      value
+    );
+
+  if (
+    normalized ===
+      undefined
+  ) {
+    return;
+  }
+
+  if (
+    !validator(
+      normalized
+    )
+  ) {
+    errors.push({
+      field,
+
+      code:
+        "INVALID_ENUM_VALUE",
+
+      message:
+        `${field} must contain a valid enum value.`,
+
+      value,
+    });
+
+    return;
+  }
+
+  target[field] =
+    normalized;
+}
+/* ============================================================================
  * Optional number assignment
  * ============================================================================
  */
@@ -3991,64 +4052,52 @@ export function createPaymentSearchCriteria(
    * ------------------------------------------------------------------------
    */
 
-  const rawPaymentStatus =
-  safeQuery.status ??
-  safeQuery.paymentStatus;
-
-const paymentStatus =
-  normalizePaymentControllerOptionalString(
-    rawPaymentStatus
-  );
-
-if (
-  paymentStatus !==
-    undefined
-) {
-  if (
-    !isPaymentStatus(
-      paymentStatus
-    )
-  ) {
-    errors.push({
-      field:
-        "status",
-
-      code:
-        "INVALID_ENUM_VALUE",
-
-      message:
-        "status must contain a valid Payment status.",
-
-      value:
-        rawPaymentStatus,
-    });
-  } else {
-    criteria.status =
-      paymentStatus;
-  }
-}
-
-  assignPaymentControllerOptionalString(
+    assignPaymentControllerOptionalString(
     criteria,
-    "paymentMethod",
-    safeQuery.paymentMethod ??
-      safeQuery.method
-  );
-
-  assignPaymentControllerOptionalString(
-    criteria,
-    "paymentType",
-    safeQuery.paymentType ??
-      safeQuery.type
-  );
-
-  assignPaymentControllerOptionalString(
-    criteria,
-    "provider",
-    safeQuery.provider
+    "vendorId",
+    safeQuery.vendorId
   );
 
   /* ------------------------------------------------------------------------
+   * Payment state
+   * ------------------------------------------------------------------------
+   */
+
+  assignPaymentControllerOptionalEnum(
+    criteria,
+    "status",
+    safeQuery.status ??
+      safeQuery.paymentStatus,
+    isPaymentStatus,
+    errors
+  );
+
+  assignPaymentControllerOptionalEnum(
+    criteria,
+    "paymentMethod",
+    safeQuery.paymentMethod ??
+      safeQuery.method,
+    isPaymentMethod,
+    errors
+  );
+
+  assignPaymentControllerOptionalEnum(
+    criteria,
+    "paymentType",
+    safeQuery.paymentType ??
+      safeQuery.type,
+    isPaymentType,
+    errors
+  );
+
+  assignPaymentControllerOptionalEnum(
+    criteria,
+    "provider",
+    safeQuery.provider,
+    isPaymentProvider,
+    errors
+  );
+/* ------------------------------------------------------------------------
    * Gateway identifiers
    * ------------------------------------------------------------------------
    */
@@ -4208,46 +4257,44 @@ export function createPaymentTransactionSearchCriteria(
     PaymentControllerSearchMappingIssue[] =
       [];
 
-  assignPaymentControllerOptionalString(
-    criteria,
-    "transactionId",
-    safeQuery.transactionId
-  );
-
-  assignPaymentControllerOptionalString(
-    criteria,
-    "paymentId",
-    safeQuery.paymentId
-  );
-
-  assignPaymentControllerOptionalString(
+    assignPaymentControllerOptionalEnum(
     criteria,
     "transactionType",
-    safeQuery.transactionType
+    safeQuery.transactionType,
+    isPaymentTransactionType,
+    errors
   );
 
-  assignPaymentControllerOptionalString(
+  assignPaymentControllerOptionalEnum(
     criteria,
     "purpose",
-    safeQuery.purpose
+    safeQuery.purpose,
+    isPaymentPurpose,
+    errors
   );
 
-  assignPaymentControllerOptionalString(
+  assignPaymentControllerOptionalEnum(
     criteria,
     "status",
-    safeQuery.status
+    safeQuery.status,
+    isPaymentTransactionStatus,
+    errors
   );
 
-  assignPaymentControllerOptionalString(
+  assignPaymentControllerOptionalEnum(
     criteria,
     "method",
-    safeQuery.method
+    safeQuery.method,
+    isPaymentMethod,
+    errors
   );
 
-  assignPaymentControllerOptionalString(
+  assignPaymentControllerOptionalEnum(
     criteria,
     "provider",
-    safeQuery.provider
+    safeQuery.provider,
+    isPaymentProvider,
+    errors
   );
 
   assignPaymentControllerOptionalString(

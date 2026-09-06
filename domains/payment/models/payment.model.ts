@@ -148,6 +148,34 @@ export enum PaymentStatus {
  *
  * This is separate from transaction direction/type.
  */
+
+/* ============================================================================
+ * Legacy Payment classification
+ * ============================================================================
+ */
+
+export enum PaymentType {
+  ADVANCE =
+    "ADVANCE",
+
+  PARTIAL =
+    "PARTIAL",
+
+  FINAL =
+    "FINAL",
+
+  REFUND =
+    "REFUND",
+
+  BALANCE =
+    "BALANCE",
+
+  FULL_PAYMENT =
+    "FULL_PAYMENT",
+
+  ADDITIONAL =
+    "ADDITIONAL",
+}
 export enum PaymentPurpose {
   ADVANCE =
     "ADVANCE",
@@ -1798,7 +1826,20 @@ export function isPaymentStatus(
     )
   );
 }
-
+export function isPaymentType(
+  value:
+    unknown
+): value is PaymentType {
+  return (
+    typeof value ===
+      "string" &&
+    Object.values(
+      PaymentType
+    ).includes(
+      value as PaymentType
+    )
+  );
+}
 export function isPaymentTransactionStatus(
   value:
     unknown
