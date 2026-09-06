@@ -21,6 +21,7 @@ import type {
 
 import {
   PaymentServiceError,
+  recordFailedPaymentCollection,
   recordSuccessfulPaymentCollection,
   synchronizeSuccessfulCollectionGatewayOrder,
   requireValidPaymentGatewayOrderTransition,
@@ -82,7 +83,20 @@ test(
       "PAID",
       "PAID"
     );
+    requireValidPaymentGatewayOrderTransition(
+      "CREATED",
+      "FAILED"
+    );
 
+    requireValidPaymentGatewayOrderTransition(
+      "PENDING",
+      "FAILED"
+    );
+
+    requireValidPaymentGatewayOrderTransition(
+      "FAILED",
+      "FAILED"
+    );
     throws(
       () =>
         requireValidPaymentGatewayOrderTransition(
@@ -104,6 +118,21 @@ test(
         requireValidPaymentGatewayOrderTransition(
           "CANCELLED",
           "PAID"
+        ),
+      (
+        error:
+          unknown
+      ) =>
+        error instanceof
+          PaymentServiceError &&
+        error.code ===
+          "BUSINESS_RULE"
+    );
+    throws(
+      () =>
+        requireValidPaymentGatewayOrderTransition(
+          "PAID",
+          "FAILED"
         ),
       (
         error:
@@ -713,6 +742,281 @@ test(
     equal(
       updateCount,
       0
+    );
+  }
+);
+test(
+  "Failed gateway collection marks its persisted gateway order FAILED",
+  async () => {
+    const payment =
+      {
+        paymentId,
+
+        paymentNumber:
+          "EMP-GATEWAY-FAILURE-001",
+
+        referenceId:
+          "EMP-REF-GATEWAY-FAILURE-001",
+
+        bookingId,
+
+        status:
+          PaymentStatus.PARTIALLY_PAID,
+
+        payable: {
+          totalAmount:
+            5000,
+
+          paidAmount:
+            1000,
+
+          balanceAmount:
+            4000,
+
+          paymentPending:
+            4000,
+
+          currency:
+            PaymentCurrency.INR,
+        },
+
+        transactions:
+          [],
+
+        refundSummary: {
+          totalRefundedAmount:
+            0,
+
+          refundPendingAmount:
+            0,
+
+          currency:
+            PaymentCurrency.INR,
+        },
+
+        audit: {
+          createdAt:
+            "2026-09-06T09:00:00.000Z",
+
+          updatedAt:
+            "2026-09-06T09:30:00.000Z",
+
+          createdBy:
+            "PAYMENT_GATEWAY_FAILURE_TEST",
+
+          updatedBy:
+            "PAYMENT_GATEWAY_FAILURE_TEST",
+
+          source:
+            "API",
+        },
+      } as unknown as
+        Payment;
+
+    let gatewayOrder:
+      PaymentGatewayOrderRepositoryRecord =
+        {
+          paymentId,
+
+          provider:
+            PaymentProvider.OTHER,
+
+          gatewayOrderId,
+
+          amount:
+            500,
+
+          currency:
+            PaymentCurrency.INR,
+
+          status:
+            "PENDING",
+
+          createdAt:
+            "2026-09-06T09:40:00.000Z",
+
+          updatedAt:
+            "2026-09-06T09:40:00.000Z",
+        };
+
+    let gatewayOrderLookupCount =
+      0;
+
+    let gatewayOrderUpdateCount =
+      0;
+
+    let gatewayOrderUpdate:
+      UpdatePaymentGatewayOrderRepositoryInput |
+      undefined;
+
+    const repository =
+      {
+        async findById() {
+          return payment;
+        },
+
+        async findTransactionById() {
+          return null;
+        },
+
+        async createTransaction(
+          input: {
+            transaction:
+              PaymentTransaction;
+          }
+        ) {
+          return input.transaction;
+        },
+
+        async updateStatus() {
+          return payment;
+        },
+
+        async upsertPendingBookingSync() {
+          return {};
+        },
+
+        async findGatewayOrderById(
+          requestedGatewayOrderId:
+            string
+        ) {
+          gatewayOrderLookupCount +=
+            1;
+
+          return requestedGatewayOrderId ===
+            gatewayOrderId
+            ? gatewayOrder
+            : null;
+        },
+
+        async updateGatewayOrder(
+          input:
+            UpdatePaymentGatewayOrderRepositoryInput
+        ) {
+          gatewayOrderUpdateCount +=
+            1;
+
+          gatewayOrderUpdate =
+            input;
+
+          gatewayOrder = {
+            ...gatewayOrder,
+
+            status:
+              input.status ??
+              gatewayOrder.status,
+
+            updatedAt:
+              input.updatedAt ??
+              gatewayOrder.updatedAt,
+          };
+
+          return gatewayOrder;
+        },
+      } as unknown as
+        CompleteExtendedPaymentRepository;
+
+    const transactionManager =
+      {
+        async runInTransaction<T>(
+          callback:
+            Parameters<
+              ExtendedPaymentRepositoryTransactionManager[
+                "runInTransaction"
+              ]
+            >[0]
+        ): Promise<T> {
+          return callback({
+            repository,
+          }) as Promise<T>;
+        },
+      } as
+        ExtendedPaymentRepositoryTransactionManager;
+
+    const result =
+      await recordFailedPaymentCollection(
+        transactionManager,
+        {
+          paymentId,
+
+          amount:
+            500,
+
+          transactionId:
+            "PTXN-GATEWAY-FAILURE-TEST-001",
+
+          currency:
+            "INR",
+
+          purpose:
+            "BALANCE",
+
+          method:
+            "OTHER",
+
+          provider:
+            PaymentProvider.OTHER,
+
+          gateway: {
+            provider:
+              PaymentProvider.OTHER,
+
+            gatewayOrderId,
+
+            gatewayPaymentId:
+              "GW-PAYMENT-FAILURE-TEST-001",
+          },
+
+          reason:
+            "PAYMENT_GATEWAY_COLLECTION_FAILED",
+
+          message:
+            "Controlled failed gateway collection.",
+
+          providerErrorCode:
+            "GATEWAY_TEST_DECLINED",
+
+          failedAt:
+            "2026-09-06T10:00:00.000Z",
+
+          updatedBy:
+            "PAYMENT_GATEWAY_FAILURE_TEST",
+        }
+      );
+
+    equal(
+      result.transaction.status,
+      "FAILED"
+    );
+
+    equal(
+      gatewayOrderLookupCount,
+      1
+    );
+
+    equal(
+      gatewayOrderUpdateCount,
+      1
+    );
+
+    equal(
+      gatewayOrderUpdate?.paymentId,
+      paymentId
+    );
+
+    equal(
+      gatewayOrderUpdate?.gatewayOrderId,
+      gatewayOrderId
+    );
+
+    equal(
+      gatewayOrderUpdate?.status,
+      "FAILED"
+    );
+
+    equal(
+      gatewayOrder.status,
+      "FAILED"
     );
   }
 );

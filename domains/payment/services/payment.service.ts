@@ -4851,17 +4851,19 @@ export function calculatePaymentAfterSuccessfulCollection(
 }
 
 /* ============================================================================
- * Successful collection gateway-order synchronization
+ * Collection gateway-order synchronization
  * ============================================================================
  */
 
-export async function synchronizeSuccessfulCollectionGatewayOrder(
+export async function synchronizePaymentCollectionGatewayOrder(
   repository:
     CompleteExtendedPaymentRepository,
   payment:
     Payment,
   transaction:
-    PaymentTransaction
+    PaymentTransaction,
+  targetStatus:
+    PaymentGatewayOrderRepositoryRecord["status"]
 ): Promise<void> {
   const gateway =
     transaction.gateway;
@@ -4889,7 +4891,7 @@ export async function synchronizeSuccessfulCollectionGatewayOrder(
   ) {
     throw new PaymentServiceError(
       "GATEWAY_OPERATION_FAILED",
-      "The successful collection references a gateway order that was not found.",
+      `The ${transaction.status.toLowerCase()} collection references a gateway order that was not found.`,
       {
         paymentId:
           payment.paymentId,
@@ -4924,7 +4926,7 @@ export async function synchronizeSuccessfulCollectionGatewayOrder(
   ) {
     throw new PaymentServiceError(
       "BUSINESS_RULE",
-      "The gateway order provider does not match the successful collection provider.",
+      "The gateway order provider does not match the collection provider.",
       {
         field:
           "gateway.provider",
@@ -4948,7 +4950,7 @@ export async function synchronizeSuccessfulCollectionGatewayOrder(
   ) {
     throw new PaymentServiceError(
       "BUSINESS_RULE",
-      "The gateway order currency does not match the successful collection currency.",
+      "The gateway order currency does not match the collection currency.",
       {
         field:
           "currency",
@@ -4973,7 +4975,7 @@ export async function synchronizeSuccessfulCollectionGatewayOrder(
   ) {
     throw new PaymentServiceError(
       "BUSINESS_RULE",
-      "The gateway order amount does not match the successful collection amount.",
+      "The gateway order amount does not match the collection amount.",
       {
         field:
           "amount",
@@ -4992,13 +4994,13 @@ export async function synchronizeSuccessfulCollectionGatewayOrder(
 
   requireValidPaymentGatewayOrderTransition(
     existingGatewayOrder.status,
-    "PAID"
+    targetStatus
   );
 
   if (
     existingGatewayOrder
       .status ===
-      "PAID"
+      targetStatus
   ) {
     return;
   }
@@ -5011,13 +5013,56 @@ export async function synchronizeSuccessfulCollectionGatewayOrder(
       gatewayOrderId,
 
       status:
-        "PAID",
+        targetStatus,
 
       updatedAt:
         transaction.completedAt ??
+        transaction.failedAt ??
         new Date()
           .toISOString(),
     });
+}
+
+/* ============================================================================
+ * Successful collection gateway-order synchronization
+ * ============================================================================
+ */
+
+export async function synchronizeSuccessfulCollectionGatewayOrder(
+  repository:
+    CompleteExtendedPaymentRepository,
+  payment:
+    Payment,
+  transaction:
+    PaymentTransaction
+): Promise<void> {
+  return synchronizePaymentCollectionGatewayOrder(
+    repository,
+    payment,
+    transaction,
+    "PAID"
+  );
+}
+
+/* ============================================================================
+ * Failed collection gateway-order synchronization
+ * ============================================================================
+ */
+
+export async function synchronizeFailedCollectionGatewayOrder(
+  repository:
+    CompleteExtendedPaymentRepository,
+  payment:
+    Payment,
+  transaction:
+    PaymentTransaction
+): Promise<void> {
+  return synchronizePaymentCollectionGatewayOrder(
+    repository,
+    payment,
+    transaction,
+    "FAILED"
+  );
 }
 /* ============================================================================
  * Successful collection persistence
@@ -5272,7 +5317,11 @@ await requirePaymentTransactionIdAvailable(
               .createTransaction({
                 transaction,
               });
-
+          await synchronizeFailedCollectionGatewayOrder(
+            completeRepository,
+            payment,
+            createdTransaction
+          );
           /**
            * A failed attempt must not erase money already collected.
            *
@@ -6707,8 +6756,7 @@ await requirePaymentTransactionIdAvailable(
               .createTransaction({
                 transaction,
               });
-
-                    await completeRepository
+            await completeRepository
             .updateFinancialSummary({
               paymentId,
 
