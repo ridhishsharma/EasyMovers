@@ -7099,7 +7099,7 @@ export function createRequestPaymentRefundControllerInput(
     );
 
   const provider =
-    normalizePaymentControllerOptionalString(
+    normalizePaymentControllerProvider(
       body.provider
     );
 
@@ -7210,7 +7210,7 @@ export function createCompletePaymentRefundControllerInput(
     );
 
   const provider =
-    normalizePaymentControllerOptionalString(
+    normalizePaymentControllerProvider(
       body.provider
     );
 
@@ -7310,7 +7310,7 @@ export function createFailPaymentRefundControllerInput(
     );
 
   const provider =
-    normalizePaymentControllerOptionalString(
+    normalizePaymentControllerProvider(
       body.provider
     );
 
@@ -8571,9 +8571,11 @@ export function createRecordPaymentWebhookControllerInput(
     );
 
   const provider =
-    requirePaymentControllerBodyString(
-      body.provider,
-      "provider"
+    normalizePaymentControllerProvider(
+      requirePaymentControllerBodyString(
+        body.provider,
+        "provider"
+      )
     );
 
   const eventType =
@@ -9239,10 +9241,12 @@ export async function checkPaymentWebhookEventController(
 
   try {
     const provider =
-      requirePaymentControllerBodyString(
-        request.query
-          ?.provider,
-        "provider"
+      normalizePaymentControllerProvider(
+        requirePaymentControllerBodyString(
+          request.query
+            ?.provider,
+          "provider"
+        )
       );
 
     const providerEventId =
