@@ -7650,7 +7650,68 @@ export async function paymentWebhookEventAlreadyExists(
  * Record webhook receipt
  * ============================================================================
  */
+export function requirePaymentWebhookReplayConsistency(
+  existing:
+    PaymentWebhookRepositoryRecord,
+  input:
+    RecordPaymentWebhookServiceInput,
+  identityField:
+    "providerEventId" |
+    "webhookId",
+  identityValue:
+    string
+): void {
+  const existingPayloadHash =
+    normalizePaymentServiceString(
+      existing.payloadHash
+    );
 
+  const incomingPayloadHash =
+    normalizePaymentServiceString(
+      input.payloadHash
+    );
+
+  const providerConflict =
+    existing.provider !==
+      input.provider;
+
+  const eventTypeConflict =
+    existing.eventType !==
+      input.eventType;
+
+  const providerEventConflict =
+    existing.providerEventId &&
+    input.providerEventId &&
+    existing.providerEventId !==
+      input.providerEventId;
+
+  const payloadConflict =
+    existingPayloadHash &&
+    incomingPayloadHash &&
+    existingPayloadHash !==
+      incomingPayloadHash;
+
+  if (
+    !providerConflict &&
+    !eventTypeConflict &&
+    !providerEventConflict &&
+    !payloadConflict
+  ) {
+    return;
+  }
+
+  throw new PaymentServiceError(
+    "BUSINESS_RULE",
+    "Webhook identity is already associated with a different payload.",
+    {
+      field:
+        identityField,
+
+      value:
+        identityValue,
+    }
+  );
+}
 export async function recordPaymentWebhook(
   repository:
     CompleteExtendedPaymentRepository,
@@ -7684,6 +7745,12 @@ export async function recordPaymentWebhook(
       if (
         existing
       ) {
+        requirePaymentWebhookReplayConsistency(
+          existing,
+          input,
+          "providerEventId",
+          input.providerEventId
+        );
         return {
           webhook:
             existing,
@@ -7707,6 +7774,12 @@ export async function recordPaymentWebhook(
     if (
       existingByWebhookId
     ) {
+      requirePaymentWebhookReplayConsistency(
+        existingByWebhookId,
+        input,
+        "webhookId",
+        webhookId
+      );
       return {
         webhook:
           existingByWebhookId,
