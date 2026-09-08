@@ -5422,8 +5422,16 @@ observedRefundedAmount:
                 .differences
             ),
 
+          providerReference:
+            input.observed
+              .providerReference ??
+            null,
+
           observedAt:
-            new Date(),
+            new Date(
+              input.observed
+                .observedAt
+            ),
 
           reconciledAt:
             new Date(

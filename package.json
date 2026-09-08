@@ -9,9 +9,9 @@
     "lint": "eslint",
     "test:payment-sync": "tsx --test tests/payment-booking-sync/**/*.test.ts",
     "test:payment-gateway-order": "tsx --test tests/payment-gateway-order/**/*.test.ts",
-    "test:payment-domain": "tsx --test tests/payment-booking-sync/**/*.test.ts tests/payment-gateway-order/**/*.test.ts",
-"test:payment-webhook": "tsx --test tests/payment-webhook/**/*.test.ts",
-"test:payment-domain": "tsx --test tests/payment-booking-sync/**/*.test.ts tests/payment-gateway-order/**/*.test.ts tests/payment-webhook/**/*.test.ts",
+    "test:payment-webhook": "tsx --test tests/payment-webhook/**/*.test.ts",
+    "test:payment-reconciliation": "tsx --test tests/payment-reconciliation/**/*.test.ts",
+    "test:payment-domain": "tsx --test tests/payment-booking-sync/**/*.test.ts tests/payment-gateway-order/**/*.test.ts tests/payment-webhook/**/*.test.ts tests/payment-reconciliation/**/*.test.ts",
     "postinstall": "prisma generate"
   },
   "prisma": {
