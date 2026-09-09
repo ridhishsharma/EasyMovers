@@ -5469,52 +5469,52 @@ export function mapPrismaReconciliationToDomain(
   "result"
 ] {
   const differences =
-  Array.isArray(
-    record.differences
-  )
-    ? record.differences
-        .filter(
-          (
-            item
-          ): item is Prisma.JsonObject =>
-            typeof item ===
-              "object" &&
-            item !==
-              null &&
-            !Array.isArray(
+    Array.isArray(
+      record.differences
+    )
+      ? record.differences
+          .filter(
+            (
               item
-            )
-        )
-        .map(
-          (
-            item
-          ) => ({
-            field:
-              String(
-                item.field ??
-                ""
-              ),
+            ): item is Prisma.JsonObject =>
+              typeof item ===
+                "object" &&
+              item !==
+                null &&
+              !Array.isArray(
+                item
+              )
+          )
+          .map(
+            (
+              item
+            ) => ({
+              field:
+                String(
+                  item.field ??
+                    ""
+                ),
 
-            expected:
-              Number(
-                item.expected ??
-                  0
-              ),
+              expected:
+                Number(
+                  item.expected ??
+                    0
+                ),
 
-            observed:
-              Number(
-                item.observed ??
-                  0
-              ),
+              observed:
+                Number(
+                  item.observed ??
+                    0
+                ),
 
-            difference:
-              Number(
-                item.difference ??
-                  0
-              ),
-          })
-        )
-    : [];
+              difference:
+                Number(
+                  item.difference ??
+                    0
+                ),
+            })
+          )
+      : [];
 
   return {
     paymentId:
@@ -5524,70 +5524,77 @@ export function mapPrismaReconciliationToDomain(
       record.reconciled,
 
     expected: {
-  paymentId:
-    record.paymentId,
+      paymentId:
+        record.paymentId,
 
-  totalAmount:
-    record.expectedTotalAmount !==
-    null
-      ? prismaPaymentDecimalToNumber(
-          record.expectedTotalAmount
-        )
-      : prismaPaymentDecimalToNumber(
+      totalAmount:
+        record.expectedTotalAmount !==
+        null
+          ? prismaPaymentDecimalToNumber(
+              record.expectedTotalAmount
+            )
+          : prismaPaymentDecimalToNumber(
+              record.expectedCollectedAmount
+            ),
+
+      paidAmount:
+        prismaPaymentDecimalToNumber(
           record.expectedCollectedAmount
         ),
 
-  paidAmount:
-    prismaPaymentDecimalToNumber(
-      record.expectedCollectedAmount
-    ),
+      refundedAmount:
+        prismaPaymentDecimalToNumber(
+          record.expectedRefundedAmount
+        ),
 
-  refundedAmount:
-    prismaPaymentDecimalToNumber(
-      record.expectedRefundedAmount
-    ),
+      balanceAmount:
+        record.expectedBalanceAmount !==
+        null
+          ? prismaPaymentDecimalToNumber(
+              record.expectedBalanceAmount
+            )
+          : 0,
 
-  balanceAmount:
-    record.expectedBalanceAmount !==
-    null
-      ? prismaPaymentDecimalToNumber(
-          record.expectedBalanceAmount
-        )
-      : 0,
-
-  currency:
-    record.currency as
-      SavePaymentReconciliationRepositoryInput[
-        "result"
-      ]["expected"]["currency"],
-},
+      currency:
+        record.currency as
+          SavePaymentReconciliationRepositoryInput[
+            "result"
+          ]["expected"]["currency"],
+    },
 
     observed: {
-  provider:
-    mapPaymentProvider(
-      record.provider
-    ),
+      provider:
+        mapPaymentProvider(
+          record.provider
+        ),
 
-  collectedAmount:
-    prismaPaymentDecimalToNumber(
-      record.observedCollectedAmount
-    ),
+      collectedAmount:
+        prismaPaymentDecimalToNumber(
+          record.observedCollectedAmount
+        ),
 
-  refundedAmount:
-    prismaPaymentDecimalToNumber(
-      record.observedRefundedAmount
-    ),
+      refundedAmount:
+        prismaPaymentDecimalToNumber(
+          record.observedRefundedAmount
+        ),
 
-  currency:
-    record.currency as
-      SavePaymentReconciliationRepositoryInput[
-        "result"
-      ]["observed"]["currency"],
+      currency:
+        record.currency as
+          SavePaymentReconciliationRepositoryInput[
+            "result"
+          ]["observed"]["currency"],
 
-  observedAt:
-    record.observedAt
-      .toISOString(),
-},
+      ...(record.providerReference
+        ? {
+            providerReference:
+              record.providerReference,
+          }
+        : {}),
+
+      observedAt:
+        record.observedAt
+          .toISOString(),
+    },
 
     differences,
 

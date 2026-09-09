@@ -18,6 +18,7 @@ import type {
 } from "../../domains/payment/repositories/payment.repository";
 
 import {
+  getLatestPrismaPaymentReconciliation,
   savePrismaPaymentReconciliation,
 } from "../../domains/payment/repositories/payment.prisma.repository";
 
@@ -220,6 +221,106 @@ test(
     deepStrictEqual(
       result,
       input.result
+    );
+  }
+);
+test(
+  "Latest reconciliation preserves provider reference and observation time",
+  async () => {
+    const paymentId =
+      "PAY-RECONCILIATION-LATEST-TEST-001";
+
+    const providerReference =
+      "PROVIDER-RECONCILIATION-LATEST-REFERENCE-001";
+
+    const observedAt =
+      "2026-09-09T08:00:00.000Z";
+
+    const reconciledAt =
+      "2026-09-09T16:00:06.668Z";
+
+    const prisma =
+      {
+        paymentReconciliation: {
+          async findFirst() {
+            return {
+              paymentId,
+
+              provider:
+                PaymentProvider.OTHER,
+
+              expectedTotalAmount:
+                23364,
+
+              expectedCollectedAmount:
+                23364,
+
+              observedCollectedAmount:
+                23364,
+
+              expectedRefundedAmount:
+                3000,
+
+              observedRefundedAmount:
+                3000,
+
+              expectedBalanceAmount:
+                0,
+
+              currency:
+                PaymentCurrency.INR,
+
+              reconciled:
+                true,
+
+              differences:
+                [],
+
+              providerReference,
+
+              observedAt:
+                new Date(
+                  observedAt
+                ),
+
+              reconciledAt:
+                new Date(
+                  reconciledAt
+                ),
+
+              reconciledBy:
+                "PAYMENT_RECONCILIATION_TEST",
+            };
+          },
+        },
+      } as unknown as
+        PrismaPaymentRepositoryClient;
+
+    const result =
+      await getLatestPrismaPaymentReconciliation(
+        prisma,
+        paymentId
+      );
+
+    ok(
+      result
+    );
+
+    equal(
+      result.observed
+        .providerReference,
+      providerReference
+    );
+
+    equal(
+      result.observed
+        .observedAt,
+      observedAt
+    );
+
+    equal(
+      result.reconciledAt,
+      reconciledAt
     );
   }
 );
