@@ -65,30 +65,31 @@ model Lead {
 }
 
 model Vendor {
-  id                     String              @id @default(cuid())
+  id                     String                  @id @default(cuid())
   companyName            String
   ownerName              String
   gstNumber              String?
   serviceCities          String
-  householdService       Boolean             @default(false)
-  officeService          Boolean             @default(false)
-  vehicleService         Boolean             @default(false)
+  householdService       Boolean                 @default(false)
+  officeService          Boolean                 @default(false)
+  vehicleService         Boolean                 @default(false)
   experienceYears        Int?
-  rating                 Float               @default(0)
-  reviewCount            Int                 @default(0)
-  status                 String              @default("PENDING")
-  createdAt              DateTime            @default(now())
-  updatedAt              DateTime            @updatedAt
+  rating                 Float                   @default(0)
+  reviewCount            Int                     @default(0)
+  status                 String                  @default("PENDING")
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  deletedAt              DateTime?
   address                String?
   city                   String?
   companyLogo            String?
-  completedMoves         Int                 @default(0)
+  completedMoves         Int                     @default(0)
   coordinatorEmail       String?
   coordinatorMobile      String?
   coordinatorName        String?
-  insuranceAvailable     Boolean             @default(false)
+  insuranceAvailable     Boolean                 @default(false)
   ownerEmail             String?
-  ownerMobile            String              @unique
+  ownerMobile            String                  @unique
   panNumber              String?
   pincode                String?
   quotationContactEmail  String?
@@ -98,17 +99,123 @@ model Vendor {
   state                  String?
   totalLabours           Int?
   totalVehicles          Int?
-  vendorCode             String              @unique
+  vendorCode             String                  @unique
   website                String?
-  assignedBookings       Booking[]           @relation("AssignedVendorBookings")
+  assignedBookings       Booking[]               @relation("AssignedVendorBookings")
   payments               Payment[]
   quotations             Quotation[]
   User                   User[]
   bankAccounts           VendorBankAccount[]
   documents              VendorDocument[]
+  serviceAreas           VendorServiceArea[]
+  serviceOfferings       VendorServiceOffering[]
+  pricingRecords         VendorPricing[]
   ratingSummary          VendorRating?
   reviews                VendorReview[]
   vehicles               VendorVehicle[]
+
+  @@index([deletedAt])
+}
+
+model VendorServiceArea {
+  id                     String             @id @default(cuid())
+  vendorId               String
+  scope                  VendorServiceScope
+  originCity             String?
+  originState            String?
+  destinationCity        String?
+  destinationState       String?
+  serviceablePostalCodes String[]           @default([])
+  active                 Boolean            @default(true)
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@index([vendorId])
+  @@index([scope])
+  @@index([originCity])
+  @@index([originState])
+  @@index([destinationCity])
+  @@index([destinationState])
+  @@index([active])
+}
+
+model VendorServiceOffering {
+  id          String            @id @default(cuid())
+  vendorId    String
+  serviceType VendorServiceType
+  title       String
+  description String?
+  active      Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@unique([vendorId, serviceType])
+  @@index([vendorId])
+  @@index([serviceType])
+  @@index([active])
+}
+
+model VendorPricing {
+  id                        String            @id @default(cuid())
+  vendorId                  String
+  serviceType               VendorServiceType
+  pricingType               VendorPricingType
+  basePrice                 Decimal?          @db.Decimal(12, 2)
+  minimumPrice              Decimal?          @db.Decimal(12, 2)
+  pricePerKilometre         Decimal?          @db.Decimal(12, 2)
+  pricePerKilogram          Decimal?          @db.Decimal(12, 2)
+  pricePerItem              Decimal?          @db.Decimal(12, 2)
+  labourCharge              Decimal?          @db.Decimal(12, 2)
+  packingCharge             Decimal?          @db.Decimal(12, 2)
+  loadingCharge             Decimal?          @db.Decimal(12, 2)
+  unloadingCharge           Decimal?          @db.Decimal(12, 2)
+  insuranceChargePercentage Decimal?          @db.Decimal(5, 2)
+  taxPercentage             Decimal?          @db.Decimal(5, 2)
+  currency                  String            @default("INR")
+  active                    Boolean           @default(true)
+  effectiveFrom             DateTime?
+  effectiveUntil            DateTime?
+  createdAt                 DateTime          @default(now())
+  updatedAt                 DateTime          @updatedAt
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@index([vendorId])
+  @@index([serviceType])
+  @@index([pricingType])
+  @@index([active])
+  @@index([effectiveFrom])
+  @@index([effectiveUntil])
+}
+
+enum VendorServiceScope {
+  WITHIN_CITY
+  WITHIN_STATE
+  PAN_INDIA
+}
+
+enum VendorServiceType {
+  HOUSEHOLD_RELOCATION
+  OFFICE_RELOCATION
+  CORPORATE_RELOCATION
+  VEHICLE_TRANSPORT
+  COMMERCIAL_GOODS
+  WAREHOUSING
+  PACKING_ONLY
+  LOADING_UNLOADING
+  INSTALLATION_UNINSTALLATION
+}
+
+enum VendorPricingType {
+  FIXED
+  PER_KILOMETRE
+  PER_ITEM
+  PER_KILOGRAM
+  CUSTOM_QUOTATION
 }
 
 model Quotation {
