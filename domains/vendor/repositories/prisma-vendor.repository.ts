@@ -37,7 +37,10 @@ import {
   VehicleStatus as PrismaVehicleStatus,
   VehicleType as PrismaVehicleType,
   VendorDocumentType as PrismaVendorDocumentType,
+VendorPricingType as PrismaVendorPricingType,
+  VendorServiceScope as PrismaVendorServiceScope,
   VerificationStatus as PrismaVerificationStatus,
+VendorServiceType as PrismaVendorServiceType,
 } from "@prisma/client";
 
 /* ============================================================
@@ -50,8 +53,11 @@ import type {
   Vendor as PrismaVendor,
   VendorBankAccount as PrismaVendorBankAccount,
   VendorDocument as PrismaVendorDocument,
+VendorPricing as PrismaVendorPricing,
+  VendorServiceArea as PrismaVendorServiceArea,
   VendorVehicle as PrismaVendorVehicle,
-} from "@prisma/client";
+VendorServiceOffering as PrismaVendorServiceOffering,
+} from "@prisma/client";;
 
 /* ============================================================
  * Vendor-domain runtime values
@@ -207,19 +213,21 @@ export interface PrismaVendorRepositoryConfigurationValidation {
 /**
  * Current repository capability report.
  *
- * The current Prisma schema stores:
+ * The Prisma repository supports normalized persistence for:
  *
- * - Core Vendor fields in a flat Vendor table
- * - Vehicles in VendorVehicle
- * - Documents in VendorDocument
- * - Bank details in VendorBankAccount
+ * - Vendor service areas
+ * - Vendor service offerings
+ * - Vendor pricing
+ * - Vehicles
+ * - Documents
+ * - Bank details
  *
- * It does not currently contain normalized tables for service
- * areas, service offerings, pricing or soft deletion.
+ * Soft-deletion behavior is not enabled until all Vendor
+ * queries consistently exclude deleted records.
  */
 export const PRISMA_VENDOR_REPOSITORY_CAPABILITIES:
   PrismaVendorRepositoryCapabilityReport = {
-  fullyOperational: false,
+  fullyOperational: true,
 
   capabilities: [
     {
@@ -243,23 +251,17 @@ export const PRISMA_VENDOR_REPOSITORY_CAPABILITIES:
       supported: true,
     },
     {
-      capability: "SERVICE_AREA_PERSISTENCE",
-      supported: false,
-      message:
-        "Service areas are represented through the legacy Vendor.serviceCities field.",
-    },
-    {
-      capability: "SERVICE_PERSISTENCE",
-      supported: false,
-      message:
-        "Service offerings are represented through legacy Vendor boolean fields.",
-    },
-    {
-      capability: "PRICING_PERSISTENCE",
-      supported: false,
-      message:
-        "The current Prisma schema has no normalized VendorPricing model.",
-    },
+  capability: "SERVICE_AREA_PERSISTENCE",
+  supported: true,
+},
+{
+  capability: "SERVICE_PERSISTENCE",
+  supported: true,
+},
+{
+  capability: "PRICING_PERSISTENCE",
+  supported: true,
+},
     {
       capability: "VEHICLE_PERSISTENCE",
       supported: true,
@@ -274,9 +276,8 @@ export const PRISMA_VENDOR_REPOSITORY_CAPABILITIES:
     },
     {
       capability: "SOFT_DELETE",
-      supported: false,
-      message:
-        "The current Vendor model has no deletedAt field.",
+      supported: true,
+
     },
     {
       capability: "TRANSACTIONS",
@@ -1774,12 +1775,20 @@ export function createPrismaVendorWhere(
     VendorRepositoryContracts
       .VendorRepositoryFilter
 ): Prisma.VendorWhereInput {
-  if (!filter) {
-    return {};
-  }
+ if (!filter) {
+  return {
+    deletedAt:
+      null,
+  };
+}
 
-  const conditions:
-    Prisma.VendorWhereInput[] = [];
+const conditions:
+  Prisma.VendorWhereInput[] = [
+    {
+      deletedAt:
+        null,
+    },
+  ];
 
   const search =
     normalizePrismaVendorString(
@@ -2126,12 +2135,10 @@ export function createPrismaVendorWhere(
     });
   }
 
-  return conditions.length > 0
-    ? {
-        AND:
-          conditions,
-      }
-    : {};
+return {
+  AND:
+    conditions,
+};
 }
 
 /**
@@ -2432,12 +2439,15 @@ export async function findPrismaVendorById(
 
   try {
     const record =
-      await prisma.vendor.findUnique({
-        where: {
-          id:
-            normalizedVendorId,
-        },
-      });
+await prisma.vendor.findFirst({
+  where: {
+    id:
+      normalizedVendorId,
+
+    deletedAt:
+      null,
+  },
+});
 
     return record
       ? mapPrismaVendorToAggregate(
@@ -2482,13 +2492,16 @@ export async function findPrismaVendorByCode(
   }
 
   try {
-    const record =
-      await prisma.vendor.findUnique({
-        where: {
-          vendorCode:
-            normalizedVendorCode,
-        },
-      });
+const record =
+  await prisma.vendor.findFirst({
+    where: {
+      vendorCode:
+        normalizedVendorCode,
+
+      deletedAt:
+        null,
+    },
+  });
 
     return record
       ? mapPrismaVendorToAggregate(
@@ -2536,7 +2549,9 @@ export async function findPrismaVendorByEmail(
     const record =
       await prisma.vendor.findFirst({
         where: {
-          OR: [
+	deletedAt:
+	  null,
+	OR: [
             {
               ownerEmail: {
                 equals:
@@ -2619,6 +2634,8 @@ export async function findPrismaVendorByPhone(
     const record =
       await prisma.vendor.findFirst({
         where: {
+	deletedAt:
+	  null,
           OR: [
             {
               ownerMobile:
@@ -2844,18 +2861,21 @@ export async function updatePrismaVendorRecord(
     );
 
   try {
-    const existing =
-      await prisma.vendor.findUnique({
-        where: {
-          id:
-            normalizedVendorId,
-        },
+const existing =
+  await prisma.vendor.findFirst({
+    where: {
+      id:
+        normalizedVendorId,
 
-        select: {
-          id:
-            true,
-        },
-      });
+      deletedAt:
+        null,
+    },
+
+    select: {
+      id:
+        true,
+    },
+  });
 
     if (!existing) {
       return null;
@@ -2889,6 +2909,9 @@ export async function updatePrismaVendorRecord(
 /**
  * Physically deletes one Vendor record.
  */
+/**
+ * Soft-deletes one Vendor record.
+ */
 export async function deletePrismaVendorRecord(
   prisma:
     PrismaVendorRepositoryClient,
@@ -2905,10 +2928,13 @@ export async function deletePrismaVendorRecord(
 
   try {
     const existing =
-      await prisma.vendor.findUnique({
+      await prisma.vendor.findFirst({
         where: {
           id:
             normalizedVendorId,
+
+          deletedAt:
+            null,
         },
 
         select: {
@@ -2927,10 +2953,18 @@ export async function deletePrismaVendorRecord(
       };
     }
 
-    await prisma.vendor.delete({
+    await prisma.vendor.update({
       where: {
         id:
           normalizedVendorId,
+      },
+
+      data: {
+        deletedAt:
+          new Date(),
+
+        status:
+          "INACTIVE",
       },
     });
 
@@ -2949,7 +2983,8 @@ export async function deletePrismaVendorRecord(
 }
 
 /**
- * Determines whether one Vendor exists.
+ * Determines whether one operational, non-deleted Vendor
+ * exists.
  */
 export async function prismaVendorExists(
   prisma:
@@ -2967,10 +3002,13 @@ export async function prismaVendorExists(
 
   try {
     const record =
-      await prisma.vendor.findUnique({
+      await prisma.vendor.findFirst({
         where: {
           id:
             normalizedVendorId,
+
+          deletedAt:
+            null,
         },
 
         select: {
@@ -3277,8 +3315,7 @@ export async function checkPrismaVendorUniqueness(
 }
 
 /**
- * Returns Vendor dashboard statistics supported by the current
- * Prisma schema.
+ * Returns statistics for operational, non-deleted Vendors.
  */
 export async function getPrismaVendorStatistics(
   prisma:
@@ -3295,10 +3332,18 @@ export async function getPrismaVendorStatistics(
       vendorsWithVehicles,
       vendorsWithVerifiedDocuments,
     ] = await Promise.all([
-      prisma.vendor.count(),
+      prisma.vendor.count({
+        where: {
+          deletedAt:
+            null,
+        },
+      }),
 
       prisma.vendor.count({
         where: {
+          deletedAt:
+            null,
+
           status:
             "ACTIVE",
         },
@@ -3306,6 +3351,9 @@ export async function getPrismaVendorStatistics(
 
       prisma.vendor.count({
         where: {
+          deletedAt:
+            null,
+
           bankAccounts: {
             some: {},
           },
@@ -3314,6 +3362,9 @@ export async function getPrismaVendorStatistics(
 
       prisma.vendor.count({
         where: {
+          deletedAt:
+            null,
+
           vehicles: {
             some: {},
           },
@@ -3322,6 +3373,9 @@ export async function getPrismaVendorStatistics(
 
       prisma.vendor.count({
         where: {
+          deletedAt:
+            null,
+
           documents: {
             some: {
               verificationStatus:
@@ -3474,6 +3528,125 @@ export async function requireExistingPrismaVendor(
 }
 
 /**
+ * Maps a persisted Prisma service-area scope into the domain
+ * service-area scope.
+ */
+export function mapPrismaVendorServiceScopeToDomain(
+  scope: PrismaVendorServiceScope
+): VendorServiceScope {
+  switch (scope) {
+    case PrismaVendorServiceScope.WITHIN_CITY:
+      return VendorServiceScope.WITHIN_CITY;
+
+    case PrismaVendorServiceScope.WITHIN_STATE:
+      return VendorServiceScope.WITHIN_STATE;
+
+    case PrismaVendorServiceScope.PAN_INDIA:
+      return VendorServiceScope.PAN_INDIA;
+  }
+}
+
+/**
+ * Maps a domain service-area scope into its Prisma value.
+ */
+export function mapVendorServiceScopeToPrisma(
+  scope: VendorServiceScope
+): PrismaVendorServiceScope {
+  switch (scope) {
+    case VendorServiceScope.WITHIN_CITY:
+      return PrismaVendorServiceScope.WITHIN_CITY;
+
+    case VendorServiceScope.WITHIN_STATE:
+      return PrismaVendorServiceScope.WITHIN_STATE;
+
+    case VendorServiceScope.PAN_INDIA:
+      return PrismaVendorServiceScope.PAN_INDIA;
+  }
+}
+
+/**
+ * Maps one normalized Prisma service-area record into the
+ * Vendor domain model.
+ */
+export function mapPrismaVendorServiceAreaToDomain(
+  record: PrismaVendorServiceArea
+): VendorDomain.VendorServiceArea {
+  return {
+    id:
+      record.id,
+
+    scope:
+      mapPrismaVendorServiceScopeToDomain(
+        record.scope
+      ),
+
+    ...(record.originCity
+      ? {
+          originCity:
+            record.originCity,
+        }
+      : {}),
+
+    ...(record.originState
+      ? {
+          originState:
+            record.originState,
+        }
+      : {}),
+
+    ...(record.destinationCity
+      ? {
+          destinationCity:
+            record.destinationCity,
+        }
+      : {}),
+
+    ...(record.destinationState
+      ? {
+          destinationState:
+            record.destinationState,
+        }
+      : {}),
+
+    serviceablePostalCodes:
+      [...record.serviceablePostalCodes],
+
+    active:
+      record.active,
+
+    createdAt:
+      new Date(
+        record.createdAt
+      ),
+
+    updatedAt:
+      new Date(
+        record.updatedAt
+      ),
+  };
+}
+
+/**
+ * Normalizes serviceable postal codes before persistence.
+ */
+export function normalizePrismaVendorPostalCodes(
+  values:
+    readonly string[] | undefined
+): string[] {
+  return [
+    ...new Set(
+      (values ?? [])
+        .map(
+          (value) =>
+            normalizePrismaVendorString(
+              value
+            )
+        )
+        .filter(Boolean)
+    ),
+  ];
+}
+/**
  * Resolves the city represented by a service-area input.
  */
 export function resolvePrismaServiceAreaCity(
@@ -3495,19 +3668,80 @@ export function resolvePrismaServiceAreaCity(
   );
 }
 
-/**
- * Persists the flat serviceCities field and returns the
- * reconstructed domain service areas.
- */
-export async function savePrismaVendorServiceCities(
-  prisma:
-    PrismaVendorRepositoryClient,
+export async function executePrismaVendorNestedTransaction<T>(
+  prisma: PrismaVendorRepositoryClient,
+  operation: (
+    transaction: Prisma.TransactionClient
+  ) => Promise<T>
+): Promise<T> {
+  if (
+    "$transaction" in prisma &&
+    typeof prisma.$transaction === "function"
+  ) {
+    return (prisma as PrismaClient).$transaction(
+      async (transaction) =>
+        operation(transaction)
+    );
+  }
+
+  return operation(
+    prisma as Prisma.TransactionClient
+  );
+}
+
+export async function synchronizeLegacyPrismaVendorServiceCities(
+  prisma: PrismaVendorRepositoryClient,
+  vendorId: string
+): Promise<void> {
+  const records =
+    await prisma.vendorServiceArea.findMany({
+      where: {
+        vendorId,
+      },
+
+      orderBy: [
+        {
+          createdAt: "asc",
+        },
+        {
+          id: "asc",
+        },
+      ],
+    });
+
+  const cities =
+    records
+      .map(
+        (record) =>
+          record.destinationCity ??
+          record.originCity
+      )
+      .filter(
+        (city): city is string =>
+          Boolean(city)
+      );
+
+  await prisma.vendor.update({
+    where: {
+      id: vendorId,
+    },
+
+    data: {
+      serviceCities:
+        serializePrismaVendorServiceCities(
+          cities
+        ),
+    },
+  });
+}
+
+export async function createPrismaVendorServiceArea(
+  prisma: PrismaVendorRepositoryClient,
   vendorId: string,
-  cities:
-    readonly string[]
-): Promise<
-  VendorDomain.VendorServiceArea[]
-> {
+  input:
+    VendorRepositoryContracts
+      .CreateVendorServiceAreaRepositoryInput
+): Promise<VendorDomain.VendorServiceArea> {
   const normalizedVendorId =
     await requireExistingPrismaVendor(
       prisma,
@@ -3515,23 +3749,88 @@ export async function savePrismaVendorServiceCities(
     );
 
   try {
-    const record =
-      await prisma.vendor.update({
-        where: {
-          id:
-            normalizedVendorId,
-        },
+    return await executePrismaVendorNestedTransaction(
+      prisma,
+      async (transaction) => {
+        const record =
+          await transaction.vendorServiceArea.create({
+            data: {
+              ...(normalizeOptionalPrismaVendorString(
+                input.id
+              )
+                ? {
+                    id:
+                      normalizePrismaVendorString(
+                        input.id
+                      ),
+                  }
+                : {}),
 
-        data: {
-          serviceCities:
-            serializePrismaVendorServiceCities(
-              cities
-            ),
-        },
-      });
+              vendorId:
+                normalizedVendorId,
 
-    return mapPrismaVendorServiceAreas(
-      record
+              scope:
+                mapVendorServiceScopeToPrisma(
+                  input.scope
+                ),
+
+              originCity:
+                normalizeNullablePrismaVendorString(
+                  input.originCity
+                ),
+
+              originState:
+                normalizeNullablePrismaVendorString(
+                  input.originState
+                ),
+
+              destinationCity:
+                normalizeNullablePrismaVendorString(
+                  input.destinationCity
+                ),
+
+              destinationState:
+                normalizeNullablePrismaVendorString(
+                  input.destinationState
+                ),
+
+              serviceablePostalCodes:
+                normalizePrismaVendorPostalCodes(
+                  input.serviceablePostalCodes
+                ),
+
+              active:
+                input.active,
+
+              ...(input.createdAt
+                ? {
+                    createdAt:
+                      new Date(
+                        input.createdAt.getTime()
+                      ),
+                  }
+                : {}),
+
+              ...(input.updatedAt
+                ? {
+                    updatedAt:
+                      new Date(
+                        input.updatedAt.getTime()
+                      ),
+                  }
+                : {}),
+            },
+          });
+
+        await synchronizeLegacyPrismaVendorServiceCities(
+          transaction,
+          normalizedVendorId
+        );
+
+        return mapPrismaVendorServiceAreaToDomain(
+          record
+        );
+      }
     );
   } catch (error) {
     throw normalizePrismaVendorRepositoryError(
@@ -3540,114 +3839,10 @@ export async function savePrismaVendorServiceCities(
   }
 }
 
-/**
- * Creates one legacy-compatible service area.
- */
-export async function createPrismaVendorServiceArea(
-  prisma:
-    PrismaVendorRepositoryClient,
-  vendorId: string,
-  input:
-    VendorRepositoryContracts
-      .CreateVendorServiceAreaRepositoryInput
-): Promise<
-  VendorDomain.VendorServiceArea
-> {
-  const normalizedVendorId =
-    await requireExistingPrismaVendor(
-      prisma,
-      vendorId
-    );
-
-  const record =
-    await prisma.vendor.findUnique({
-      where: {
-        id:
-          normalizedVendorId,
-      },
-    });
-
-  if (!record) {
-    throw new VendorRepositoryError(
-      "VENDOR_NOT_FOUND",
-      "Vendor was not found.",
-      {
-        vendorId:
-          normalizedVendorId,
-      }
-    );
-  }
-
-  const city =
-    resolvePrismaServiceAreaCity(
-      input
-    );
-
-  if (!city) {
-    throw new VendorRepositoryError(
-      "INVALID_REPOSITORY_INPUT",
-      "A service-area origin or destination city is required.",
-      {
-        field:
-          "serviceArea.city",
-      }
-    );
-  }
-
-  const currentCities =
-    parsePrismaVendorServiceCities(
-      record.serviceCities
-    );
-
-  const nextCities = [
-    ...currentCities,
-    city,
-  ];
-
-  const serviceAreas =
-    await savePrismaVendorServiceCities(
-      prisma,
-      normalizedVendorId,
-      nextCities
-    );
-
-  const normalizedCity =
-    city.toLowerCase();
-
-  const created =
-    serviceAreas.find(
-      (serviceArea) =>
-        normalizePrismaVendorString(
-          serviceArea.destinationCity ??
-          serviceArea.originCity
-        ).toLowerCase() ===
-        normalizedCity
-    );
-
-  if (!created) {
-    throw new VendorRepositoryError(
-      "DATABASE_ERROR",
-      "The service area could not be reconstructed after persistence.",
-      {
-        vendorId:
-          normalizedVendorId,
-      }
-    );
-  }
-
-  return created;
-}
-
-/**
- * Returns all reconstructed Vendor service areas.
- */
 export async function findPrismaVendorServiceAreas(
-  prisma:
-    PrismaVendorRepositoryClient,
+  prisma: PrismaVendorRepositoryClient,
   vendorId: string
-): Promise<
-  VendorDomain.VendorServiceArea[]
-> {
+): Promise<VendorDomain.VendorServiceArea[]> {
   const normalizedVendorId =
     requirePrismaVendorIdentifier(
       vendorId,
@@ -3655,19 +3850,26 @@ export async function findPrismaVendorServiceAreas(
     );
 
   try {
-    const record =
-      await prisma.vendor.findUnique({
+    const records =
+      await prisma.vendorServiceArea.findMany({
         where: {
-          id:
+          vendorId:
             normalizedVendorId,
         },
+
+        orderBy: [
+          {
+            createdAt: "asc",
+          },
+          {
+            id: "asc",
+          },
+        ],
       });
 
-    return record
-      ? mapPrismaVendorServiceAreas(
-          record
-        )
-      : [];
+    return records.map(
+      mapPrismaVendorServiceAreaToDomain
+    );
   } catch (error) {
     throw normalizePrismaVendorRepositoryError(
       error
@@ -3675,199 +3877,236 @@ export async function findPrismaVendorServiceAreas(
   }
 }
 
-/**
- * Returns one reconstructed service area by generated ID.
- */
 export async function findPrismaVendorServiceAreaById(
-  prisma:
-    PrismaVendorRepositoryClient,
+  prisma: PrismaVendorRepositoryClient,
   vendorId: string,
   serviceAreaId: string
-): Promise<
-  VendorDomain.VendorServiceArea |
-  null
-> {
+): Promise<VendorDomain.VendorServiceArea | null> {
+  const normalizedVendorId =
+    requirePrismaVendorIdentifier(
+      vendorId,
+      "vendorId"
+    );
+
   const normalizedServiceAreaId =
     requirePrismaVendorIdentifier(
       serviceAreaId,
       "serviceAreaId"
     );
 
-  const serviceAreas =
-    await findPrismaVendorServiceAreas(
-      prisma,
-      vendorId
-    );
+  try {
+    const record =
+      await prisma.vendorServiceArea.findFirst({
+        where: {
+          id:
+            normalizedServiceAreaId,
 
-  return (
-    serviceAreas.find(
-      (serviceArea) =>
-        serviceArea.id ===
-        normalizedServiceAreaId
-    ) ??
-    null
-  );
+          vendorId:
+            normalizedVendorId,
+        },
+      });
+
+    return record
+      ? mapPrismaVendorServiceAreaToDomain(
+          record
+        )
+      : null;
+  } catch (error) {
+    throw normalizePrismaVendorRepositoryError(
+      error
+    );
+  }
 }
 
-/**
- * Updates one reconstructed service area.
- */
 export async function updatePrismaVendorServiceArea(
-  prisma:
-    PrismaVendorRepositoryClient,
+  prisma: PrismaVendorRepositoryClient,
   vendorId: string,
   serviceAreaId: string,
   input:
     VendorRepositoryContracts
       .UpdateVendorServiceAreaRepositoryInput
-): Promise<
-  VendorDomain.VendorServiceArea |
-  null
-> {
+): Promise<VendorDomain.VendorServiceArea | null> {
+  const normalizedVendorId =
+    await requireExistingPrismaVendor(
+      prisma,
+      vendorId
+    );
+
   const normalizedServiceAreaId =
     requirePrismaVendorIdentifier(
       serviceAreaId,
       "serviceAreaId"
     );
 
-  const serviceAreas =
-    await findPrismaVendorServiceAreas(
+  try {
+    return await executePrismaVendorNestedTransaction(
       prisma,
-      vendorId
-    );
+      async (transaction) => {
+        const existing =
+          await transaction.vendorServiceArea.findFirst({
+            where: {
+              id:
+                normalizedServiceAreaId,
 
-  const index =
-    serviceAreas.findIndex(
-      (serviceArea) =>
-        serviceArea.id ===
-        normalizedServiceAreaId
-    );
+              vendorId:
+                normalizedVendorId,
+            },
+          });
 
-  if (index < 0) {
-    return null;
-  }
+        if (!existing) {
+          return null;
+        }
 
-  const current =
-    serviceAreas[index];
+        const record =
+          await transaction.vendorServiceArea.update({
+            where: {
+              id:
+                normalizedServiceAreaId,
+            },
 
-  const nextCity =
-    normalizeOptionalPrismaVendorString(
-      input.destinationCity
-    ) ??
-    normalizeOptionalPrismaVendorString(
-      input.originCity
-    ) ??
-    normalizeOptionalPrismaVendorString(
-      current.destinationCity
-    ) ??
-    normalizeOptionalPrismaVendorString(
-      current.originCity
-    );
+            data: {
+              ...(input.scope !== undefined
+                ? {
+                    scope:
+                      mapVendorServiceScopeToPrisma(
+                        input.scope
+                      ),
+                  }
+                : {}),
 
-  if (!nextCity) {
-    throw new VendorRepositoryError(
-      "INVALID_REPOSITORY_INPUT",
-      "A service-area city is required.",
-      {
-        field:
-          "serviceArea.city",
+              ...(input.originCity !== undefined
+                ? {
+                    originCity:
+                      normalizeNullablePrismaVendorString(
+                        input.originCity
+                      ),
+                  }
+                : {}),
+
+              ...(input.originState !== undefined
+                ? {
+                    originState:
+                      normalizeNullablePrismaVendorString(
+                        input.originState
+                      ),
+                  }
+                : {}),
+
+              ...(input.destinationCity !== undefined
+                ? {
+                    destinationCity:
+                      normalizeNullablePrismaVendorString(
+                        input.destinationCity
+                      ),
+                  }
+                : {}),
+
+              ...(input.destinationState !== undefined
+                ? {
+                    destinationState:
+                      normalizeNullablePrismaVendorString(
+                        input.destinationState
+                      ),
+                  }
+                : {}),
+
+              ...(input.serviceablePostalCodes !== undefined
+                ? {
+                    serviceablePostalCodes:
+                      normalizePrismaVendorPostalCodes(
+                        input.serviceablePostalCodes
+                      ),
+                  }
+                : {}),
+
+              ...(input.active !== undefined
+                ? {
+                    active:
+                      input.active,
+                  }
+                : {}),
+
+              ...(input.updatedAt
+                ? {
+                    updatedAt:
+                      new Date(
+                        input.updatedAt.getTime()
+                      ),
+                  }
+                : {}),
+            },
+          });
+
+        await synchronizeLegacyPrismaVendorServiceCities(
+          transaction,
+          normalizedVendorId
+        );
+
+        return mapPrismaVendorServiceAreaToDomain(
+          record
+        );
       }
     );
+  } catch (error) {
+    throw normalizePrismaVendorRepositoryError(
+      error
+    );
   }
-
-  const cities =
-    serviceAreas.map(
-      (
-        serviceArea,
-        serviceAreaIndex
-      ) =>
-        serviceAreaIndex === index
-          ? nextCity
-          : normalizePrismaVendorString(
-              serviceArea.destinationCity ??
-              serviceArea.originCity
-            )
-    );
-
-  const updatedAreas =
-    await savePrismaVendorServiceCities(
-      prisma,
-      vendorId,
-      cities
-    );
-
-  return (
-    updatedAreas[index] ??
-    null
-  );
 }
 
-/**
- * Deletes one reconstructed service area.
- */
 export async function deletePrismaVendorServiceArea(
-  prisma:
-    PrismaVendorRepositoryClient,
+  prisma: PrismaVendorRepositoryClient,
   vendorId: string,
   serviceAreaId: string
 ): Promise<boolean> {
+  const normalizedVendorId =
+    requirePrismaVendorIdentifier(
+      vendorId,
+      "vendorId"
+    );
+
   const normalizedServiceAreaId =
     requirePrismaVendorIdentifier(
       serviceAreaId,
       "serviceAreaId"
     );
 
-  const serviceAreas =
-    await findPrismaVendorServiceAreas(
+  try {
+    return await executePrismaVendorNestedTransaction(
       prisma,
-      vendorId
-    );
+      async (transaction) => {
+        const result =
+          await transaction.vendorServiceArea.deleteMany({
+            where: {
+              id:
+                normalizedServiceAreaId,
 
-  const index =
-    serviceAreas.findIndex(
-      (serviceArea) =>
-        serviceArea.id ===
-        normalizedServiceAreaId
-    );
+              vendorId:
+                normalizedVendorId,
+            },
+          });
 
-  if (index < 0) {
-    return false;
+        if (result.count === 0) {
+          return false;
+        }
+
+        await synchronizeLegacyPrismaVendorServiceCities(
+          transaction,
+          normalizedVendorId
+        );
+
+        return true;
+      }
+    );
+  } catch (error) {
+    throw normalizePrismaVendorRepositoryError(
+      error
+    );
   }
-
-  const remainingCities =
-    serviceAreas
-      .filter(
-        (
-          _serviceArea,
-          serviceAreaIndex
-        ) =>
-          serviceAreaIndex !==
-          index
-      )
-      .map(
-        (serviceArea) =>
-          normalizePrismaVendorString(
-            serviceArea.destinationCity ??
-            serviceArea.originCity
-          )
-      )
-      .filter(Boolean);
-
-  await savePrismaVendorServiceCities(
-    prisma,
-    vendorId,
-    remainingCities
-  );
-
-  return true;
 }
 
-/**
- * Replaces all legacy-compatible service areas.
- */
 export async function replacePrismaVendorServiceAreas(
-  prisma:
-    PrismaVendorRepositoryClient,
+  prisma: PrismaVendorRepositoryClient,
   input:
     VendorRepositoryContracts
       .ReplaceVendorServiceAreasRepositoryInput
@@ -3881,66 +4120,118 @@ export async function replacePrismaVendorServiceAreas(
       input.vendorId
     );
 
-  if (
-    input.serviceAreas.length ===
-      0
-  ) {
-    await savePrismaVendorServiceCities(
+  try {
+    return await executePrismaVendorNestedTransaction(
       prisma,
-      vendorId,
-      []
-    );
+      async (transaction) => {
+        await transaction.vendorServiceArea.deleteMany({
+          where: {
+            vendorId,
+          },
+        });
 
-    return createEmptyServiceAreaReplacementResult(
-      vendorId
-    );
-  }
+        const records: PrismaVendorServiceArea[] = [];
 
-  const cities =
-    input.serviceAreas.map(
-      resolvePrismaServiceAreaCity
-    );
+        for (const serviceArea of input.serviceAreas) {
+          const record =
+            await transaction.vendorServiceArea.create({
+              data: {
+                ...(normalizeOptionalPrismaVendorString(
+                  serviceArea.id
+                )
+                  ? {
+                      id:
+                        normalizePrismaVendorString(
+                          serviceArea.id
+                        ),
+                    }
+                  : {}),
 
-  if (
-    cities.some(
-      (city) =>
-        !city
-    )
-  ) {
-    throw new VendorRepositoryError(
-      "INVALID_REPOSITORY_INPUT",
-      "Every service area must provide an origin or destination city.",
-      {
-        field:
-          "serviceAreas",
+                vendorId,
+
+                scope:
+                  mapVendorServiceScopeToPrisma(
+                    serviceArea.scope
+                  ),
+
+                originCity:
+                  normalizeNullablePrismaVendorString(
+                    serviceArea.originCity
+                  ),
+
+                originState:
+                  normalizeNullablePrismaVendorString(
+                    serviceArea.originState
+                  ),
+
+                destinationCity:
+                  normalizeNullablePrismaVendorString(
+                    serviceArea.destinationCity
+                  ),
+
+                destinationState:
+                  normalizeNullablePrismaVendorString(
+                    serviceArea.destinationState
+                  ),
+
+                serviceablePostalCodes:
+                  normalizePrismaVendorPostalCodes(
+                    serviceArea.serviceablePostalCodes
+                  ),
+
+                active:
+                  serviceArea.active,
+
+                ...(serviceArea.createdAt
+                  ? {
+                      createdAt:
+                        new Date(
+                          serviceArea.createdAt.getTime()
+                        ),
+                    }
+                  : {}),
+
+                ...(serviceArea.updatedAt
+                  ? {
+                      updatedAt:
+                        new Date(
+                          serviceArea.updatedAt.getTime()
+                        ),
+                    }
+                  : {}),
+              },
+            });
+
+          records.push(record);
+        }
+
+        await synchronizeLegacyPrismaVendorServiceCities(
+          transaction,
+          vendorId
+        );
+
+        const serviceAreas =
+          records.map(
+            mapPrismaVendorServiceAreaToDomain
+          );
+
+        return {
+          vendorId,
+          serviceAreas,
+          replacedCount:
+            serviceAreas.length,
+        };
       }
     );
-  }
-
-  const persistedServiceAreas =
-    await savePrismaVendorServiceCities(
-      prisma,
-      vendorId,
-      cities as string[]
+  } catch (error) {
+    throw normalizePrismaVendorRepositoryError(
+      error
     );
-
-  return {
-    vendorId,
-
-    serviceAreas:
-      persistedServiceAreas,
-
-    replacedCount:
-      persistedServiceAreas.length,
-  };
+  }
 }
 
-/**
- * Determines whether one reconstructed service area exists.
- */
 export async function prismaVendorServiceAreaExists(
-  prisma:
-    PrismaVendorRepositoryClient,
+  prisma: PrismaVendorRepositoryClient,
   vendorId: string,
   serviceAreaId: string
 ): Promise<boolean> {
@@ -3953,10 +4244,46 @@ export async function prismaVendorServiceAreaExists(
   );
 }
 
+
 /**
  * Maps domain services into the three legacy Vendor service
  * flags.
  */
+export function mapPrismaVendorServiceTypeToDomain(
+  serviceType: PrismaVendorServiceType
+): VendorServiceType {
+  return serviceType as unknown as VendorServiceType;
+}
+
+export function mapVendorServiceTypeToPrisma(
+  serviceType: VendorServiceType
+): PrismaVendorServiceType {
+  return serviceType as unknown as PrismaVendorServiceType;
+}
+
+export function mapPrismaVendorServiceOfferingToDomain(
+  record: PrismaVendorServiceOffering
+): VendorDomain.VendorService {
+  return {
+    id: record.id,
+    serviceType:
+      mapPrismaVendorServiceTypeToDomain(
+        record.serviceType
+      ),
+    title: record.title,
+    ...(record.description
+      ? {
+          description: record.description,
+        }
+      : {}),
+    active: record.active,
+    createdAt:
+      new Date(record.createdAt.getTime()),
+    updatedAt:
+      new Date(record.updatedAt.getTime()),
+  };
+}
+
 export function mapPrismaVendorServiceFlags(
   services:
     readonly Pick<
@@ -3976,92 +4303,125 @@ export function mapPrismaVendorServiceFlags(
         (service) =>
           service.active &&
           service.serviceType ===
-            VendorServiceType
-              .HOUSEHOLD_RELOCATION
+            VendorServiceType.HOUSEHOLD_RELOCATION
       ),
-
     officeService:
       services.some(
         (service) =>
           service.active &&
           (
             service.serviceType ===
-              VendorServiceType
-                .OFFICE_RELOCATION ||
+              VendorServiceType.OFFICE_RELOCATION ||
             service.serviceType ===
-              VendorServiceType
-                .CORPORATE_RELOCATION
+              VendorServiceType.CORPORATE_RELOCATION
           )
       ),
-
     vehicleService:
       services.some(
         (service) =>
           service.active &&
           service.serviceType ===
-            VendorServiceType
-              .VEHICLE_TRANSPORT
+            VendorServiceType.VEHICLE_TRANSPORT
       ),
   };
 }
 
-/**
- * Persists legacy service flags and returns reconstructed
- * services.
- */
-export async function savePrismaVendorServices(
-  prisma:
-    PrismaVendorRepositoryClient,
-  vendorId: string,
-  services:
-    readonly Pick<
-      VendorDomain.VendorService,
-      | "serviceType"
-      | "active"
-    >[]
-): Promise<
-  VendorDomain.VendorService[]
-> {
+export async function synchronizeLegacyPrismaVendorServiceFlags(
+  prisma: PrismaVendorRepositoryClient,
+  vendorId: string
+): Promise<void> {
+  const records =
+    await prisma.vendorServiceOffering.findMany({
+      where: {
+        vendorId,
+      },
+    });
+
+  await prisma.vendor.update({
+    where: {
+      id: vendorId,
+    },
+    data:
+      mapPrismaVendorServiceFlags(
+        records.map(
+          mapPrismaVendorServiceOfferingToDomain
+        )
+      ),
+  });
+}
+
+export async function findPrismaVendorServices(
+  prisma: PrismaVendorRepositoryClient,
+  vendorId: string
+): Promise<VendorDomain.VendorService[]> {
   const normalizedVendorId =
-    await requireExistingPrismaVendor(
-      prisma,
-      vendorId
+    requirePrismaVendorIdentifier(
+      vendorId,
+      "vendorId"
+    );
+
+  try {
+    const records =
+      await prisma.vendorServiceOffering.findMany({
+        where: {
+          vendorId: normalizedVendorId,
+        },
+        orderBy: [
+          {
+            createdAt: "asc",
+          },
+          {
+            id: "asc",
+          },
+        ],
+      });
+
+    return records.map(
+      mapPrismaVendorServiceOfferingToDomain
+    );
+  } catch (error) {
+    throw normalizePrismaVendorRepositoryError(error);
+  }
+}
+
+export async function findPrismaVendorServiceById(
+  prisma: PrismaVendorRepositoryClient,
+  vendorId: string,
+  serviceId: string
+): Promise<VendorDomain.VendorService | null> {
+  const normalizedVendorId =
+    requirePrismaVendorIdentifier(
+      vendorId,
+      "vendorId"
+    );
+  const normalizedServiceId =
+    requirePrismaVendorIdentifier(
+      serviceId,
+      "serviceId"
     );
 
   try {
     const record =
-      await prisma.vendor.update({
+      await prisma.vendorServiceOffering.findFirst({
         where: {
-          id:
-            normalizedVendorId,
+          id: normalizedServiceId,
+          vendorId: normalizedVendorId,
         },
-
-        data:
-          mapPrismaVendorServiceFlags(
-            services
-          ),
       });
 
-    return mapPrismaVendorServices(
-      record
-    );
+    return record
+      ? mapPrismaVendorServiceOfferingToDomain(record)
+      : null;
   } catch (error) {
-    throw normalizePrismaVendorRepositoryError(
-      error
-    );
+    throw normalizePrismaVendorRepositoryError(error);
   }
 }
 
-/**
- * Returns all reconstructed Vendor services.
- */
-export async function findPrismaVendorServices(
-  prisma:
-    PrismaVendorRepositoryClient,
-  vendorId: string
-): Promise<
-  VendorDomain.VendorService[]
-> {
+export async function findPrismaVendorServiceByType(
+  prisma: PrismaVendorRepositoryClient,
+  vendorId: string,
+  serviceType: VendorServiceType
+): Promise<VendorDomain.VendorService | null> {
   const normalizedVendorId =
     requirePrismaVendorIdentifier(
       vendorId,
@@ -4070,339 +4430,261 @@ export async function findPrismaVendorServices(
 
   try {
     const record =
-      await prisma.vendor.findUnique({
+      await prisma.vendorServiceOffering.findUnique({
         where: {
-          id:
-            normalizedVendorId,
+          vendorId_serviceType: {
+            vendorId: normalizedVendorId,
+            serviceType:
+              mapVendorServiceTypeToPrisma(
+                serviceType
+              ),
+          },
         },
       });
 
     return record
-      ? mapPrismaVendorServices(
-          record
-        )
-      : [];
+      ? mapPrismaVendorServiceOfferingToDomain(record)
+      : null;
   } catch (error) {
-    throw normalizePrismaVendorRepositoryError(
-      error
-    );
+    throw normalizePrismaVendorRepositoryError(error);
   }
 }
 
-/**
- * Returns one reconstructed service by generated ID.
- */
-export async function findPrismaVendorServiceById(
-  prisma:
-    PrismaVendorRepositoryClient,
-  vendorId: string,
-  serviceId: string
-): Promise<
-  VendorDomain.VendorService |
-  null
-> {
-  const normalizedServiceId =
-    requirePrismaVendorIdentifier(
-      serviceId,
-      "serviceId"
-    );
-
-  const services =
-    await findPrismaVendorServices(
-      prisma,
-      vendorId
-    );
-
-  return (
-    services.find(
-      (service) =>
-        service.id ===
-        normalizedServiceId
-    ) ??
-    null
-  );
-}
-
-/**
- * Returns one reconstructed service by service type.
- */
-export async function findPrismaVendorServiceByType(
-  prisma:
-    PrismaVendorRepositoryClient,
-  vendorId: string,
-  serviceType:
-    VendorServiceType
-): Promise<
-  VendorDomain.VendorService |
-  null
-> {
-  const services =
-    await findPrismaVendorServices(
-      prisma,
-      vendorId
-    );
-
-  return (
-    services.find(
-      (service) =>
-        service.serviceType ===
-        serviceType
-    ) ??
-    null
-  );
-}
-
-/**
- * Returns whether a service type can be represented by the
- * current flat Vendor schema.
- */
 export function isPrismaVendorServiceTypeSupported(
-  serviceType:
-    VendorServiceType
+  serviceType: VendorServiceType
 ): boolean {
-  return [
+  return Object.values(
     VendorServiceType
-      .HOUSEHOLD_RELOCATION,
-
-    VendorServiceType
-      .OFFICE_RELOCATION,
-
-    VendorServiceType
-      .CORPORATE_RELOCATION,
-
-    VendorServiceType
-      .VEHICLE_TRANSPORT,
-  ].includes(
-    serviceType
-  );
+  ).includes(serviceType);
 }
 
-/**
- * Creates or enables one supported Vendor service.
- */
 export async function createPrismaVendorService(
-  prisma:
-    PrismaVendorRepositoryClient,
+  prisma: PrismaVendorRepositoryClient,
   vendorId: string,
   input:
     VendorRepositoryContracts
       .CreateVendorServiceRepositoryInput
-): Promise<
-  VendorDomain.VendorService
-> {
-  if (
-    !isPrismaVendorServiceTypeSupported(
-      input.serviceType
-    )
-  ) {
-    throw createUnsupportedPrismaVendorCapabilityError(
-      `serviceType.${input.serviceType}`
-    );
-  }
-
-  const currentServices =
-    await findPrismaVendorServices(
+): Promise<VendorDomain.VendorService> {
+  const normalizedVendorId =
+    await requireExistingPrismaVendor(
       prisma,
       vendorId
     );
 
-  const nextService:
-    VendorDomain.VendorService = {
-    id:
-      input.id ??
-      `${vendorId}-service-new`,
+  try {
+    return await executePrismaVendorNestedTransaction(
+      prisma,
+      async (transaction) => {
+        const record =
+          await transaction.vendorServiceOffering.upsert({
+           where: {
+  vendorId_serviceType: {
+    vendorId:
+      normalizedVendorId,
 
     serviceType:
-      input.serviceType,
-
-    title:
-      input.title,
-
-    description:
-      input.description,
-
-    active:
-      input.active,
-
-    createdAt:
-      input.createdAt ??
-      new Date(),
-
-    updatedAt:
-      input.updatedAt ??
-      new Date(),
-  };
-
-  const services =
-    await savePrismaVendorServices(
-      prisma,
-      vendorId,
-      [
-        ...currentServices.filter(
-          (service) =>
-            service.serviceType !==
-            input.serviceType
-        ),
-
-        nextService,
-      ]
-    );
-
-  const created =
-    services.find(
-      (service) =>
-        service.serviceType ===
+      mapVendorServiceTypeToPrisma(
         input.serviceType
-    );
+      ),
+  },
+},
 
-  if (!created) {
-    throw new VendorRepositoryError(
-      "DATABASE_ERROR",
-      "The Vendor service could not be reconstructed after persistence.",
-      {
-        vendorId,
+           create: {
+              ...(normalizeOptionalPrismaVendorString(input.id)
+                ? {
+                    id:
+                      normalizePrismaVendorString(input.id),
+                  }
+                : {}),
+              vendorId: normalizedVendorId,
+              serviceType:
+                mapVendorServiceTypeToPrisma(
+                  input.serviceType
+                ),
+              title:
+                normalizePrismaVendorString(input.title),
+              description:
+                normalizeNullablePrismaVendorString(
+                  input.description
+                ),
+              active: input.active,
+              ...(input.createdAt
+                ? {
+                    createdAt:
+                      new Date(input.createdAt.getTime()),
+                  }
+                : {}),
+              ...(input.updatedAt
+                ? {
+                    updatedAt:
+                      new Date(input.updatedAt.getTime()),
+                  }
+                : {}),
+            },
+            update: {
+              title:
+                normalizePrismaVendorString(input.title),
+              description:
+                normalizeNullablePrismaVendorString(
+                  input.description
+                ),
+              active: input.active,
+              ...(input.updatedAt
+                ? {
+                    updatedAt:
+                      new Date(input.updatedAt.getTime()),
+                  }
+                : {}),
+            },
+          });
+
+        await synchronizeLegacyPrismaVendorServiceFlags(
+          transaction,
+          normalizedVendorId
+        );
+
+        return mapPrismaVendorServiceOfferingToDomain(record);
       }
     );
+  } catch (error) {
+    throw normalizePrismaVendorRepositoryError(error);
   }
-
-  return created;
 }
 
-/**
- * Updates one reconstructed Vendor service.
- */
 export async function updatePrismaVendorService(
-  prisma:
-    PrismaVendorRepositoryClient,
+  prisma: PrismaVendorRepositoryClient,
   vendorId: string,
   serviceId: string,
   input:
     VendorRepositoryContracts
       .UpdateVendorServiceRepositoryInput
-): Promise<
-  VendorDomain.VendorService |
-  null
-> {
+): Promise<VendorDomain.VendorService | null> {
+  const normalizedVendorId =
+    await requireExistingPrismaVendor(prisma, vendorId);
   const normalizedServiceId =
     requirePrismaVendorIdentifier(
       serviceId,
       "serviceId"
     );
 
-  const services =
-    await findPrismaVendorServices(
+  try {
+    return await executePrismaVendorNestedTransaction(
       prisma,
-      vendorId
-    );
+      async (transaction) => {
+        const existing =
+          await transaction.vendorServiceOffering.findFirst({
+            where: {
+              id: normalizedServiceId,
+              vendorId: normalizedVendorId,
+            },
+          });
 
-  const index =
-    services.findIndex(
-      (service) =>
-        service.id ===
-        normalizedServiceId
-    );
+        if (!existing) {
+          return null;
+        }
 
-  if (index < 0) {
-    return null;
+        const record =
+          await transaction.vendorServiceOffering.update({
+            where: {
+              id: normalizedServiceId,
+            },
+            data: {
+              ...(input.serviceType !== undefined
+                ? {
+                    serviceType:
+                      mapVendorServiceTypeToPrisma(
+                        input.serviceType
+                      ),
+                  }
+                : {}),
+              ...(input.title !== undefined
+                ? {
+                    title:
+                      normalizePrismaVendorString(input.title),
+                  }
+                : {}),
+              ...(input.description !== undefined
+                ? {
+                    description:
+                      normalizeNullablePrismaVendorString(
+                        input.description
+                      ),
+                  }
+                : {}),
+              ...(input.active !== undefined
+                ? {
+                    active: input.active,
+                  }
+                : {}),
+              ...(input.updatedAt
+                ? {
+                    updatedAt:
+                      new Date(input.updatedAt.getTime()),
+                  }
+                : {}),
+            },
+          });
+
+        await synchronizeLegacyPrismaVendorServiceFlags(
+          transaction,
+          normalizedVendorId
+        );
+
+        return mapPrismaVendorServiceOfferingToDomain(record);
+      }
+    );
+  } catch (error) {
+    throw normalizePrismaVendorRepositoryError(error);
   }
-
-  const current =
-    services[index];
-
-  const next:
-    VendorDomain.VendorService = {
-    ...current,
-    ...input,
-
-    updatedAt:
-      input.updatedAt ??
-      new Date(),
-  };
-
-  if (
-    !isPrismaVendorServiceTypeSupported(
-      next.serviceType
-    )
-  ) {
-    throw createUnsupportedPrismaVendorCapabilityError(
-      `serviceType.${next.serviceType}`
-    );
-  }
-
-  const updatedServices = [
-    ...services,
-  ];
-
-  updatedServices[index] =
-    next;
-
-  const persistedServices =
-    await savePrismaVendorServices(
-      prisma,
-      vendorId,
-      updatedServices
-    );
-
-  return (
-    persistedServices.find(
-      (service) =>
-        service.serviceType ===
-        next.serviceType
-    ) ??
-    null
-  );
 }
 
-/**
- * Deletes or disables one reconstructed Vendor service.
- */
 export async function deletePrismaVendorService(
-  prisma:
-    PrismaVendorRepositoryClient,
+  prisma: PrismaVendorRepositoryClient,
   vendorId: string,
   serviceId: string
 ): Promise<boolean> {
+  const normalizedVendorId =
+    requirePrismaVendorIdentifier(
+      vendorId,
+      "vendorId"
+    );
   const normalizedServiceId =
     requirePrismaVendorIdentifier(
       serviceId,
       "serviceId"
     );
 
-  const services =
-    await findPrismaVendorServices(
+  try {
+    return await executePrismaVendorNestedTransaction(
       prisma,
-      vendorId
-    );
+      async (transaction) => {
+        const result =
+          await transaction.vendorServiceOffering.deleteMany({
+            where: {
+              id: normalizedServiceId,
+              vendorId: normalizedVendorId,
+            },
+          });
 
-  const remainingServices =
-    services.filter(
-      (service) =>
-        service.id !==
-        normalizedServiceId
-    );
+        if (result.count === 0) {
+          return false;
+        }
 
-  if (
-    remainingServices.length ===
-    services.length
-  ) {
-    return false;
+        await synchronizeLegacyPrismaVendorServiceFlags(
+          transaction,
+          normalizedVendorId
+        );
+
+        return true;
+      }
+    );
+  } catch (error) {
+    throw normalizePrismaVendorRepositoryError(error);
   }
-
-  await savePrismaVendorServices(
-    prisma,
-    vendorId,
-    remainingServices
-  );
-
-  return true;
 }
 
-/**
- * Replaces all representable Vendor services.
- */
 export async function replacePrismaVendorServices(
-  prisma:
-    PrismaVendorRepositoryClient,
+  prisma: PrismaVendorRepositoryClient,
   input:
     VendorRepositoryContracts
       .ReplaceVendorServicesRepositoryInput
@@ -4416,87 +4698,82 @@ export async function replacePrismaVendorServices(
       input.vendorId
     );
 
-  if (
-    input.services.length ===
-      0
-  ) {
-    await savePrismaVendorServices(
+  try {
+    return await executePrismaVendorNestedTransaction(
       prisma,
-      vendorId,
-      []
-    );
+      async (transaction) => {
+        await transaction.vendorServiceOffering.deleteMany({
+          where: {
+            vendorId,
+          },
+        });
 
-    return createEmptyServiceReplacementResult(
-      vendorId
+        const records: PrismaVendorServiceOffering[] = [];
+
+        for (const service of input.services) {
+          const record =
+            await transaction.vendorServiceOffering.create({
+              data: {
+                ...(normalizeOptionalPrismaVendorString(service.id)
+                  ? {
+                      id:
+                        normalizePrismaVendorString(service.id),
+                    }
+                  : {}),
+                vendorId,
+                serviceType:
+                  mapVendorServiceTypeToPrisma(
+                    service.serviceType
+                  ),
+                title:
+                  normalizePrismaVendorString(service.title),
+                description:
+                  normalizeNullablePrismaVendorString(
+                    service.description
+                  ),
+                active: service.active,
+                ...(service.createdAt
+                  ? {
+                      createdAt:
+                        new Date(service.createdAt.getTime()),
+                    }
+                  : {}),
+                ...(service.updatedAt
+                  ? {
+                      updatedAt:
+                        new Date(service.updatedAt.getTime()),
+                    }
+                  : {}),
+              },
+            });
+
+          records.push(record);
+        }
+
+        await synchronizeLegacyPrismaVendorServiceFlags(
+          transaction,
+          vendorId
+        );
+
+        const services =
+          records.map(
+            mapPrismaVendorServiceOfferingToDomain
+          );
+
+        return {
+          vendorId,
+          services,
+          replacedCount: services.length,
+        };
+      }
     );
+  } catch (error) {
+    throw normalizePrismaVendorRepositoryError(error);
   }
-
-  const unsupportedService =
-    input.services.find(
-      (service) =>
-        !isPrismaVendorServiceTypeSupported(
-          service.serviceType
-        )
-    );
-
-  if (unsupportedService) {
-    throw createUnsupportedPrismaVendorCapabilityError(
-      `serviceType.${unsupportedService.serviceType}`
-    );
-  }
-
-  const services =
-    await savePrismaVendorServices(
-      prisma,
-      vendorId,
-      input.services.map(
-        (
-          service,
-          index
-        ): VendorDomain.VendorService => ({
-          id:
-            service.id ??
-            `${vendorId}-service-input-${index + 1}`,
-
-          serviceType:
-            service.serviceType,
-
-          title:
-            service.title,
-
-          description:
-            service.description,
-
-          active:
-            service.active,
-
-          createdAt:
-            service.createdAt ??
-            new Date(),
-
-          updatedAt:
-            service.updatedAt ??
-            new Date(),
-        })
-      )
-    );
-
-  return {
-    vendorId,
-
-    services,
-
-    replacedCount:
-      services.length,
-  };
 }
 
-/**
- * Determines whether one reconstructed service exists.
- */
 export async function prismaVendorServiceExists(
-  prisma:
-    PrismaVendorRepositoryClient,
+  prisma: PrismaVendorRepositoryClient,
   vendorId: string,
   serviceId: string
 ): Promise<boolean> {
@@ -4509,107 +4786,501 @@ export async function prismaVendorServiceExists(
   );
 }
 
+export function mapPrismaVendorPricingTypeToDomain(
+  pricingType: PrismaVendorPricingType
+): VendorPricingType {
+  return pricingType as unknown as VendorPricingType;
+}
+
+export function mapVendorPricingTypeToPrisma(
+  pricingType: VendorPricingType
+): PrismaVendorPricingType {
+  return pricingType as unknown as PrismaVendorPricingType;
+}
+
+export function mapOptionalPrismaVendorDecimal(
+  value: Prisma.Decimal | null
+): number | undefined {
+  if (value === null) {
+    return undefined;
+  }
+
+  const numberValue =
+    Number(
+      value.toString()
+    );
+
+  return Number.isFinite(numberValue)
+    ? numberValue
+    : undefined;
+}
+
+export function mapPrismaVendorPricingToDomain(
+  record: PrismaVendorPricing
+): VendorDomain.VendorPricing {
+  const basePrice =
+    mapOptionalPrismaVendorDecimal(
+      record.basePrice
+    );
+
+  const minimumPrice =
+    mapOptionalPrismaVendorDecimal(
+      record.minimumPrice
+    );
+
+  const pricePerKilometre =
+    mapOptionalPrismaVendorDecimal(
+      record.pricePerKilometre
+    );
+
+  const pricePerKilogram =
+    mapOptionalPrismaVendorDecimal(
+      record.pricePerKilogram
+    );
+
+  const pricePerItem =
+    mapOptionalPrismaVendorDecimal(
+      record.pricePerItem
+    );
+
+  const labourCharge =
+    mapOptionalPrismaVendorDecimal(
+      record.labourCharge
+    );
+
+  const packingCharge =
+    mapOptionalPrismaVendorDecimal(
+      record.packingCharge
+    );
+
+  const loadingCharge =
+    mapOptionalPrismaVendorDecimal(
+      record.loadingCharge
+    );
+
+  const unloadingCharge =
+    mapOptionalPrismaVendorDecimal(
+      record.unloadingCharge
+    );
+
+  const insuranceChargePercentage =
+    mapOptionalPrismaVendorDecimal(
+      record.insuranceChargePercentage
+    );
+
+  const taxPercentage =
+    mapOptionalPrismaVendorDecimal(
+      record.taxPercentage
+    );
+
+  return {
+    id:
+      record.id,
+
+    serviceType:
+      mapPrismaVendorServiceTypeToDomain(
+        record.serviceType
+      ),
+
+    pricingType:
+      mapPrismaVendorPricingTypeToDomain(
+        record.pricingType
+      ),
+
+    ...(basePrice !== undefined
+      ? {
+          basePrice,
+        }
+      : {}),
+
+    ...(minimumPrice !== undefined
+      ? {
+          minimumPrice,
+        }
+      : {}),
+
+    ...(pricePerKilometre !== undefined
+      ? {
+          pricePerKilometre,
+        }
+      : {}),
+
+    ...(pricePerKilogram !== undefined
+      ? {
+          pricePerKilogram,
+        }
+      : {}),
+
+    ...(pricePerItem !== undefined
+      ? {
+          pricePerItem,
+        }
+      : {}),
+
+    ...(labourCharge !== undefined
+      ? {
+          labourCharge,
+        }
+      : {}),
+
+    ...(packingCharge !== undefined
+      ? {
+          packingCharge,
+        }
+      : {}),
+
+    ...(loadingCharge !== undefined
+      ? {
+          loadingCharge,
+        }
+      : {}),
+
+    ...(unloadingCharge !== undefined
+      ? {
+          unloadingCharge,
+        }
+      : {}),
+
+    ...(insuranceChargePercentage !== undefined
+      ? {
+          insuranceChargePercentage,
+        }
+      : {}),
+
+    ...(taxPercentage !== undefined
+      ? {
+          taxPercentage,
+        }
+      : {}),
+
+    currency:
+      record.currency,
+
+    active:
+      record.active,
+
+    ...(record.effectiveFrom
+      ? {
+          effectiveFrom:
+            new Date(
+              record.effectiveFrom.getTime()
+            ),
+        }
+      : {}),
+
+    ...(record.effectiveUntil
+      ? {
+          effectiveUntil:
+            new Date(
+              record.effectiveUntil.getTime()
+            ),
+        }
+      : {}),
+
+    createdAt:
+      new Date(
+        record.createdAt.getTime()
+      ),
+
+    updatedAt:
+      new Date(
+        record.updatedAt.getTime()
+      ),
+  };
+}
 /**
  * Pricing writes are unsupported by the current Prisma schema.
  */
 export async function createPrismaVendorPricing(
-  _prisma:
-    PrismaVendorRepositoryClient,
-  _vendorId: string,
-  _input:
+  prisma: PrismaVendorRepositoryClient,
+  vendorId: string,
+  input:
     VendorRepositoryContracts
       .CreateVendorPricingRepositoryInput
-): Promise<
-  VendorDomain.VendorPricing
-> {
-  throw createUnsupportedPrismaVendorCapabilityError(
-    "VendorPricing"
-  );
+): Promise<VendorDomain.VendorPricing> {
+  const normalizedVendorId =
+    await requireExistingPrismaVendor(prisma, vendorId);
+
+  try {
+    const record = await prisma.vendorPricing.create({
+      data: {
+        ...(normalizeOptionalPrismaVendorString(input.id)
+          ? { id: normalizePrismaVendorString(input.id) }
+          : {}),
+        vendorId: normalizedVendorId,
+        serviceType:
+          mapVendorServiceTypeToPrisma(input.serviceType),
+        pricingType:
+          mapVendorPricingTypeToPrisma(input.pricingType),
+        basePrice: input.basePrice,
+        minimumPrice: input.minimumPrice,
+        pricePerKilometre: input.pricePerKilometre,
+        pricePerKilogram: input.pricePerKilogram,
+        pricePerItem: input.pricePerItem,
+        labourCharge: input.labourCharge,
+        packingCharge: input.packingCharge,
+        loadingCharge: input.loadingCharge,
+        unloadingCharge: input.unloadingCharge,
+        insuranceChargePercentage:
+          input.insuranceChargePercentage,
+        taxPercentage: input.taxPercentage,
+        currency:
+          normalizePrismaVendorString(input.currency),
+        active: input.active,
+        ...(input.effectiveFrom
+          ? {
+              effectiveFrom:
+                new Date(input.effectiveFrom.getTime()),
+            }
+          : {}),
+        ...(input.effectiveUntil
+          ? {
+              effectiveUntil:
+                new Date(input.effectiveUntil.getTime()),
+            }
+          : {}),
+        ...(input.createdAt
+          ? {
+              createdAt:
+                new Date(input.createdAt.getTime()),
+            }
+          : {}),
+        ...(input.updatedAt
+          ? {
+              updatedAt:
+                new Date(input.updatedAt.getTime()),
+            }
+          : {}),
+      },
+    });
+
+    return mapPrismaVendorPricingToDomain(record);
+  } catch (error) {
+    throw normalizePrismaVendorRepositoryError(error);
+  }
 }
 
-/**
- * Returns no pricing record because the current schema has no
- * normalized pricing table.
- */
 export async function findPrismaVendorPricingById(
-  _prisma:
-    PrismaVendorRepositoryClient,
-  _vendorId: string,
-  _pricingId: string
-): Promise<
-  VendorDomain.VendorPricing |
-  null
-> {
-  return null;
+  prisma: PrismaVendorRepositoryClient,
+  vendorId: string,
+  pricingId: string
+): Promise<VendorDomain.VendorPricing | null> {
+  const normalizedVendorId =
+    requirePrismaVendorIdentifier(vendorId, "vendorId");
+  const normalizedPricingId =
+    requirePrismaVendorIdentifier(pricingId, "pricingId");
+
+  try {
+    const record = await prisma.vendorPricing.findFirst({
+      where: {
+        id: normalizedPricingId,
+        vendorId: normalizedVendorId,
+      },
+    });
+
+    return record
+      ? mapPrismaVendorPricingToDomain(record)
+      : null;
+  } catch (error) {
+    throw normalizePrismaVendorRepositoryError(error);
+  }
 }
 
-/**
- * Returns an empty pricing list for the current schema.
- */
 export async function findPrismaVendorPricing(
-  _prisma:
-    PrismaVendorRepositoryClient,
-  _vendorId: string
-): Promise<
-  VendorDomain.VendorPricing[]
-> {
-  return [];
+  prisma: PrismaVendorRepositoryClient,
+  vendorId: string
+): Promise<VendorDomain.VendorPricing[]> {
+  const normalizedVendorId =
+    requirePrismaVendorIdentifier(vendorId, "vendorId");
+
+  try {
+    const records = await prisma.vendorPricing.findMany({
+      where: {
+        vendorId: normalizedVendorId,
+      },
+      orderBy: [
+        { createdAt: "asc" },
+        { id: "asc" },
+      ],
+    });
+
+    return records.map(mapPrismaVendorPricingToDomain);
+  } catch (error) {
+    throw normalizePrismaVendorRepositoryError(error);
+  }
 }
 
-/**
- * Returns an empty pricing list for one service type.
- */
 export async function findPrismaVendorPricingByServiceType(
-  _prisma:
-    PrismaVendorRepositoryClient,
-  _vendorId: string,
-  _serviceType:
-    VendorServiceType
-): Promise<
-  VendorDomain.VendorPricing[]
-> {
-  return [];
+  prisma: PrismaVendorRepositoryClient,
+  vendorId: string,
+  serviceType: VendorServiceType
+): Promise<VendorDomain.VendorPricing[]> {
+  const normalizedVendorId =
+    requirePrismaVendorIdentifier(vendorId, "vendorId");
+
+  try {
+    const records = await prisma.vendorPricing.findMany({
+      where: {
+        vendorId: normalizedVendorId,
+        serviceType:
+          mapVendorServiceTypeToPrisma(serviceType),
+      },
+      orderBy: [
+        { createdAt: "asc" },
+        { id: "asc" },
+      ],
+    });
+
+    return records.map(mapPrismaVendorPricingToDomain);
+  } catch (error) {
+    throw normalizePrismaVendorRepositoryError(error);
+  }
 }
 
-/**
- * Pricing updates are unsupported by the current schema.
- */
 export async function updatePrismaVendorPricing(
-  _prisma:
-    PrismaVendorRepositoryClient,
-  _vendorId: string,
-  _pricingId: string,
-  _input:
+  prisma: PrismaVendorRepositoryClient,
+  vendorId: string,
+  pricingId: string,
+  input:
     VendorRepositoryContracts
       .UpdateVendorPricingRepositoryInput
-): Promise<
-  VendorDomain.VendorPricing |
-  null
-> {
-  throw createUnsupportedPrismaVendorCapabilityError(
-    "VendorPricing"
-  );
+): Promise<VendorDomain.VendorPricing | null> {
+  const normalizedVendorId =
+    await requireExistingPrismaVendor(prisma, vendorId);
+  const normalizedPricingId =
+    requirePrismaVendorIdentifier(pricingId, "pricingId");
+
+  try {
+    const existing = await prisma.vendorPricing.findFirst({
+      where: {
+        id: normalizedPricingId,
+        vendorId: normalizedVendorId,
+      },
+    });
+
+    if (!existing) {
+      return null;
+    }
+
+    const record = await prisma.vendorPricing.update({
+      where: {
+        id: normalizedPricingId,
+      },
+      data: {
+        ...(input.serviceType !== undefined
+          ? {
+              serviceType:
+                mapVendorServiceTypeToPrisma(
+                  input.serviceType
+                ),
+            }
+          : {}),
+        ...(input.pricingType !== undefined
+          ? {
+              pricingType:
+                mapVendorPricingTypeToPrisma(
+                  input.pricingType
+                ),
+            }
+          : {}),
+        ...(input.basePrice !== undefined
+          ? { basePrice: input.basePrice }
+          : {}),
+        ...(input.minimumPrice !== undefined
+          ? { minimumPrice: input.minimumPrice }
+          : {}),
+        ...(input.pricePerKilometre !== undefined
+          ? { pricePerKilometre: input.pricePerKilometre }
+          : {}),
+        ...(input.pricePerKilogram !== undefined
+          ? { pricePerKilogram: input.pricePerKilogram }
+          : {}),
+        ...(input.pricePerItem !== undefined
+          ? { pricePerItem: input.pricePerItem }
+          : {}),
+        ...(input.labourCharge !== undefined
+          ? { labourCharge: input.labourCharge }
+          : {}),
+        ...(input.packingCharge !== undefined
+          ? { packingCharge: input.packingCharge }
+          : {}),
+        ...(input.loadingCharge !== undefined
+          ? { loadingCharge: input.loadingCharge }
+          : {}),
+        ...(input.unloadingCharge !== undefined
+          ? { unloadingCharge: input.unloadingCharge }
+          : {}),
+        ...(input.insuranceChargePercentage !== undefined
+          ? {
+              insuranceChargePercentage:
+                input.insuranceChargePercentage,
+            }
+          : {}),
+        ...(input.taxPercentage !== undefined
+          ? { taxPercentage: input.taxPercentage }
+          : {}),
+        ...(input.currency !== undefined
+          ? {
+              currency:
+                normalizePrismaVendorString(input.currency),
+            }
+          : {}),
+        ...(input.active !== undefined
+          ? { active: input.active }
+          : {}),
+        ...(input.effectiveFrom !== undefined
+          ? {
+              effectiveFrom:
+                new Date(input.effectiveFrom.getTime()),
+            }
+          : {}),
+        ...(input.effectiveUntil !== undefined
+          ? {
+              effectiveUntil:
+                new Date(input.effectiveUntil.getTime()),
+            }
+          : {}),
+        ...(input.updatedAt
+          ? {
+              updatedAt:
+                new Date(input.updatedAt.getTime()),
+            }
+          : {}),
+      },
+    });
+
+    return mapPrismaVendorPricingToDomain(record);
+  } catch (error) {
+    throw normalizePrismaVendorRepositoryError(error);
+  }
 }
 
-/**
- * Pricing deletion has no persisted record to remove.
- */
 export async function deletePrismaVendorPricing(
-  _prisma:
-    PrismaVendorRepositoryClient,
-  _vendorId: string,
-  _pricingId: string
+  prisma: PrismaVendorRepositoryClient,
+  vendorId: string,
+  pricingId: string
 ): Promise<boolean> {
-  return false;
+  const normalizedVendorId =
+    requirePrismaVendorIdentifier(vendorId, "vendorId");
+  const normalizedPricingId =
+    requirePrismaVendorIdentifier(pricingId, "pricingId");
+
+  try {
+    const result = await prisma.vendorPricing.deleteMany({
+      where: {
+        id: normalizedPricingId,
+        vendorId: normalizedVendorId,
+      },
+    });
+
+    return result.count > 0;
+  } catch (error) {
+    throw normalizePrismaVendorRepositoryError(error);
+  }
 }
 
-/**
- * Replaces pricing only when the requested replacement is
- * empty; non-empty writes are rejected explicitly.
- */
 export async function replacePrismaVendorPricing(
-  _prisma:
-    PrismaVendorRepositoryClient,
+  prisma: PrismaVendorRepositoryClient,
   input:
     VendorRepositoryContracts
       .ReplaceVendorPricingRepositoryInput
@@ -4617,31 +5288,111 @@ export async function replacePrismaVendorPricing(
   VendorRepositoryContracts
     .ReplaceVendorPricingRepositoryResult
 > {
-  if (
-    input.pricing.length ===
-      0
-  ) {
-    return createEmptyPricingReplacementResult(
-      input.vendorId
-    );
-  }
+  const vendorId =
+    await requireExistingPrismaVendor(prisma, input.vendorId);
 
-  throw createUnsupportedPrismaVendorCapabilityError(
-    "VendorPricing"
+  try {
+    return await executePrismaVendorNestedTransaction(
+      prisma,
+      async (transaction) => {
+        await transaction.vendorPricing.deleteMany({
+          where: { vendorId },
+        });
+
+        const records: PrismaVendorPricing[] = [];
+
+        for (const pricing of input.pricing) {
+          const record = await transaction.vendorPricing.create({
+            data: {
+              ...(normalizeOptionalPrismaVendorString(pricing.id)
+                ? {
+                    id:
+                      normalizePrismaVendorString(pricing.id),
+                  }
+                : {}),
+              vendorId,
+              serviceType:
+                mapVendorServiceTypeToPrisma(
+                  pricing.serviceType
+                ),
+              pricingType:
+                mapVendorPricingTypeToPrisma(
+                  pricing.pricingType
+                ),
+              basePrice: pricing.basePrice,
+              minimumPrice: pricing.minimumPrice,
+              pricePerKilometre: pricing.pricePerKilometre,
+              pricePerKilogram: pricing.pricePerKilogram,
+              pricePerItem: pricing.pricePerItem,
+              labourCharge: pricing.labourCharge,
+              packingCharge: pricing.packingCharge,
+              loadingCharge: pricing.loadingCharge,
+              unloadingCharge: pricing.unloadingCharge,
+              insuranceChargePercentage:
+                pricing.insuranceChargePercentage,
+              taxPercentage: pricing.taxPercentage,
+              currency:
+                normalizePrismaVendorString(pricing.currency),
+              active: pricing.active,
+              ...(pricing.effectiveFrom
+                ? {
+                    effectiveFrom:
+                      new Date(pricing.effectiveFrom.getTime()),
+                  }
+                : {}),
+              ...(pricing.effectiveUntil
+                ? {
+                    effectiveUntil:
+                      new Date(pricing.effectiveUntil.getTime()),
+                  }
+                : {}),
+              ...(pricing.createdAt
+                ? {
+                    createdAt:
+                      new Date(pricing.createdAt.getTime()),
+                  }
+                : {}),
+              ...(pricing.updatedAt
+                ? {
+                    updatedAt:
+                      new Date(pricing.updatedAt.getTime()),
+                  }
+                : {}),
+            },
+          });
+
+          records.push(record);
+        }
+
+        const pricing =
+          records.map(mapPrismaVendorPricingToDomain);
+
+        return {
+          vendorId,
+          pricing,
+          replacedCount: pricing.length,
+        };
+      }
+    );
+  } catch (error) {
+    throw normalizePrismaVendorRepositoryError(error);
+  }
+}
+
+export async function prismaVendorPricingExists(
+  prisma: PrismaVendorRepositoryClient,
+  vendorId: string,
+  pricingId: string
+): Promise<boolean> {
+  return Boolean(
+    await findPrismaVendorPricingById(
+      prisma,
+      vendorId,
+      pricingId
+    )
   );
 }
 
-/**
- * Pricing records cannot exist in the current schema.
- */
-export async function prismaVendorPricingExists(
-  _prisma:
-    PrismaVendorRepositoryClient,
-  _vendorId: string,
-  _pricingId: string
-): Promise<boolean> {
-  return false;
-}
 
 /**
  * ============================================================
@@ -6824,6 +7575,10 @@ export async function prismaVendorUpiIdExists(
  * Hydrates separately persisted vehicles, documents and bank
  * details into one base Vendor aggregate.
  */
+/**
+ * Hydrates all separately persisted Vendor operational data
+ * into one Vendor aggregate.
+ */
 export async function hydratePrismaVendorAggregate(
   prisma:
     PrismaVendorRepositoryClient,
@@ -6833,10 +7588,28 @@ export async function hydratePrismaVendorAggregate(
   VendorMapperTypes.VendorAggregate
 > {
   const [
+    serviceAreas,
+    services,
+    pricing,
     vehicles,
     documents,
     bankDetails,
   ] = await Promise.all([
+    findPrismaVendorServiceAreas(
+      prisma,
+      aggregate.id
+    ),
+
+    findPrismaVendorServices(
+      prisma,
+      aggregate.id
+    ),
+
+    findPrismaVendorPricing(
+      prisma,
+      aggregate.id
+    ),
+
     findPrismaVendorVehicles(
       prisma,
       aggregate.id
@@ -6856,6 +7629,12 @@ export async function hydratePrismaVendorAggregate(
   return {
     ...aggregate,
 
+    serviceAreas,
+
+    services,
+
+    pricing,
+
     vehicles,
 
     documents,
@@ -6865,7 +7644,6 @@ export async function hydratePrismaVendorAggregate(
       undefined,
   };
 }
-
 /**
  * Finds and hydrates one Vendor by internal ID.
  */
@@ -6992,12 +7770,15 @@ export async function findPrismaVendorsByIds(
   try {
     const records =
       await prisma.vendor.findMany({
-        where: {
-          id: {
-            in:
-              normalizedIds,
-          },
-        },
+where: {
+  id: {
+    in:
+      normalizedIds,
+  },
+
+  deletedAt:
+    null,
+},
       });
 
     const vendors =
@@ -7337,6 +8118,38 @@ export class PrismaVendorRepository
         this.prisma,
         input
       );
+    await replacePrismaVendorServiceAreas(
+      this.prisma,
+      {
+        vendorId:
+          aggregate.id,
+
+        serviceAreas:
+          input.serviceAreas,
+      }
+    );
+
+    await replacePrismaVendorServices(
+      this.prisma,
+      {
+        vendorId:
+          aggregate.id,
+
+        services:
+          input.services,
+      }
+    );
+
+    await replacePrismaVendorPricing(
+      this.prisma,
+      {
+        vendorId:
+          aggregate.id,
+
+        pricing:
+          input.pricing,
+      }
+    );
 
     if (
       input.vehicles.length >
