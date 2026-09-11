@@ -9158,16 +9158,23 @@ export class PrismaVendorRepositoryTransactionManager
   ): Promise<T> {
     try {
       return await this.prisma.$transaction(
-        async (
+  async (
+    transaction
+  ) =>
+    callback({
+      repository:
+        new PrismaVendorRepository(
           transaction
-        ) =>
-          callback({
-            repository:
-              new PrismaVendorRepository(
-                transaction
-              ),
-          })
-      );
+        ),
+    }),
+  {
+    maxWait:
+      10_000,
+
+    timeout:
+      30_000,
+  }
+);
     } catch (error) {
       const normalizedError =
         normalizePrismaVendorRepositoryError(
@@ -9206,16 +9213,23 @@ export class PrismaCompleteVendorRepositoryTransactionManager
   ): Promise<T> {
     try {
       return await this.prisma.$transaction(
-        async (
+  async (
+    transaction
+  ) =>
+    callback({
+      repository:
+        new PrismaVendorRepository(
           transaction
-        ) =>
-          callback({
-            repository:
-              new PrismaVendorRepository(
-                transaction
-              ),
-          })
-      );
+        ),
+    }),
+  {
+    maxWait:
+      10_000,
+
+    timeout:
+      30_000,
+  }
+);
     } catch (error) {
       const normalizedError =
         normalizePrismaVendorRepositoryError(

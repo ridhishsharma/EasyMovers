@@ -19,6 +19,7 @@ import {
   prismaVendorExists,
   replacePrismaVendorPricing,
   replacePrismaVendorServiceAreas,
+PrismaVendorRepositoryTransactionManager,
   replacePrismaVendorServices,
 } from "../../domains/vendor/repositories/prisma-vendor.repository";
 
@@ -502,3 +503,67 @@ test("Vendor deletion is soft, idempotent, and removes the Vendor from existence
   assert.equal(memory.vendors.get("vendor-1")?.status, "INACTIVE");
   assert.ok(memory.vendors.get("vendor-1")?.deletedAt instanceof Date);
 });
+test(
+  "Vendor transaction manager provides sufficient remote-database timing limits",
+  async () => {
+    let receivedOptions:
+      {
+        maxWait?: number;
+        timeout?: number;
+      } | undefined;
+
+    const prisma = {
+      $transaction: async (
+        operation:
+          (
+            transaction: unknown
+          ) => Promise<string>,
+        options?:
+          {
+            maxWait?: number;
+            timeout?: number;
+          }
+      ) => {
+        receivedOptions =
+          options;
+
+        return operation({});
+      },
+    };
+
+    const transactionManager =
+      new PrismaVendorRepositoryTransactionManager(
+        prisma as never
+      );
+
+    const result =
+      await transactionManager
+        .runInTransaction(
+          async ({
+            repository,
+          }) => {
+            assert.ok(
+              repository
+            );
+
+            return "completed";
+          }
+        );
+
+    assert.equal(
+      result,
+      "completed"
+    );
+
+    assert.deepEqual(
+      receivedOptions,
+      {
+        maxWait:
+          10_000,
+
+        timeout:
+          30_000,
+      }
+    );
+  }
+);
