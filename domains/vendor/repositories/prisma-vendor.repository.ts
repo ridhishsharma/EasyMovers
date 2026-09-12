@@ -94,6 +94,7 @@ import type * as VendorDomain from "../models/vendor.model";
 import {
   mapVendorAggregate,
   mapVendorAggregateSummary,
+  mapVendorBusinessType,
 } from "../mappers/vendor.mapper";
 
 /* ============================================================
@@ -1184,9 +1185,12 @@ export function mapPrismaVendorToAggregate(
     vendorCode:
       vendor.vendorCode,
 
-    businessDetails: {
-      companyName:
-        vendor.companyName,
+        businessDetails: {
+      companyName: vendor.companyName,
+
+      businessType: mapVendorBusinessType(
+        vendor.businessType
+      ),
 
       gstNumber:
         vendor.gstNumber ??
@@ -1447,7 +1451,9 @@ export function mapVendorAggregateToPrismaCreateData(
       generatePrismaVendorCode(),
 
     companyName,
-
+    businessType: mapVendorBusinessType(
+      input.businessDetails.businessType
+    ),
     companyLogo:
       null,
 
@@ -1643,7 +1649,11 @@ export function mapVendorUpdateToPrismaData(
           .establishedYear
       );
   }
-
+  if (input.businessDetails?.businessType !== undefined) {
+    data.businessType = mapVendorBusinessType(
+      input.businessDetails.businessType
+    );
+  }
   if (
     input.ownerDetails !==
       undefined

@@ -45,7 +45,12 @@ export enum VendorCategory {
   REGIONAL = "REGIONAL",
   NATIONAL = "NATIONAL",
 }
-
+export enum VendorBusinessType {
+  UNSPECIFIED = "UNSPECIFIED",
+  INDIVIDUAL_OWNER_DRIVER = "INDIVIDUAL_OWNER_DRIVER",
+  SOLE_PROPRIETOR = "SOLE_PROPRIETOR",
+  REGISTERED_BUSINESS = "REGISTERED_BUSINESS",
+}
 /**
  * Vendor service coverage.
  */
@@ -186,6 +191,7 @@ export interface VendorBusinessDetails {
   panNumber?: string;
   establishedYear?: number;
   category: VendorCategory;
+  businessType?: VendorBusinessType;
 }
 
 /**

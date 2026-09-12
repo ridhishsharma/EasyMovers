@@ -68,6 +68,7 @@ model Vendor {
   id                     String                  @id @default(cuid())
   companyName            String
   ownerName              String
+  businessType           VendorBusinessType      @default(UNSPECIFIED)
   gstNumber              String?
   serviceCities          String
   householdService       Boolean                 @default(false)
@@ -115,6 +116,13 @@ model Vendor {
   vehicles               VendorVehicle[]
 
   @@index([deletedAt])
+}
+
+enum VendorBusinessType {
+  UNSPECIFIED
+  INDIVIDUAL_OWNER_DRIVER
+  SOLE_PROPRIETOR
+  REGISTERED_BUSINESS
 }
 
 model VendorServiceArea {

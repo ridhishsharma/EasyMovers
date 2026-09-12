@@ -24,6 +24,7 @@ import {
   VendorServiceType,
   VendorVehicleStatus,
   VendorVehicleType,
+  VendorBusinessType,
 } from "../models/vendor.model";
 
 import type {
@@ -486,7 +487,17 @@ export function validateVendorBusinessDetails(
       "VENDOR_CATEGORY_REQUIRED"
     );
   }
-
+  if (
+    business.businessType !== undefined &&
+    !isEnumValue(VendorBusinessType, business.businessType)
+  ) {
+    addError(
+      errors,
+      "business.businessType",
+      "Vendor business type is invalid.",
+      "INVALID_VENDOR_BUSINESS_TYPE"
+    );
+  }
   return resultFromErrors(errors);
 }
 

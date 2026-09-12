@@ -43,6 +43,9 @@ VendorDocument,
 VendorVehicle,
 } from "../models/vendor.model";
 
+import {
+  VendorBusinessType,
+} from "../models/vendor.model";
 /**
  * Input shape accepted by mapper functions.
  *
@@ -335,6 +338,32 @@ function mapOptionalDateString(
     .slice(0, 10);
 }
 
+export function mapVendorBusinessType(
+  value: unknown
+): VendorBusinessType {
+  if (value === undefined || value === null) {
+    return VendorBusinessType.UNSPECIFIED;
+  }
+
+  if (typeof value !== "string") {
+    throw new Error("Vendor business type must be a string.");
+  }
+
+  const normalized = value.trim().toUpperCase();
+
+  switch (normalized) {
+    case VendorBusinessType.UNSPECIFIED:
+      return VendorBusinessType.UNSPECIFIED;
+    case VendorBusinessType.INDIVIDUAL_OWNER_DRIVER:
+      return VendorBusinessType.INDIVIDUAL_OWNER_DRIVER;
+    case VendorBusinessType.SOLE_PROPRIETOR:
+      return VendorBusinessType.SOLE_PROPRIETOR;
+    case VendorBusinessType.REGISTERED_BUSINESS:
+      return VendorBusinessType.REGISTERED_BUSINESS;
+    default:
+      throw new Error("Vendor business type is invalid.");
+  }
+}
 /**
  * Maps vendor business details.
  */
@@ -374,6 +403,9 @@ export function mapVendorBusinessDetails(
 
     category:
       input.category as VendorBusinessDetails["category"],
+    businessType: mapVendorBusinessType(
+      input.businessType
+    ),
   };
 }
 
