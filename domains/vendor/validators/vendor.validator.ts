@@ -500,7 +500,25 @@ export function validateVendorBusinessDetails(
   }
   return resultFromErrors(errors);
 }
+export function validateVendorBusinessTypeUpdate(
+  value: unknown
+): VendorValidationResult {
+  const errors: VendorValidationError[] = [];
 
+  if (
+    value !== undefined &&
+    !isEnumValue(VendorBusinessType, value)
+  ) {
+    addError(
+      errors,
+      "businessDetails.businessType",
+      "Vendor business type is invalid.",
+      "INVALID_VENDOR_BUSINESS_TYPE"
+    );
+  }
+
+  return resultFromErrors(errors);
+}
 /**
  * Validates VendorOwnerDetails.
  */

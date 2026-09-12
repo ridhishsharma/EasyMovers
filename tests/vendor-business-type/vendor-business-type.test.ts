@@ -15,6 +15,12 @@ import {
 import {
   validateVendorBusinessDetails,
 } from "../../domains/vendor/validators/vendor.validator";
+import {
+  VendorService,
+} from "../../domains/vendor/services/vendor.service";
+import type {
+  VendorRepositoryPort,
+} from "../../domains/vendor/repositories/vendor.repository";
 
 test("Missing business type maps to UNSPECIFIED", () => {
   assert.equal(
@@ -112,5 +118,79 @@ test("Registration rejects an unsupported business type", () => {
     result.errors.some(
       (error) => error.code === "INVALID_VENDOR_BUSINESS_TYPE"
     )
+  );
+});
+test("Invalid classification is rejected before the repository update", async () => {
+  let updateCalled = false;
+
+  const service = new VendorService({
+    repository: {
+      update: async () => {
+        updateCalled = true;
+        throw new Error("Repository must not be called");
+      },
+    } as unknown as VendorRepositoryPort,
+  });
+
+  const result = await service.updateVendor({
+    vendorId: "vendor-1",
+    changes: {
+      businessDetails: {
+        companyName: "Test Local Transport",
+        category: VendorCategory.LOCAL,
+        businessType: "INVALID_TYPE" as VendorBusinessType,
+      },
+    },
+  });
+
+  assert.equal(updateCalled, false);
+  assert.equal(result.success, false);
+
+  if (!result.success) {
+    assert.equal(result.errorCode, "VENDOR_VALIDATION_FAILED");
+    assert.ok(
+      result.validationErrors?.some(
+        (error) =>
+          error.field === "businessDetails.businessType" &&
+          error.code === "INVALID_VENDOR_BUSINESS_TYPE"
+      )
+    );
+  }
+});
+
+test("Omitted classification remains omitted when the service delegates update", async () => {
+  let captured:
+    Parameters<VendorRepositoryPort["update"]>[1] | undefined;
+
+  const service = new VendorService({
+    repository: {
+      update: async (
+        _vendorId: string,
+        changes: Parameters<VendorRepositoryPort["update"]>[1]
+      ) => {
+        captured = changes;
+        return null;
+      },
+    } as unknown as VendorRepositoryPort,
+  });
+
+  const result = await service.updateVendor({
+    vendorId: "vendor-1",
+    changes: {
+      businessDetails: {
+        companyName: "Updated Transport Name",
+        category: VendorCategory.LOCAL,
+      },
+    },
+  });
+
+  assert.equal(result.success, true);
+  assert.ok(captured);
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(
+      captured.businessDetails,
+      "businessType"
+    ),
+    false
   );
 });

@@ -1089,7 +1089,17 @@ export class VendorService {
           input.vendorId,
           "Vendor ID"
         );
+      const validation =
+        VendorValidators.validateVendorBusinessTypeUpdate(
+          input.changes.businessDetails?.businessType
+        );
 
+      if (!validation.valid) {
+        return createValidationFailure(
+          validation,
+          "Vendor update validation failed."
+        );
+      }
       const updated =
         await this.repository
           .update(
