@@ -22,7 +22,9 @@
 
 import {
   VendorDocumentStatus,
+VendorDocumentType,
   VendorVehicleStatus,
+  VendorBusinessType,
 } from "../models/vendor.model";
 
 import {
@@ -815,6 +817,41 @@ function mapBankDetailsInput(
   };
 }
 
+export function hasVerifiedVendorDocument(
+  documents: readonly VendorDomain.VendorDocument[],
+  documentType: VendorDocumentType,
+  observedAt: Date = new Date()
+): boolean {
+  const observedTime = observedAt.getTime();
+
+  if (!Number.isFinite(observedTime)) {
+    return false;
+  }
+
+  return documents.some((document) => {
+    if (
+      document.documentType !== documentType ||
+      document.status !== VendorDocumentStatus.VERIFIED
+    ) {
+      return false;
+    }
+
+    if (document.expiresAt === undefined) {
+      return true;
+    }
+
+    if (!(document.expiresAt instanceof Date)) {
+      return false;
+    }
+
+    const expiryTime = document.expiresAt.getTime();
+
+    return (
+      Number.isFinite(expiryTime) &&
+      expiryTime > observedTime
+    );
+  });
+}
 /* ============================================================
  * Aggregate Vendor service
  * ============================================================
@@ -1089,6 +1126,12 @@ export class VendorService {
           input.vendorId,
           "Vendor ID"
         );
+      if (input.changes.active !== undefined) {
+        return createVendorServiceFailure(
+          "VENDOR_OPERATION_NOT_ALLOWED",
+          "Vendor activation status cannot be changed through profile updates. Use the administrator status operation."
+        );
+      }
       const validation =
         VendorValidators.validateVendorBusinessTypeUpdate(
           input.changes.businessDetails?.businessType
@@ -1200,33 +1243,90 @@ export class VendorService {
       );
     }
   }
-  async setVendorActiveStatus(
-    input:
-      SetVendorActiveStatusServiceInput
+        async setVendorActiveStatus(
+    input: SetVendorActiveStatusServiceInput
   ): Promise<
     VendorServiceResult<
-      VendorMapper.VendorAggregate |
-      null
+      VendorMapper.VendorAggregate | null
     >
   > {
     try {
-      const vendorId =
-        requireServiceString(
-          input.vendorId,
-          "Vendor ID"
-        );
+      const vendorId = requireServiceString(
+        input.vendorId,
+        "Vendor ID"
+      );
+
+      if (input.active === true) {
+        const vendor =
+          await this.repository.findById(vendorId);
+
+        if (!vendor) {
+          return createVendorServiceFailure(
+            "VENDOR_NOT_FOUND",
+            "Vendor was not found."
+          );
+        }
+
+        const businessType =
+          vendor.businessDetails.businessType;
+
+        if (
+          businessType === undefined ||
+          businessType === VendorBusinessType.UNSPECIFIED
+        ) {
+          return createVendorServiceFailure(
+            "VENDOR_OPERATION_NOT_ALLOWED",
+            "Vendor business type must be established before activation."
+          );
+        }
+
+        if (
+          !vendor.serviceAreas.some(
+            (area) => area.active === true
+          )
+        ) {
+          return createVendorServiceFailure(
+            "VENDOR_OPERATION_NOT_ALLOWED",
+            "At least one active service area is required before activation."
+          );
+        }
+
+        if (
+          !vendor.services.some(
+            (service) => service.active === true
+          )
+        ) {
+          return createVendorServiceFailure(
+            "VENDOR_OPERATION_NOT_ALLOWED",
+            "At least one active service offering is required before activation."
+          );
+        }
+
+        if (vendor.bankDetails?.verified !== true) {
+          return createVendorServiceFailure(
+            "VENDOR_OPERATION_NOT_ALLOWED",
+            "Verified bank details are required before activation."
+          );
+        }
+
+        if (
+          !hasVerifiedVendorDocument(
+            vendor.documents,
+            VendorDocumentType.PAN_CARD
+          )
+        ) {
+          return createVendorServiceFailure(
+            "VENDOR_OPERATION_NOT_ALLOWED",
+            "A verified PAN document is required before activation."
+          );
+        }
+      }
 
       return createVendorServiceSuccess(
-        await this.repository
-          .update(
-            vendorId,
-            {
-              active:
-                input.active,
-              updatedAt:
-                new Date(),
-            }
-          )
+        await this.repository.update(vendorId, {
+          active: input.active,
+          updatedAt: new Date(),
+        })
       );
     } catch (error) {
       return createVendorServiceFailureFromError(

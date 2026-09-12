@@ -7954,114 +7954,84 @@ export function createPrismaVendorBulkFailure(
  * Updates active status for multiple Vendors.
  */
 export async function updatePrismaVendorStatuses(
-  prisma:
-    PrismaVendorRepositoryClient,
-  input:
-    VendorRepositoryContracts
-      .BulkVendorStatusUpdateRepositoryInput
+  prisma: PrismaVendorRepositoryClient,
+  input: VendorRepositoryContracts.BulkVendorStatusUpdateRepositoryInput
 ): Promise<
-  VendorRepositoryContracts
-    .BulkVendorStatusUpdateRepositoryResult
+  VendorRepositoryContracts.BulkVendorStatusUpdateRepositoryResult
 > {
-  if (
-    input.vendors.length ===
-      0
-  ) {
+  if (input.vendors.length === 0) {
     return createEmptyVendorStatusUpdateResult();
   }
 
   const result:
-    VendorRepositoryContracts
-      .BulkVendorStatusUpdateRepositoryResult = {
-    requestedCount:
-      input.vendors.length,
+    VendorRepositoryContracts.BulkVendorStatusUpdateRepositoryResult = {
+      requestedCount: input.vendors.length,
+      updatedCount: 0,
+      failedCount: 0,
+      updatedVendorIds: [],
+      failures: [],
+    };
 
-    updatedCount:
-      0,
-
-    failedCount:
-      0,
-
-    updatedVendorIds:
-      [],
-
-    failures:
-      [],
-  };
-
-  for (
-    const item
-    of input.vendors
-  ) {
-    const vendorId =
-      normalizePrismaVendorString(
-        item.vendorId
-      );
+  for (const item of input.vendors) {
+    const vendorId = normalizePrismaVendorString(item.vendorId);
 
     if (!vendorId) {
       result.failures.push({
-        vendorId:
-          item.vendorId,
-
-        errorCode:
-          "INVALID_REPOSITORY_INPUT",
-
-        errorMessage:
-          "Vendor ID is required.",
+        vendorId: item.vendorId,
+        errorCode: "INVALID_REPOSITORY_INPUT",
+        errorMessage: "Vendor ID is required.",
       });
+      continue;
+    }
 
+    if (typeof item.active !== "boolean") {
+      result.failures.push({
+        vendorId,
+        errorCode: "INVALID_REPOSITORY_INPUT",
+        errorMessage: "Vendor active status must be a boolean.",
+      });
+      continue;
+    }
+
+    if (item.active === true) {
+      result.failures.push({
+        vendorId,
+        errorCode: "INVALID_REPOSITORY_INPUT",
+        errorMessage:
+          "Bulk activation is disabled. Use the administrator status operation with eligibility checks.",
+      });
       continue;
     }
 
     try {
-      const updateResult =
-        await prisma.vendor.updateMany({
-          where: {
-            id:
-              vendorId,
-          },
+      const updateResult = await prisma.vendor.updateMany({
+        where: {
+          id: vendorId,
+          deletedAt: null,
+        },
+        data: {
+          status: mapVendorActiveToPrismaStatus(false),
+        },
+      });
 
-          data: {
-            status:
-              mapVendorActiveToPrismaStatus(
-                item.active
-              ),
-          },
-        });
-
-      if (
-        updateResult.count ===
-          0
-      ) {
+      if (updateResult.count === 0) {
         result.failures.push({
           vendorId,
-
-          errorCode:
-            "VENDOR_NOT_FOUND",
-
-          errorMessage:
-            "Vendor was not found.",
+          errorCode: "VENDOR_NOT_FOUND",
+          errorMessage: "Vendor was not found.",
         });
       } else {
-        result.updatedVendorIds.push(
-          vendorId
-        );
+        result.updatedVendorIds.push(vendorId);
       }
     } catch (error) {
       result.failures.push(
-        createPrismaVendorBulkFailure(
-          vendorId,
-          error
-        )
+        createPrismaVendorBulkFailure(vendorId, error)
       );
     }
   }
 
-  result.updatedCount =
-    result.updatedVendorIds.length;
-
-  result.failedCount =
-    result.failures.length;
+  result.updatedCount = result.updatedVendorIds.length;
+  result.failedCount = result.failures.length;
 
   return result;
 }
