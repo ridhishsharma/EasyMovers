@@ -63,6 +63,7 @@ AddVendorVehicleServiceInput,
 DeleteVendorPricingServiceInput,
 DeleteVendorVehicleServiceInput,
 UpdateVendorPricingServiceInput,
+RestoreVendorServiceInput,
 UpdateVendorVehicleServiceInput,
 AddVendorDocumentServiceInput,
 DeleteVendorBankDetailsServiceInput,
@@ -1317,6 +1318,12 @@ export interface VendorController {
   ): Promise<
     VendorControllerResponse
   >;
+  restoreVendor(
+    request: VendorControllerRequest<
+      unknown,
+      VendorIdRouteParams
+    >
+  ): Promise<VendorControllerResponse>;
 
   setVendorActiveStatus(
     request:
@@ -1805,7 +1812,51 @@ export class DefaultVendorController
       );
     }
   }
+  async restoreVendor(
+    request: VendorControllerRequest<
+      unknown,
+      VendorIdRouteParams
+    >
+  ): Promise<VendorControllerResponse> {
+    const context =
+      createVendorControllerMutationContext(request);
 
+    const requestId = context.requestId;
+
+    try {
+      const vendorId = getVendorIdFromRequest(request);
+
+      if (!vendorId) {
+        return createVendorControllerBadRequest(
+          "INVALID_VENDOR_INPUT",
+          "Vendor ID is required.",
+          requestId
+        );
+      }
+
+      const input: RestoreVendorServiceInput = {
+        vendorId,
+        context,
+      };
+
+      const result =
+        await this.vendorService.restoreVendor(input);
+
+      return mapVendorServiceResultToControllerResponse(
+        result,
+        VENDOR_HTTP_STATUS.OK,
+        requestId
+      );
+    } catch (error) {
+      return createVendorControllerInternalError(
+        "VENDOR_RESTORE_FAILED",
+        error instanceof Error
+          ? error.message
+          : "Unable to restore vendor.",
+        requestId
+      );
+    }
+  }
   /**
    * Activates or deactivates a vendor.
    */
@@ -4343,6 +4394,7 @@ export type VendorControllerRouteName =
   | "listVendorSummaries"
   | "updateVendor"
   | "deleteVendor"
+  | "restoreVendor"
   | "setVendorActiveStatus"
   | "getVendorStatistics"
   | "addServiceArea"
@@ -4511,6 +4563,14 @@ export const VENDOR_CONTROLLER_ROUTES:
       access: "ADMIN",
       description:
         "Deletes or soft-deletes a vendor.",
+    },
+    {
+      name: "restoreVendor",
+      method: "POST",
+      path: "/vendors/:vendorId/restore",
+      access: "ADMIN",
+      description:
+        "Restores a soft-deleted vendor without changing its status.",
     },
     {
       name: "setVendorActiveStatus",
@@ -4801,7 +4861,10 @@ export function createUnifiedVendorController(
         .bind(
           collection.vendors
         ),
-
+    restoreVendor:
+      collection.vendors.restoreVendor.bind(
+        collection.vendors
+      ),
     setVendorActiveStatus:
       collection.vendors
         .setVendorActiveStatus

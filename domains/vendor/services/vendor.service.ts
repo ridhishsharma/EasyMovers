@@ -83,6 +83,7 @@ export type VendorServiceErrorCode =
   | "VENDOR_CREATE_FAILED"
   | "VENDOR_UPDATE_FAILED"
   | "VENDOR_DELETE_FAILED"
+  | "VENDOR_RESTORE_FAILED"
   | "VENDOR_LOOKUP_FAILED"
   | "VENDOR_LIST_FAILED"
   | "VENDOR_TRANSACTION_FAILED"
@@ -350,7 +351,10 @@ export interface DeleteVendorServiceInput {
   context?:
     VendorServiceMutationContext;
 }
-
+export interface RestoreVendorServiceInput {
+  vendorId: string;
+  context?: VendorServiceMutationContext;
+}
 export interface SetVendorActiveStatusServiceInput {
   vendorId: string;
   active: boolean;
@@ -1162,7 +1166,30 @@ export class VendorService {
       );
     }
   }
+  async restoreVendor(
+    input: RestoreVendorServiceInput
+  ): Promise<
+    VendorServiceResult<
+      VendorRepository.RestoreVendorRepositoryResult
+    >
+  > {
+    try {
+      const vendorId = requireServiceString(
+        input.vendorId,
+        "Vendor ID"
+      );
 
+      const result = await this.repository.restore(vendorId);
+
+      return createVendorServiceSuccess(result);
+    } catch (error) {
+      return createVendorServiceFailureFromError(
+        error,
+        "VENDOR_RESTORE_FAILED",
+        "Unable to restore Vendor."
+      );
+    }
+  }
   async setVendorActiveStatus(
     input:
       SetVendorActiveStatusServiceInput
