@@ -2912,75 +2912,171 @@ const existing =
 /**
  * Soft-deletes one Vendor record.
  */
+/**
+ * Physically deletes one Vendor record.
+ */
 export async function deletePrismaVendorRecord(
-  prisma:
-    PrismaVendorRepositoryClient,
+  prisma: PrismaVendorRepositoryClient,
   vendorId: string
 ): Promise<
-  VendorRepositoryContracts
-    .VendorRepositoryDeleteResult
+  VendorRepositoryContracts.VendorRepositoryDeleteResult
 > {
   const normalizedVendorId =
-    requirePrismaVendorIdentifier(
-      vendorId,
-      "vendorId"
-    );
+    requirePrismaVendorIdentifier(vendorId, "vendorId");
 
   try {
-    const existing =
-      await prisma.vendor.findFirst({
-        where: {
-          id:
-            normalizedVendorId,
-
-          deletedAt:
-            null,
-        },
-
-        select: {
-          id:
-            true,
-        },
-      });
+    const existing = await prisma.vendor.findUnique({
+      where: {
+        id: normalizedVendorId,
+      },
+      select: {
+        id: true,
+      },
+    });
 
     if (!existing) {
       return {
-        vendorId:
-          normalizedVendorId,
-
-        deleted:
-          false,
+        vendorId: normalizedVendorId,
+        deleted: false,
       };
     }
 
-    await prisma.vendor.update({
+    await prisma.vendor.delete({
       where: {
-        id:
-          normalizedVendorId,
-      },
-
-      data: {
-        deletedAt:
-          new Date(),
-
-        status:
-          "INACTIVE",
+        id: normalizedVendorId,
       },
     });
 
     return {
-      vendorId:
-        normalizedVendorId,
-
-      deleted:
-        true,
+      vendorId: normalizedVendorId,
+      deleted: true,
     };
   } catch (error) {
-    throw normalizePrismaVendorRepositoryError(
-      error
-    );
+    throw normalizePrismaVendorRepositoryError(error);
   }
 }
+
+/**
+ * Soft-deletes one operational Vendor while preserving its
+ * identity and related records.
+ */
+export async function softDeletePrismaVendorRecord(
+  prisma: PrismaVendorRepositoryClient,
+  input:
+    VendorRepositoryContracts.SoftDeleteVendorRepositoryInput
+): Promise<
+  VendorRepositoryContracts.SoftDeleteVendorRepositoryResult
+> {
+  const vendorId =
+    requirePrismaVendorIdentifier(input.vendorId, "vendorId");
+
+  const deletedAt =
+    input.deletedAt
+      ? new Date(input.deletedAt.getTime())
+      : new Date();
+
+  try {
+    const result = await prisma.vendor.updateMany({
+      where: {
+        id: vendorId,
+        deletedAt: null,
+      },
+      data: {
+        deletedAt,
+      },
+    });
+
+    if (result.count === 0) {
+      return {
+        vendorId,
+        deleted: false,
+      };
+    }
+
+    return {
+      vendorId,
+      deleted: true,
+      deletedAt,
+    };
+  } catch (error) {
+    throw normalizePrismaVendorRepositoryError(error);
+  }
+}
+
+/**
+ * Restores one previously soft-deleted Vendor.
+ */
+export async function restorePrismaVendorRecord(
+  prisma: PrismaVendorRepositoryClient,
+  vendorId: string
+): Promise<
+  VendorRepositoryContracts.RestoreVendorRepositoryResult
+> {
+  const normalizedVendorId =
+    requirePrismaVendorIdentifier(vendorId, "vendorId");
+
+  const restoredAt = new Date();
+
+  try {
+    const result = await prisma.vendor.updateMany({
+      where: {
+        id: normalizedVendorId,
+        deletedAt: {
+          not: null,
+        },
+      },
+      data: {
+        deletedAt: null,
+      },
+    });
+
+    if (result.count === 0) {
+      return {
+        vendorId: normalizedVendorId,
+        restored: false,
+      };
+    }
+
+    return {
+      vendorId: normalizedVendorId,
+      restored: true,
+      restoredAt,
+    };
+  } catch (error) {
+    throw normalizePrismaVendorRepositoryError(error);
+  }
+}
+
+/**
+ * Determines whether a stored Vendor is soft deleted.
+ */
+export async function isPrismaVendorDeleted(
+  prisma: PrismaVendorRepositoryClient,
+  vendorId: string
+): Promise<boolean> {
+  const normalizedVendorId =
+    normalizePrismaVendorString(vendorId);
+
+  if (!normalizedVendorId) {
+    return false;
+  }
+
+  try {
+    const record = await prisma.vendor.findUnique({
+      where: {
+        id: normalizedVendorId,
+      },
+      select: {
+        deletedAt: true,
+      },
+    });
+
+    return Boolean(record?.deletedAt);
+  } catch (error) {
+    throw normalizePrismaVendorRepositoryError(error);
+  }
+}
+
 
 /**
  * Determines whether one operational, non-deleted Vendor
@@ -7987,15 +8083,6 @@ export async function deleteManyPrismaVendors(
     return createEmptyVendorBulkDeleteResult();
   }
 
-  if (
-    input.softDelete ===
-      true
-  ) {
-    throw createUnsupportedPrismaVendorCapabilityError(
-      "VendorSoftDelete"
-    );
-  }
-
   const result:
     VendorRepositoryContracts
       .BulkDeleteVendorsRepositoryResult = {
@@ -8021,10 +8108,17 @@ export async function deleteManyPrismaVendors(
   ) {
     try {
       const deletion =
-        await deletePrismaVendorRecord(
-          prisma,
-          vendorId
-        );
+  input.softDelete === true
+    ? await softDeletePrismaVendorRecord(
+        prisma,
+        {
+          vendorId,
+        }
+      )
+    : await deletePrismaVendorRecord(
+        prisma,
+        vendorId
+      );
 
       if (
         deletion.deleted
@@ -9073,21 +9167,22 @@ export class PrismaVendorRepository
     );
   }
 
-  async softDelete(
-    _input:
+    softDelete(
+    input:
       VendorRepositoryContracts
         .SoftDeleteVendorRepositoryInput
   ): Promise<
     VendorRepositoryContracts
       .SoftDeleteVendorRepositoryResult
   > {
-    throw createUnsupportedPrismaVendorCapabilityError(
-      "VendorSoftDelete"
+    return softDeletePrismaVendorRecord(
+      this.prisma,
+      input
     );
   }
 
-  async restore(
-    _vendorId: string,
+  restore(
+    vendorId: string,
     _context?:
       VendorRepositoryContracts
         .VendorRepositoryMutationContext
@@ -9095,16 +9190,21 @@ export class PrismaVendorRepository
     VendorRepositoryContracts
       .RestoreVendorRepositoryResult
   > {
-    throw createUnsupportedPrismaVendorCapabilityError(
-      "VendorRestore"
+    return restorePrismaVendorRecord(
+      this.prisma,
+      vendorId
     );
   }
 
-  async isDeleted(
-    _vendorId: string
+  isDeleted(
+    vendorId: string
   ): Promise<boolean> {
-    return false;
+    return isPrismaVendorDeleted(
+      this.prisma,
+      vendorId
+    );
   }
+
 
   checkHealth():
     Promise<

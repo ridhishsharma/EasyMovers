@@ -13,13 +13,15 @@ import {
   createPrismaVendorPricing,
   createPrismaVendorWhere,
   deletePrismaVendorRecord,
+  deleteManyPrismaVendors,
+  PrismaVendorRepository,
   findPrismaVendorPricing,
   findPrismaVendorServiceAreas,
   findPrismaVendorServices,
   prismaVendorExists,
   replacePrismaVendorPricing,
   replacePrismaVendorServiceAreas,
-PrismaVendorRepositoryTransactionManager,
+  PrismaVendorRepositoryTransactionManager,
   replacePrismaVendorServices,
 } from "../../domains/vendor/repositories/prisma-vendor.repository";
 
@@ -117,6 +119,13 @@ function createMemoryPrisma() {
     if (!where) return true;
     if (where.id !== undefined && vendor.id !== where.id) return false;
     if (where.deletedAt === null && vendor.deletedAt !== null) return false;
+    if (
+      typeof where.deletedAt === "object" &&
+      where.deletedAt !== null &&
+      "not" in where.deletedAt &&
+      where.deletedAt.not === null &&
+      vendor.deletedAt === null
+    ) return false;
     return true;
   };
 
@@ -125,6 +134,25 @@ function createMemoryPrisma() {
       operation(prisma),
 
     vendor: {
+      updateMany: async ({ where, data }: any) => {
+        let count = 0;
+        for (const [id, vendor] of vendors) {
+          if (!matchesVendorWhere(vendor, where)) continue;
+          vendors.set(id, { ...vendor, ...data });
+          count += 1;
+        }
+        return { count };
+      },
+
+      delete: async ({ where }: any) => {
+        const vendor = vendors.get(where.id);
+        if (!vendor) throw new Error("Vendor not found");
+        vendors.delete(where.id);
+        serviceAreas = serviceAreas.filter((row) => row.vendorId !== where.id);
+        services = services.filter((row) => row.vendorId !== where.id);
+        pricingRecords = pricingRecords.filter((row) => row.vendorId !== where.id);
+        return vendor;
+      },
       findFirst: async ({ where }: any) =>
         [...vendors.values()].find((vendor) =>
           matchesVendorWhere(vendor, where)
@@ -489,7 +517,7 @@ test("Operational Vendor filters always exclude soft-deleted records", () => {
   });
 });
 
-test("Vendor deletion is soft, idempotent, and removes the Vendor from existence checks", async () => {
+test("Ordinary Vendor deletion physically removes the record", async () => {
   const memory = createMemoryPrisma();
 
   assert.equal(await prismaVendorExists(memory.prisma, "vendor-1"), true);
@@ -500,8 +528,111 @@ test("Vendor deletion is soft, idempotent, and removes the Vendor from existence
   assert.deepEqual(first, { vendorId: "vendor-1", deleted: true });
   assert.deepEqual(second, { vendorId: "vendor-1", deleted: false });
   assert.equal(await prismaVendorExists(memory.prisma, "vendor-1"), false);
-  assert.equal(memory.vendors.get("vendor-1")?.status, "INACTIVE");
+  assert.equal(memory.vendors.has("vendor-1"), false);
+});
+
+async function seedOperationalRecords(memory: ReturnType<typeof createMemoryPrisma>) {
+  await createPrismaVendorServiceArea(memory.prisma, "vendor-1", {
+    scope: VendorServiceScope.WITHIN_CITY,
+    originCity: "Bhopal",
+    destinationCity: "Bhopal",
+    active: true,
+  });
+  await createPrismaVendorService(memory.prisma, "vendor-1", {
+    serviceType: VendorServiceType.LOADING_UNLOADING,
+    title: "Loading and unloading",
+    active: true,
+  });
+  await createPrismaVendorPricing(memory.prisma, "vendor-1", {
+    serviceType: VendorServiceType.LOADING_UNLOADING,
+    pricingType: VendorPricingType.FIXED,
+    basePrice: 500,
+    currency: "INR",
+    active: true,
+  });
+}
+
+test("Dedicated soft deletion preserves status and operational records", async () => {
+  const memory = createMemoryPrisma();
+  await seedOperationalRecords(memory);
+  const repository = new PrismaVendorRepository(memory.prisma);
+  const deletedAt = new Date("2026-09-12T08:00:00.000Z");
+
+  const first = await repository.softDelete({ vendorId: "vendor-1", deletedAt });
+  assert.equal(first.deleted, true);
+  assert.equal(first.deletedAt?.toISOString(), deletedAt.toISOString());
+  assert.equal(await repository.isDeleted("vendor-1"), true);
+  assert.equal(await prismaVendorExists(memory.prisma, "vendor-1"), false);
+  assert.equal(memory.vendors.get("vendor-1")?.status, "ACTIVE");
+  assert.equal(memory.getServiceAreas().length, 1);
+  assert.equal(memory.getServices().length, 1);
+  assert.equal(memory.getPricing().length, 1);
+
+  const second = await repository.softDelete({ vendorId: "vendor-1" });
+  assert.equal(second.deleted, false);
+  assert.equal(memory.vendors.get("vendor-1")?.deletedAt?.toISOString(), deletedAt.toISOString());
+  assert.equal((await repository.softDelete({ vendorId: "missing" })).deleted, false);
+});
+
+test("Restoration clears soft deletion without losing operational records", async () => {
+  const memory = createMemoryPrisma();
+  await seedOperationalRecords(memory);
+  const repository = new PrismaVendorRepository(memory.prisma);
+  await repository.softDelete({ vendorId: "vendor-1" });
+
+  const restored = await repository.restore("vendor-1");
+  assert.equal(restored.restored, true);
+  assert.ok(restored.restoredAt instanceof Date);
+  assert.equal(memory.vendors.get("vendor-1")?.deletedAt, null);
+  assert.equal(memory.vendors.get("vendor-1")?.status, "ACTIVE");
+  assert.equal(await repository.isDeleted("vendor-1"), false);
+  assert.equal(await prismaVendorExists(memory.prisma, "vendor-1"), true);
+  assert.equal(memory.getServiceAreas().length, 1);
+  assert.equal(memory.getServices().length, 1);
+  assert.equal(memory.getPricing().length, 1);
+  assert.equal((await repository.restore("vendor-1")).restored, false);
+  assert.equal((await repository.restore("missing")).restored, false);
+  assert.equal(await repository.isDeleted("missing"), false);
+});
+
+test("Bulk soft deletion retains rows and reports missing Vendors independently", async () => {
+  const memory = createMemoryPrisma();
+  await seedOperationalRecords(memory);
+  memory.vendors.set("vendor-2", { ...memory.vendors.get("vendor-1")!, id: "vendor-2" });
+
+  const result = await deleteManyPrismaVendors(memory.prisma, {
+    vendorIds: ["vendor-1", "vendor-2", "missing"],
+    softDelete: true,
+  });
+  assert.equal(result.requestedCount, 3);
+  assert.equal(result.deletedCount, 2);
+  assert.equal(result.failedCount, 1);
+  assert.deepEqual(result.deletedVendorIds, ["vendor-1", "vendor-2"]);
+  assert.equal(result.failures[0]?.vendorId, "missing");
+  assert.equal(result.failures[0]?.errorCode, "VENDOR_NOT_FOUND");
+  assert.equal(memory.vendors.size, 2);
   assert.ok(memory.vendors.get("vendor-1")?.deletedAt instanceof Date);
+  assert.ok(memory.vendors.get("vendor-2")?.deletedAt instanceof Date);
+  assert.equal(memory.getServiceAreas().length, 1);
+  assert.equal(memory.getServices().length, 1);
+  assert.equal(memory.getPricing().length, 1);
+});
+
+test("Bulk hard deletion removes rows and their operational children", async () => {
+  const memory = createMemoryPrisma();
+  await seedOperationalRecords(memory);
+  const result = await deleteManyPrismaVendors(memory.prisma, {
+    vendorIds: ["vendor-1", "missing"],
+    softDelete: false,
+  });
+  assert.equal(result.requestedCount, 2);
+  assert.equal(result.deletedCount, 1);
+  assert.equal(result.failedCount, 1);
+  assert.equal(result.failures[0]?.vendorId, "missing");
+  assert.equal(memory.vendors.has("vendor-1"), false);
+  assert.equal(memory.getServiceAreas().length, 0);
+  assert.equal(memory.getServices().length, 0);
+  assert.equal(memory.getPricing().length, 0);
 });
 test(
   "Vendor transaction manager provides sufficient remote-database timing limits",
