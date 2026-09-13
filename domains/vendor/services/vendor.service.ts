@@ -566,9 +566,9 @@ export function createInitialVendorRepositoryInput(
     bankDetails:
       input.bankDetails,
 
-    active:
-      options.active ??
-      true,
+    // Onboarding never grants operational eligibility.
+    // Activation must use the guarded administrator status operation.
+    active: false,
   };
 }
 

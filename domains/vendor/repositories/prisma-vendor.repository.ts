@@ -3037,6 +3037,8 @@ export async function restorePrismaVendorRecord(
       },
       data: {
         deletedAt: null,
+        // Restoration must not revive a previous activation decision.
+        status: mapVendorActiveToPrismaStatus(false),
       },
     });
 
