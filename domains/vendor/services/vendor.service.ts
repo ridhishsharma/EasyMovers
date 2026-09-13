@@ -31,6 +31,11 @@ import {
   isVendorRepositoryError,
 } from "../repositories/vendor.repository";
 
+import {
+  hasActivationEligibleTransportVehicle,
+  requiresTransportVehicle,
+} from "./vendor-vehicle-eligibility";
+
 import type * as VendorDomain
   from "../models/vendor.model";
 
@@ -1318,6 +1323,16 @@ export class VendorService {
           return createVendorServiceFailure(
             "VENDOR_OPERATION_NOT_ALLOWED",
             "A verified PAN document is required before activation."
+          );
+        }
+
+        if (
+          requiresTransportVehicle(vendor.services) &&
+          !hasActivationEligibleTransportVehicle(vendor.vehicles, vendor.documents)
+        ) {
+          return createVendorServiceFailure(
+            "VENDOR_OPERATION_NOT_ALLOWED",
+            "Transport services require an active available vehicle with matching verified registration and unexpired verified insurance evidence before activation."
           );
         }
       }
