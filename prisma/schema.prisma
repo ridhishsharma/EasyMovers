@@ -458,6 +458,7 @@ model CallbackRequest {
 
 model User {
   id                     String                  @id @default(cuid())
+supabaseAuthId String? @unique @db.Uuid
   email                  String?                 @unique
   mobile                 String                  @unique
   passwordHash           String

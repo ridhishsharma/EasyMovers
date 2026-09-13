@@ -84,6 +84,10 @@ import {
 } from "./routes/vendor.routes";
 
 import {
+  resolveApplicationAuthentication,
+} from "../../lib/auth";
+
+import {
   prisma,
 } from "@/lib/prisma";
 /**
@@ -752,24 +756,13 @@ export interface CompleteVendorApplicationModule
  * Vendor route module.
  */
 export function resolveVendorModuleAuthenticationResolver(
-  options?:
-    VendorModuleRouteOptions
-): VendorFetchAuthenticationResolver | undefined {
-  if (
-    options?.authenticationResolver
-  ) {
+  options?: VendorModuleRouteOptions
+): VendorFetchAuthenticationResolver {
+  if (options?.authenticationResolver) {
     return options.authenticationResolver;
   }
 
-  if (
-    options
-      ?.useHeaderAuthenticationResolver ===
-      false
-  ) {
-    return undefined;
-  }
-
-  return createVendorHeaderAuthenticationResolver();
+  return resolveApplicationAuthentication;
 }
 
 /**
