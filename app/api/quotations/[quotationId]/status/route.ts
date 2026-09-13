@@ -1,3 +1,6 @@
+import { resolveApplicationAuthentication } from "@/lib/auth";
+import { authorizeInternalQuotation } from "@/lib/quotation-access";
+
 /**
  * ============================================================================
  * EasyMovers
@@ -144,20 +147,7 @@ function getQuotationStatusRequestIp(
  * ============================================================================
  */
 
-function getQuotationStatusAuthenticatedUserId(
-  request:
-    Request
-): string | undefined {
-  const userId =
-    request.headers
-      .get(
-        "x-user-id"
-      )
-      ?.trim();
 
-  return userId ||
-    undefined;
-}
 
 /* ============================================================================
  * Headers
@@ -199,7 +189,8 @@ function createQuotationStatusControllerMetadata(
   request:
     Request,
   requestId:
-    string
+    string,
+  authenticatedUserId: string
 ): Pick<
   QuotationControllerRequest,
   | "method"
@@ -222,10 +213,7 @@ function createQuotationStatusControllerMetadata(
       )
       ?.trim();
 
-  const authenticatedUserId =
-    getQuotationStatusAuthenticatedUserId(
-      request
-    );
+
 
   return {
     method:
@@ -445,6 +433,15 @@ export async function PATCH(
       request
     );
 
+  const access = await authorizeInternalQuotation(request, resolveApplicationAuthentication);
+  if (!access.allowed) {
+    return NextResponse.json(
+      { success: false, error: { code: access.code, message: access.message },
+        meta: { requestId, timestamp: new Date().toISOString() } },
+      { status: access.status, headers: { "x-request-id": requestId, "Cache-Control": "no-store" } }
+    );
+  }
+
   let body:
     unknown;
 
@@ -483,7 +480,8 @@ export async function PATCH(
 
       ...createQuotationStatusControllerMetadata(
         request,
-        requestId
+        requestId,
+        access.userId
       ),
     };
 

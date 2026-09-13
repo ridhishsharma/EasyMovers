@@ -1,3 +1,6 @@
+import { resolveApplicationAuthentication } from "@/lib/auth";
+import { authorizeInternalQuotation } from "@/lib/quotation-access";
+
 /**
  * ============================================================================
  * EasyMovers
@@ -622,6 +625,15 @@ export async function GET(
     getQuotationStatisticsRequestId(
       request
     );
+
+  const access = await authorizeInternalQuotation(request, resolveApplicationAuthentication);
+  if (!access.allowed) {
+    return NextResponse.json(
+      { success: false, error: { code: access.code, message: access.message },
+        meta: { requestId, timestamp: new Date().toISOString() } },
+      { status: access.status, headers: { "x-request-id": requestId, "Cache-Control": "no-store" } }
+    );
+  }
 
   try {
     const module =

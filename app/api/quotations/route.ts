@@ -1,3 +1,6 @@
+import { resolveApplicationAuthentication } from "@/lib/auth";
+import { authorizeInternalQuotation } from "@/lib/quotation-access";
+
 /**
  * ============================================================================
  * EasyMovers
@@ -137,20 +140,7 @@ function getQuotationRequestIp(
  * When the final EasyMovers authentication/session layer is connected,
  * replace this header lookup with the authenticated session identity.
  */
-function getQuotationAuthenticatedUserId(
-  request:
-    Request
-): string | undefined {
-  const userId =
-    request.headers
-      .get(
-        "x-user-id"
-      )
-      ?.trim();
 
-  return userId ||
-    undefined;
-}
 
 /* ============================================================================
  * Headers
@@ -441,6 +431,15 @@ export async function GET(
       request
     );
 
+  const access = await authorizeInternalQuotation(request, resolveApplicationAuthentication);
+  if (!access.allowed) {
+    return NextResponse.json(
+      { success: false, error: { code: access.code, message: access.message },
+        meta: { requestId, timestamp: new Date().toISOString() } },
+      { status: access.status, headers: { "x-request-id": requestId, "Cache-Control": "no-store" } }
+    );
+  }
+
   try {
     const module =
       getOrCreateQuotationModule({
@@ -498,14 +497,10 @@ export async function GET(
           }
         : {}),
 
-      ...(getQuotationAuthenticatedUserId(
-        request
-      )
+      ...(access.userId
         ? {
             authenticatedUserId:
-              getQuotationAuthenticatedUserId(
-                request
-              ),
+              access.userId,
           }
         : {}),
     };
@@ -560,6 +555,15 @@ export async function POST(
     getQuotationRequestId(
       request
     );
+
+  const access = await authorizeInternalQuotation(request, resolveApplicationAuthentication);
+  if (!access.allowed) {
+    return NextResponse.json(
+      { success: false, error: { code: access.code, message: access.message },
+        meta: { requestId, timestamp: new Date().toISOString() } },
+      { status: access.status, headers: { "x-request-id": requestId, "Cache-Control": "no-store" } }
+    );
+  }
 
   let body:
     unknown;
@@ -627,14 +631,10 @@ export async function POST(
           }
         : {}),
 
-      ...(getQuotationAuthenticatedUserId(
-        request
-      )
+      ...(access.userId
         ? {
             authenticatedUserId:
-              getQuotationAuthenticatedUserId(
-                request
-              ),
+              access.userId,
           }
         : {}),
     };

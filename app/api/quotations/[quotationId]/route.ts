@@ -1,3 +1,6 @@
+import { resolveApplicationAuthentication } from "@/lib/auth";
+import { authorizeInternalQuotation } from "@/lib/quotation-access";
+
 /**
  * ============================================================================
  * EasyMovers
@@ -147,20 +150,7 @@ function getQuotationRequestIp(
  * Temporary adapter until the final authentication/session layer
  * is connected.
  */
-function getQuotationAuthenticatedUserId(
-  request:
-    Request
-): string | undefined {
-  const userId =
-    request.headers
-      .get(
-        "x-user-id"
-      )
-      ?.trim();
 
-  return userId ||
-    undefined;
-}
 
 /* ============================================================================
  * Headers
@@ -202,7 +192,8 @@ function createQuotationRouteControllerMetadata(
   request:
     Request,
   requestId:
-    string
+    string,
+  authenticatedUserId: string
 ): Pick<
   QuotationControllerRequest,
   | "method"
@@ -225,10 +216,7 @@ function createQuotationRouteControllerMetadata(
       )
       ?.trim();
 
-  const authenticatedUserId =
-    getQuotationAuthenticatedUserId(
-      request
-    );
+
 
   return {
     method:
@@ -448,6 +436,15 @@ export async function GET(
       request
     );
 
+  const access = await authorizeInternalQuotation(request, resolveApplicationAuthentication);
+  if (!access.allowed) {
+    return NextResponse.json(
+      { success: false, error: { code: access.code, message: access.message },
+        meta: { requestId, timestamp: new Date().toISOString() } },
+      { status: access.status, headers: { "x-request-id": requestId, "Cache-Control": "no-store" } }
+    );
+  }
+
   try {
     const quotationId =
       await resolveQuotationId(
@@ -470,7 +467,8 @@ export async function GET(
 
       ...createQuotationRouteControllerMetadata(
         request,
-        requestId
+        requestId,
+        access.userId
       ),
     };
 
@@ -520,6 +518,15 @@ export async function PATCH(
       request
     );
 
+  const access = await authorizeInternalQuotation(request, resolveApplicationAuthentication);
+  if (!access.allowed) {
+    return NextResponse.json(
+      { success: false, error: { code: access.code, message: access.message },
+        meta: { requestId, timestamp: new Date().toISOString() } },
+      { status: access.status, headers: { "x-request-id": requestId, "Cache-Control": "no-store" } }
+    );
+  }
+
   let body:
     unknown;
 
@@ -558,7 +565,8 @@ export async function PATCH(
 
       ...createQuotationRouteControllerMetadata(
         request,
-        requestId
+        requestId,
+        access.userId
       ),
     };
 

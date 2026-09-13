@@ -1,3 +1,6 @@
+import { resolveApplicationAuthentication } from "@/lib/auth";
+import { authorizeInternalQuotation } from "@/lib/quotation-access";
+
 /**
  * ============================================================================
  * EasyMovers
@@ -143,20 +146,7 @@ function getRejectQuotationRequestIp(
  * ============================================================================
  */
 
-function getRejectQuotationAuthenticatedUserId(
-  request:
-    Request
-): string | undefined {
-  const userId =
-    request.headers
-      .get(
-        "x-user-id"
-      )
-      ?.trim();
 
-  return userId ||
-    undefined;
-}
 
 /* ============================================================================
  * Request headers
@@ -198,7 +188,8 @@ function createRejectQuotationControllerMetadata(
   request:
     Request,
   requestId:
-    string
+    string,
+  authenticatedUserId: string
 ): Pick<
   QuotationControllerRequest,
   | "method"
@@ -221,10 +212,7 @@ function createRejectQuotationControllerMetadata(
       )
       ?.trim();
 
-  const authenticatedUserId =
-    getRejectQuotationAuthenticatedUserId(
-      request
-    );
+
 
   return {
     method:
@@ -444,6 +432,15 @@ export async function POST(
       request
     );
 
+  const access = await authorizeInternalQuotation(request, resolveApplicationAuthentication);
+  if (!access.allowed) {
+    return NextResponse.json(
+      { success: false, error: { code: access.code, message: access.message },
+        meta: { requestId, timestamp: new Date().toISOString() } },
+      { status: access.status, headers: { "x-request-id": requestId, "Cache-Control": "no-store" } }
+    );
+  }
+
   let body:
     unknown;
 
@@ -482,7 +479,8 @@ export async function POST(
 
       ...createRejectQuotationControllerMetadata(
         request,
-        requestId
+        requestId,
+        access.userId
       ),
     };
 
