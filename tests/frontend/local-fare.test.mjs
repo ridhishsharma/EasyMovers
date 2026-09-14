@@ -1,0 +1,8 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';import vm from 'node:vm';import ts from 'typescript';
+const exports={};vm.runInNewContext(ts.transpileModule(readFileSync(new URL('../../lib/local-fare.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports});
+const rate={code:'TEST_ONLY',label:'Test vehicle',basePaise:10000,includedKm:2,perKmPaise:2000,minimumPaise:12000,helperPaise:5000,maxKm:50};
+const card={version:'test-only',cities:['Bhopal, Madhya Pradesh'],validUntil:'2099-01-01T00:00:00Z',vehicles:[rate]};
+test('missing and expired rates never produce a fare',()=>{assert.throws(()=>exports.readRateCard());assert.throws(()=>exports.readRateCard(JSON.stringify({...card,validUntil:'2000-01-01'})))});
+test('rate card requires city coverage and nonnegative integer money',()=>{assert.throws(()=>exports.readRateCard(JSON.stringify({...card,cities:[]})));assert.throws(()=>exports.readRateCard(JSON.stringify({...card,vehicles:[{...rate,perKmPaise:-1}]})));assert.throws(()=>exports.readRateCard(JSON.stringify({...card,vehicles:[rate,rate]})))});
+test('included distance and minimum fare are applied before helper charges',()=>{assert.equal(exports.calculateFare(rate,1000,0),12000);assert.equal(exports.calculateFare(rate,3000,1),17000);assert.equal(exports.calculateFare(rate,4500,0),15000)});
+test('distance and helper bounds reject unsupported routes',()=>{for(const distance of [-1,0,50001,NaN])assert.throws(()=>exports.calculateFare(rate,distance,0));for(const helper of [-1,3,0.5])assert.throws(()=>exports.calculateFare(rate,1000,helper))});

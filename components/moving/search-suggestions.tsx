@@ -1,0 +1,8 @@
+"use client";
+import {useId,useState} from "react";
+import styles from "./moving.module.css";
+export function SearchSuggestions({label,value,options,onChange,onSelect}:{label:string;value:string;options:string[];onChange:(value:string)=>void;onSelect:(value:string)=>void}) {
+ const id=useId(); const [open,setOpen]=useState(false);const [active,setActive]=useState(-1);
+ const matches=value.trim().length>=1?options.filter(item=>item.toLowerCase().includes(value.trim().toLowerCase())).slice(0,8):[];
+ return <div className={styles.searchBox}><input role="combobox" aria-label={label} aria-autocomplete="list" aria-expanded={open&&matches.length>0} aria-controls={id} aria-activedescendant={active>=0?`${id}-${active}`:undefined} value={value} placeholder={label} maxLength={150} onFocus={()=>setOpen(true)} onBlur={()=>{setOpen(false);setActive(-1)}} onChange={e=>{onChange(e.target.value);setOpen(true);setActive(-1)}} onKeyDown={e=>{if(e.key==="Escape"){setOpen(false);setActive(-1)}if(e.key==="ArrowDown"||e.key==="ArrowUp"){e.preventDefault();setOpen(true);setActive(previous=>Math.max(0,Math.min(matches.length-1,previous+(e.key==="ArrowDown"?1:-1))))}if(e.key==="Enter"&&open&&matches.length&&active>=0){e.preventDefault();onSelect(matches[active]);setOpen(false);setActive(-1)}}}/>{open&&matches.length>0&&<ul id={id} role="listbox" className={styles.suggestions}>{matches.map((item,index)=><li role="option" id={`${id}-${index}`} aria-selected={active===index} key={item} onMouseDown={e=>e.preventDefault()}><button type="button" tabIndex={-1} onClick={()=>{onSelect(item);setOpen(false);setActive(-1)}}>{item}</button></li>)}</ul>}</div>
+}

@@ -1,10 +1,11 @@
 import type { Metadata } from "next"
 import "./globals.css"
+import { AppBrandShell } from "@/components/brand/app-brand-shell"
 
 export const metadata: Metadata = {
 title: "Easy Movers | Move Anywhere With Confidence",
 description:
-"AI-powered relocation platform for household shifting, office relocation, vehicle transportation, and corporate moving services across India.",
+"Plan home shifting, office relocation and vehicle transport with EasyMovers. Request quotations and check your recorded booking status.",
 }
 
 export default function RootLayout({
@@ -19,7 +20,7 @@ return (
 
   <body className="bg-slate-950 text-white antialiased overflow-x-hidden">
 
-    {children}
+    <AppBrandShell>{children}</AppBrandShell>
 
   </body>
 

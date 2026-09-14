@@ -1,36 +1,11 @@
-import { Navbar } from "@/components/sections/navbar"
-import { HeroSection } from "@/components/sections/hero"
-import { TrustSection } from "@/components/sections/trust"
-import { ServicesSection } from "@/components/sections/services"
-import { CorporateSection } from "@/components/sections/corporate"
-import { TestimonialSection } from "@/components/sections/testimonial-section"
-import { VendorCTASection } from "@/components/sections/vendor-cta"
-import { Footer } from "@/components/sections/footer"
+import type { Metadata } from "next";
+import { LandingPage } from "@/components/landing/landing-page";
+
+export const metadata: Metadata = {
+  title: "EasyMovers | Move Anywhere With Confidence",
+  description: "Plan your home move, office relocation or vehicle transport with EasyMovers. Share your requirements and request a tailored moving quotation.",
+};
 
 export default function HomePage() {
-
-return (
-
-<main className="min-h-screen overflow-x-hidden bg-slate-950">
-
-  <Navbar />
-
-  <HeroSection />
- 
-
-  <TrustSection />
-
-  <ServicesSection />
-
-  <CorporateSection />
-
-  <TestimonialSection />
-
-  <VendorCTASection />
-
-  <Footer />
-
-</main>
-
-)
+  return <LandingPage />;
 }
