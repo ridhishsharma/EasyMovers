@@ -1,3 +1,2 @@
-.logo{display:inline-block;position:relative;overflow:hidden;width:145px;height:102px;background:transparent;flex-shrink:0;vertical-align:middle;border-radius:6px}.logo img{mix-blend-mode:multiply;position:absolute;width:234%;max-width:none;height:auto;left:-67%;top:-27.65%}
-
-@media(max-width:600px){.logo{width:112px;height:79px}}
+.logo{display:inline-flex;align-items:center;gap:9px;flex-shrink:0;vertical-align:middle;white-space:nowrap}.icon{display:block;width:54px;height:49px;object-fit:contain}.word{display:inline-flex;position:relative;align-items:baseline;padding-bottom:5px;font-family:var(--font-geist-sans),"Trebuchet MS",Arial,sans-serif;font-size:26px;font-weight:800;line-height:1;letter-spacing:-1.1px}.word::after{content:"";position:absolute;left:2px;right:2px;bottom:0;height:3px;border-radius:999px;background:linear-gradient(90deg,#e8b53f,#f4d36f)}.easy{color:#103963}.movers{color:#1762a7}
+@media(max-width:600px){.logo{gap:7px}.icon{width:45px;height:41px}.word{font-size:22px;padding-bottom:4px}.word::after{height:2px}}
