@@ -108,6 +108,89 @@ const details = {
   destinationAddress: "Drop address",
   items: [{ itemName: "Sofa", quantity: 1 }],
 };
+
+const serviceCard = { version: 'test', cities: ['Bhopal, Madhya Pradesh'], validUntil: '2099-01-01T00:00:00Z', vehicles: [
+  { code: 'SMALL', label: 'Small vehicle', basePaise: 10000, includedKm: 2, perKmPaise: 2000, minimumPaise: 12000, helperPaise: 5000, maxKm: 50 },
+  { code: 'LARGE', label: 'Large vehicle', basePaise: 20000, includedKm: 2, perKmPaise: 3000, minimumPaise: 22000, helperPaise: 5000, maxKm: 50 },
+] };
+
+test('pilot service catalogue stays available with missing, malformed and expired rates', async () => {
+  const h = harness();
+  const endpoint = h.load('app/api/public/local-service-options/route.ts');
+  for (const rates of [undefined, 'invalid', JSON.stringify({ ...serviceCard, validUntil: '2000-01-01' })]) {
+    h.env.LOCAL_TRANSPORT_RATE_CARD = rates;
+    const data = await (await endpoint.GET()).json();
+    assert.equal(data.status, 'available');
+    assert.deepEqual(data.cities, ['Bhopal, Madhya Pradesh']);
+    assert.equal(data.vehicles.length, 10);
+    assert.equal(new Set(data.vehicles.map(item => item.code)).size, 10);
+    assert.ok(data.vehicles.some(item => item.code === 'TRUCK_17_FT_CLOSED'));
+    assert.equal(data.basePaise, undefined);
+  }
+});
+
+test('local selection creates an enquiry without rates and does not overwrite existing drafts', async () => {
+  let saved;
+  const h = harness({ $transaction: async callback => callback({
+    lead: { upsert: async input => { saved = input; return { id: 'lead-a', referenceId: reference }; } },
+    inventory: { upsert: async () => ({}) },
+  }) });
+  const endpoint = h.load('app/api/public/moving-enquiry/route.ts');
+  const valid = { ...initial, serviceCity: 'Bhopal, Madhya Pradesh', localVehicle: 'MINI_TRUCK' };
+  for (const change of [{ localVehicle: 'invented' }, { serviceCity: 'Indore, Madhya Pradesh' }]) {
+    assert.equal((await endpoint.POST(request('POST', { ...valid, ...change }))).status, 400);
+    assert.equal(saved, undefined);
+  }
+  assert.equal((await endpoint.POST(request('POST', valid))).status, 201);
+  assert.equal(JSON.parse(saved.create.notes).localVehicle, 'MINI_TRUCK');
+  assert.equal(JSON.parse(saved.create.notes).serviceCity, serviceCard.cities[0]);
+  assert.deepEqual(Object.keys(saved.update), []);
+});
+
+test('instant pricing readiness requires draft authorization and rates but does not write records', async () => {
+  const h = harness();
+  const endpoint = h.load('app/api/public/local-fare/route.ts');
+  const url = `https://staging.easymovers.in/api/public/local-fare?reference=${reference}`;
+  assert.equal((await endpoint.GET(new Request(url))).status, 401);
+  const cookie = h.load('lib/enquiry-session.ts').draftCookie('lead-a', reference, true);
+  const req = new Request(url, { headers: { Cookie: cookie } });
+  assert.equal((await (await endpoint.GET(req)).json()).configured, false);
+  h.env.LOCAL_TRANSPORT_RATE_CARD = JSON.stringify(serviceCard);
+  assert.equal((await (await endpoint.GET(req)).json()).configured, true);
+  delete h.env.GOOGLE_MAPS_SERVER_KEY;
+  assert.equal((await (await endpoint.GET(req)).json()).configured, false);
+});
+
+test('individual draft restores profile and catalogue choices but never persists sensitive numbers', () => {
+  const h = harness();
+  const module = h.load('lib/individual-application.ts');
+  const fields = { ...module.applicationDefaults, fullName: 'Test Driver', vehicleCategory: 'MINI_TRUCK', accountNumber: '1234567890', upi: 'test@bank', licenceNumber: 'TEST-LICENCE' };
+  const saved = module.serializableIndividualDraft(fields);
+  assert.equal(saved.status, 'LOCAL_DRAFT');
+  assert.equal(saved.fields.accountNumber, '');
+  assert.equal(saved.fields.upi, '');
+  assert.equal(saved.fields.licenceNumber, '');
+  const restored = module.restoreIndividualDraft(JSON.stringify(saved));
+  assert.equal(restored.fullName, 'Test Driver');
+  assert.equal(restored.vehicleCategory, 'MINI_TRUCK');
+  assert.equal(restored.accountNumber, '');
+  assert.throws(() => module.restoreIndividualDraft('{bad'));
+  assert.throws(() => module.restoreIndividualDraft(JSON.stringify({ version: 2 })));
+});
+
+test('fare uses the saved initial vehicle and rejects a removed vehicle', async () => {
+  let routes = 0;
+  const h = harness({ lead: { findUnique: async () => ({ notes: JSON.stringify({ mode: 'LOCAL', localVehicle: 'LARGE', from: { city: 'Bhopal', state: 'Madhya Pradesh', latitude: 23.2, longitude: 77.4 }, to: { latitude: 23.3, longitude: 77.5 } }) }) } }, async () => { routes++; return Response.json({ routes: [{ distanceMeters: 1000 }] }); });
+  h.env.LOCAL_TRANSPORT_RATE_CARD = JSON.stringify(serviceCard);
+  const endpoint = h.load('app/api/public/local-fare/route.ts');
+  const cookie = h.load('lib/enquiry-session.ts').draftCookie('lead-a', reference, true);
+  const result = await (await endpoint.POST(request('POST', { reference }, cookie))).json();
+  assert.equal(result.vehicle, 'LARGE');
+  assert.equal(result.amountPaise, 22000);
+  h.env.LOCAL_TRANSPORT_RATE_CARD = JSON.stringify({ ...serviceCard, vehicles: [serviceCard.vehicles[0]] });
+  assert.equal((await endpoint.POST(request('POST', { reference }, cookie))).status, 400);
+  assert.equal(routes, 1);
+});
 test("initial local lead and inventory are atomic, reference readable, private session HttpOnly", async () => {
   let leadInput, inventoryInput;
   const h = harness({

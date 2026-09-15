@@ -62,3 +62,23 @@ test('PIN provider outage returns a manual-entry recovery message', async () => 
   const response = await route.GET(new Request('https://example.com?pin=462011'));
   assert.equal(response.status, 503); assert.match((await response.json()).message, /manually/);
 });
+
+test('metrics distinguish missing, partial, invalid and ready configuration', async () => {
+  for (const [env, expected] of [
+    [{}, 'missing'],
+    [{ PUBLIC_SUCCESSFUL_MOVES: '0' }, 'partial'],
+    [{ PUBLIC_SUCCESSFUL_MOVES: 'bad' }, 'invalid'],
+    [{ PUBLIC_SUCCESSFUL_MOVES: '0', PUBLIC_CITIES_COVERED: '0', PUBLIC_VERIFIED_VENDORS: '0', PUBLIC_CUSTOMER_RATING: '0' }, 'ready'],
+  ]) {
+    const data = await (await load('app/api/public/platform-summary/route.ts', {}, env).GET()).json();
+    assert.equal(data.configuration, expected);
+    assert.equal(data.rating, expected === 'ready' ? 0 : null);
+  }
+});
+
+test('UI rejects malformed metrics and preserves genuine zero and unpublished values', () => {
+  const { parseMetrics } = load('lib/platform-metrics.ts');
+  const metrics = { successfulMoves: 0, citiesCovered: null, verifiedVendors: 1, rating: null, configuration: 'partial', updatedAt: null };
+  assert.equal(parseMetrics(metrics).successfulMoves, 0);
+  for (const value of [{}, null, { ...metrics, rating: 6 }, { ...metrics, successfulMoves: '10' }, { ...metrics, citiesCovered: -1 }, { ...metrics, updatedAt: 'invalid' }]) assert.throws(() => parseMetrics(value));
+});

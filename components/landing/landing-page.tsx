@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { Menu, X } from "lucide-react";
 import { QuickEnquiry } from "@/components/moving/quick-enquiry";
 import styles from "./landing-page.module.css";
 import { BrandLogo } from "@/components/brand/brand-logo";
@@ -60,10 +61,10 @@ export function LandingPage() {
     <a href="#main-content" className={styles.skip}>Skip to content</a>
     <header className={styles.header}>
       <div className={styles.nav}>
-        <Link href="/" className={styles.brand} aria-label="EasyMovers home"><BrandLogo /></Link>
-        <button className={styles.menuButton} aria-expanded={menuOpen} aria-controls="landing-navigation" onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? "Close" : "Menu"}</button>
+        <Link href="/" className={`${styles.brand} ${styles.navBrand}`} aria-label="EasyMovers home"><BrandLogo /></Link>
+        <button className={styles.menuButton} aria-label={menuOpen ? "Close navigation" : "Open navigation"} title={menuOpen ? "Close navigation" : "Open navigation"} aria-expanded={menuOpen} aria-controls="landing-navigation" onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <X size={22} /> : <Menu size={22} />}</button>
         <nav id="landing-navigation" aria-label="Main navigation" className={`${styles.navLinks} ${menuOpen ? styles.navOpen : ""}`}>
-          <a href="#services" onClick={() => setMenuOpen(false)}>Our services</a><a href="#how-it-works" onClick={() => setMenuOpen(false)}>How it works</a><a href="#routes" onClick={() => setMenuOpen(false)}>Explore routes</a><Link href="/track">Track / resume move</Link><a href="#questions" onClick={() => setMenuOpen(false)}>FAQs</a><Link href="/partner">Become a partner <Arrow /></Link>
+          <a href="#services" onClick={() => setMenuOpen(false)}>Services</a><a href="#how-it-works" onClick={() => setMenuOpen(false)}>How it works</a><a href="#routes" onClick={() => setMenuOpen(false)}>Routes</a><Link href="/track">Track move</Link><Link href="/partner">Partner</Link>
         </nav>
         <a className={styles.navCta} href="#move-form">Plan your move <Arrow /></a>
       </div>

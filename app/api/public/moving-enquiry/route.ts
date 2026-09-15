@@ -8,6 +8,7 @@ import {
   readDraftSession,
 } from "@/lib/enquiry-session";
 import { verifyIndianLocation } from "@/lib/verified-indian-location";
+import { isSupportedLocalSelection } from "@/lib/local-services";
 export const runtime = "nodejs";
 const reply = (body: object, status = 200, cookie?: string) =>
   NextResponse.json(body, {
@@ -106,6 +107,17 @@ export async function POST(req: Request) {
       if (!/^[6-9]\d{9}$/.test(mobile))
         throw Error("Enter a valid 10-digit mobile number.");
       if (data.consent !== true) throw Error("Contact consent is required.");
+      let localSelection;
+      // Older enquiry clients may omit these fields; new selections are always checked server-side.
+      if (mode === "LOCAL" && (data.serviceCity !== undefined || data.localVehicle !== undefined)) {
+        const serviceCity = text(data, "serviceCity");
+        const localVehicle = text(data, "localVehicle", 100);
+        if (!isSupportedLocalSelection(serviceCity, localVehicle))
+          throw Error("Select a supported service city and vehicle.");
+        if (`${from.city}, ${from.state}`.toLowerCase() !== serviceCity.toLowerCase())
+          throw Error("Pickup and drop must be in the selected service city.");
+        localSelection = { serviceCity, localVehicle };
+      }
       route = {
         name: "",
         mobile,
@@ -133,6 +145,7 @@ export async function POST(req: Request) {
           stage: "DRAFT",
           from,
           to,
+          ...localSelection,
           contactConsent: true,
           consentAt: new Date().toISOString(),
         }),

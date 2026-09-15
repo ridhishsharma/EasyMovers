@@ -46,11 +46,13 @@ function loadMaps(key: string) {
 export function LocationPicker({
   label,
   local,
+  serviceCity = "",
   value,
   onChange,
 }: {
   label: string;
   local: boolean;
+  serviceCity?: string;
   value: LocationChoice | null;
   onChange: (value: LocationChoice | null) => void;
 }) {
@@ -87,7 +89,7 @@ export function LocationPicker({
         });
         widget.description = label;
         widget.placeholder = local
-          ? `Search ${label.toLowerCase()} address`
+          ? `Search ${label.toLowerCase()} address${serviceCity ? ` in ${serviceCity}` : ""}`
           : `Search Indian ${label.toLowerCase()} city`;
         selected = (async (event: any) => {
           try {
@@ -144,7 +146,7 @@ export function LocationPicker({
     };
     // Location selection is owned by the parent; each widget is recreated only for a route-type change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, local]);
+  }, [key, local, serviceCity]);
   useEffect(() => {
     if (!open || !mapHost.current || !key) return;
     let active = true;
@@ -222,8 +224,8 @@ export function LocationPicker({
     <div className={styles.location}>
       <label className={styles.label}>{label}</label>
       {!fallback && <div ref={host} className={styles.placesHost} />}
-      {fallback && (local ? <><input aria-label={`${label} address`} placeholder="Street, building, locality and city" maxLength={300} value={address} onChange={e=>{setAddress(e.target.value);onChange(e.target.value.trim()?{address:e.target.value,label:e.target.value}:null)}}/><p className={styles.muted}>Enter a full address, or enable map search to select the exact point.</p></> : <SearchSuggestions label={`Search Indian ${label.toLowerCase()} city`} value={city} options={indianCities.map(item=>item.label)} onChange={next=>manual(next, "")} onSelect={next=>manual(next, "")}/>)}
-      {local && label === "From" && <button type="button" className={styles.smallLink} onClick={async()=>{setError("");if(!key){setError("Current location needs map search enabled. Enter the full pickup address instead.");return}if(!navigator.geolocation){setError("Location is unavailable on this device.");return}try{await loadMaps(key);navigator.geolocation.getCurrentPosition(async position=>{try{const {results}=await new window.google.maps.Geocoder().geocode({location:{lat:position.coords.latitude,lng:position.coords.longitude}});const result=results.find((item:any)=>item.address_components.some((part:any)=>part.types.includes("country")&&part.short_name==="IN"));if(!result)throw Error();onChange({placeId:result.place_id,label:result.formatted_address,latitude:position.coords.latitude,longitude:position.coords.longitude});setAddress(result.formatted_address)}catch{setError("Could not identify your pickup address. Search or choose it on the map.")}},()=>setError("Location access was declined or unavailable. Enter your pickup address."),{timeout:10000,maximumAge:0,enableHighAccuracy:true})}catch{setError("Map search is unavailable. Enter your pickup address.")}}}>◎ Use current location</button>}
+      {fallback && (local ? <input aria-label={`${label} address`} placeholder="Street, building and locality" maxLength={300} value={address} onChange={e=>{setAddress(e.target.value);onChange(e.target.value.trim()?{...(serviceCity ? {city:serviceCity} : {}),address:e.target.value,label:serviceCity ? `${e.target.value}, ${serviceCity}` : e.target.value}:null)}}/> : <SearchSuggestions label={`Search Indian ${label.toLowerCase()} city`} value={city} options={indianCities.map(item=>item.label)} onChange={next=>manual(next, "")} onSelect={next=>manual(next, "")}/>)}
+      {local && (label === "From" || label === "Pickup") && <button type="button" className={styles.smallLink} onClick={async()=>{setError("");if(!key){setError("Current location needs map search enabled. Enter the full pickup address instead.");return}if(!navigator.geolocation){setError("Location is unavailable on this device.");return}try{await loadMaps(key);navigator.geolocation.getCurrentPosition(async position=>{try{const {results}=await new window.google.maps.Geocoder().geocode({location:{lat:position.coords.latitude,lng:position.coords.longitude}});const result=results.find((item:any)=>item.address_components.some((part:any)=>part.types.includes("country")&&part.short_name==="IN"));if(!result)throw Error();onChange({placeId:result.place_id,label:result.formatted_address,latitude:position.coords.latitude,longitude:position.coords.longitude});setAddress(result.formatted_address)}catch{setError("Could not identify your pickup address. Search or choose it on the map.")}},()=>setError("Location access was declined or unavailable. Enter your pickup address."),{timeout:10000,maximumAge:0,enableHighAccuracy:true})}catch{setError("Map search is unavailable. Enter your pickup address.")}}}>◎ Use current location</button>}
       {value && <p className={styles.selectedLocation}>✓ {value.label}</p>}
       {local && !fallback && (
         <button
