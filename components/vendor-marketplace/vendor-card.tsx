@@ -242,7 +242,7 @@ export function VendorCard({
 
             <Image
 
-              src={logo ?? "/images/logo.jpg"}
+              src={logo ?? "/image/New_Logo_NBG.png"}
 
               alt={companyName ?? "Vendor Logo"}
   fill
