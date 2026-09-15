@@ -4,10 +4,51 @@
   color: #12365b;
   padding: 44px 24px 72px;
 }
+.quickEnquiry h2 { margin: 0 0 14px; font-size: 24px; letter-spacing: 0; }
+.quickEnquiry .tabs { margin-bottom: 16px; border-radius: 8px; }
+.quickEnquiry .muted { margin: 8px 0 0; }
+.enquiryFields { border: 0; padding: 0; margin: 0; min-width: 0; display: grid; gap: 14px; }
+.enquiryRoute { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.enquiryRoute > div { min-width: 0; }
+.quickEnquiry .location { margin: 0; }
+.quickEnquiry input, .quickEnquiry select { border-radius: 6px; }
+.quickEnquiry .selectedLocation { overflow-wrap: anywhere; }
+.enquiryActions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: 8px; margin-top: 16px; }
+.enquiryActions .primary, .enquiryActions .secondary { gap: 7px; padding: 10px; font-size: 13px; border-radius: 6px; text-align: center; }
+.enquiryActions svg { flex-shrink: 0; }
+.pinSearch { display: grid; grid-template-columns: minmax(0, 1fr) 44px; align-items: end; gap: 8px; }
+.pinSearch button { padding: 10px; }
+@media (min-width: 761px) {
+  .enquiryRoute { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .quickEnquiry .field input, .quickEnquiry .field select, .quickEnquiry .location input { min-height: 44px; padding: 10px; }
+  .quickEnquiry .tabs button { padding: 10px 8px; }
+}
 .container {
   max-width: 1120px;
   margin: auto;
 }
+.companyContainer { max-width: 900px; }
+.companyPage { padding: 20px 24px 44px; }
+.companyBreadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  color: #63788b;
+  font-size: 13px;
+}
+.companyBreadcrumb a { color: #175b96; }
+.intro.companyIntro { margin-bottom: 14px; }
+.intro.companyIntro h1 { margin: 5px 0 6px; font-size: clamp(30px, 3vw, 38px); }
+.intro.companyIntro p { margin: 0; line-height: 1.5; }
+.companyLayout { max-width: 900px; margin: 0 auto; }
+.card.companyCard { border-radius: 10px; border-top: 4px solid #e5b73b; padding: 22px 28px; }
+.companySteps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 18px; }
+.companySteps span { display: flex; align-items: center; min-height: 40px; padding: 7px 12px; border: 1px solid #d5e0e8; border-radius: 7px; color: #60758b; background: #f8fafc; font-size: 12px; font-weight: 700; }
+.companySteps .current { border-color: #1762a7; color: #103963; background: #eaf3ff; }
+.companySignIn { margin-top: 22px; padding-top: 20px; border-top: 1px solid #dce5ef; }
+.companyCard .companySignIn h2 { margin-bottom: 8px; }
 .intro {
   margin-bottom: 28px;
 }
@@ -421,6 +462,8 @@
   .card {
     padding: 22px;
   }
+  .card.companyCard { padding: 18px 16px; }
+  .companySteps span { justify-content: center; padding: 7px 4px; text-align: center; }
   .progress {
     flex-wrap: wrap;
   }

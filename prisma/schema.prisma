@@ -450,10 +450,55 @@ model CallbackRequest {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   userId        String?
+  vendorApplicationId String?
   User          User?    @relation(fields: [userId], references: [id])
+  vendorApplication VendorApplication? @relation(fields: [vendorApplicationId], references: [id], onDelete: SetNull)
 
   @@index([mobile])
   @@index([status])
+  @@index([vendorApplicationId])
+}
+
+model VendorApplication {
+  id                 String                  @id @default(cuid())
+  referenceId        String                  @unique
+  requestId          String                  @unique @db.Uuid
+  companyName        String
+  businessType       VendorBusinessType
+  operatingCategory  String
+  gstNumber          String?
+  panNumber          String?
+  contactName        String
+  mobile             String
+  email              String
+  addressLine1       String
+  city               String
+  state              String
+  postalCode         String
+  status             VendorApplicationStatus @default(PENDING)
+  consentAt          DateTime
+  reviewedAt         DateTime?
+  reviewedBy         String?
+  reviewNotes        String?
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  callbackRequests   CallbackRequest[]
+
+  @@index([mobile])
+  @@index([email])
+  @@index([panNumber])
+  @@index([gstNumber])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum VendorApplicationStatus {
+  PENDING
+  UNDER_REVIEW
+  NEEDS_INFORMATION
+  APPROVED
+  REJECTED
+  WITHDRAWN
 }
 
 model User {
