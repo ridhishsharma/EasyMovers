@@ -6,6 +6,7 @@ const component = readFileSync("components/moving/partner-registration.tsx", "ut
 const applicationRoute = readFileSync("app/api/public/vendor-applications/route.ts", "utf8");
 const callbackRoute = readFileSync("app/api/public/vendor-applications/callback/route.ts", "utf8");
 const postalRoute = readFileSync("app/api/public/postal-lookup/route.ts", "utf8");
+const enquirySession = readFileSync("lib/enquiry-session.ts", "utf8");
 const schema = readFileSync("prisma/schema.prisma", "utf8");
 
 test("company form submits a pending public application without Supabase sign-in", () => {
@@ -23,6 +24,10 @@ test("public routes enforce origin, size, validation and rate controls", () => {
   }
   assert.match(applicationRoute, /VENDOR_APPLICATION_RATE_LIMITED/);
   assert.match(callbackRoute, /CALLBACK_RATE_LIMITED/);
+  assert.match(enquirySession, /APP_ALLOWED_ORIGINS/);
+  assert.match(enquirySession, /process\.env\.NODE_ENV !== "production"/);
+  assert.match(enquirySession, /allowed\.has\(supplied\)/);
+  assert.doesNotMatch(enquirySession, /x-forwarded-host|x-forwarded-proto/i);
 });
 
 test("vendor applications remain separate from active vendors", () => {

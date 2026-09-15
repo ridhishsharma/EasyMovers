@@ -55,7 +55,37 @@ export function readDraftSession(
 export function draftCookie(id: string, reference: string, secure: boolean) {
   return `${draftCookieName(reference)}=${draftToken(id, reference)}; HttpOnly; SameSite=Lax; Path=/api; Max-Age=${DRAFT_SECONDS}${secure ? "; Secure" : ""}`;
 }
+
+function normalizedOrigin(value: string | null | undefined) {
+  if (!value) return null;
+  try {
+    const parsed = new URL(value.trim());
+    return parsed.protocol === "https:" || parsed.protocol === "http:"
+      ? parsed.origin
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function configuredOrigins() {
+  return new Set(
+    (process.env.APP_ALLOWED_ORIGINS || "")
+      .split(",")
+      .map(normalizedOrigin)
+      .filter((origin): origin is string => Boolean(origin)),
+  );
+}
+
 export function checkOrigin(req: Request) {
-  if (req.headers.get("origin") !== new URL(req.url).origin)
-    throw Error("Invalid origin");
+  const supplied = normalizedOrigin(req.headers.get("origin"));
+  if (!supplied) throw Error("Invalid origin");
+
+  const allowed = configuredOrigins();
+  if (process.env.NODE_ENV !== "production") {
+    const requestOrigin = normalizedOrigin(req.url);
+    if (requestOrigin) allowed.add(requestOrigin);
+  }
+
+  if (!allowed.has(supplied)) throw Error("Invalid origin");
 }
