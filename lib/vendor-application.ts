@@ -46,6 +46,70 @@ function placeName(data: Record<string, unknown>, key: "city" | "state") {
   return value.replace(/\s+/g, " ");
 }
 
+function personName(data: Record<string, unknown>, key: string) {
+  const value = required(data, key, 100).replace(/\s+/g, " ");
+  if (!/^[\p{L}][\p{L}\p{M} .'-]{1,99}$/u.test(value)) {
+    throw Error(`CHECK_${key.toUpperCase()}`);
+  }
+  return value;
+}
+
+function address(data: Record<string, unknown>) {
+  const value = required(data, "addressLine1", 300).replace(/\s+/g, " ");
+  if (
+    value.length < 5 ||
+    !/\p{L}/u.test(value) ||
+    !/^[\p{L}\p{M}\p{N}\s,.'#&/()\-:]+$/u.test(value)
+  ) {
+    throw Error("CHECK_ADDRESSLINE1");
+  }
+  return value;
+}
+
+type PostalOffice = {
+  Name?: string;
+  District?: string;
+  State?: string;
+  Block?: string;
+  Division?: string;
+  Country?: string;
+  Pincode?: string;
+};
+
+const comparable = (value: string | undefined) =>
+  value?.normalize("NFKC").toLocaleLowerCase("en-IN").replace(/[^\p{L}\p{N}]+/gu, " ").trim() ?? "";
+
+export async function verifyVendorPostalLocation(input: PublicVendorApplicationInput) {
+  let response: Response;
+  try {
+    response = await fetch(`https://api.postalpincode.in/pincode/${input.postalCode}`, {
+      signal: AbortSignal.timeout(8_000),
+      cache: "no-store",
+    });
+  } catch {
+    throw Error("POSTAL_LOOKUP_UNAVAILABLE");
+  }
+  if (!response.ok) throw Error("POSTAL_LOOKUP_UNAVAILABLE");
+  const result = (await response.json())?.[0];
+  const offices: PostalOffice[] = Array.isArray(result?.PostOffice)
+    ? result.PostOffice.filter((office: PostalOffice) =>
+        office.Pincode === input.postalCode && office.Country === "India")
+    : [];
+  if (result?.Status !== "Success" || !offices.length) {
+    throw Error("CHECK_POSTALLOCATION");
+  }
+  const city = comparable(input.city);
+  const state = comparable(input.state);
+  const stateMatches = offices.some((office) => comparable(office.State) === state);
+  const cityMatches = offices.some((office) =>
+    [office.District, office.Name, office.Block, office.Division].some((candidate) => {
+      const normalized = comparable(candidate);
+      return normalized === city || normalized.startsWith(`${city} `) || city.startsWith(`${normalized} `);
+    }),
+  );
+  if (!stateMatches || !cityMatches) throw Error("CHECK_POSTALLOCATION");
+}
+
 export function parseVendorApplication(value: unknown): PublicVendorApplicationInput {
   const data = object(value);
   const requestId = required(data, "requestId", 36);
@@ -72,10 +136,10 @@ export function parseVendorApplication(value: unknown): PublicVendorApplicationI
     operatingCategory: operatingCategory as PublicVendorApplicationInput["operatingCategory"],
     gstNumber,
     panNumber,
-    contactName: required(data, "contactName", 100),
+    contactName: personName(data, "contactName"),
     mobile,
     email,
-    addressLine1: required(data, "addressLine1", 300),
+    addressLine1: address(data),
     city: placeName(data, "city"),
     state: placeName(data, "state"),
     postalCode,
@@ -92,6 +156,8 @@ export function vendorApplicationReference(now = new Date()) {
 export function vendorApplicationError(error: unknown) {
   const code = error instanceof Error ? error.message : "";
   if (code === "CONSENT_REQUIRED") return "Accept the onboarding terms and service standards.";
+  if (code === "CHECK_POSTALLOCATION") return "The city and state do not match this Indian PIN code.";
+  if (code === "POSTAL_LOOKUP_UNAVAILABLE") return "PIN verification is temporarily unavailable. Please retry.";
   if (code.startsWith("CHECK_")) return "Check the highlighted application details.";
   return "Invalid partner application.";
 }

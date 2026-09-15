@@ -10,6 +10,11 @@ const value = (data: Record<string, unknown>, key: string, max: number) => {
   if (typeof result !== "string" || !result.trim() || result.trim().length > max) throw Error("INVALID");
   return result.trim();
 };
+const personName = (data: Record<string, unknown>, key: string) => {
+  const result = value(data, key, 100).replace(/\s+/g, " ");
+  if (!/^[\p{L}][\p{L}\p{M} .'-]{1,99}$/u.test(result)) throw Error("INVALID");
+  return result;
+};
 
 export async function POST(req: Request) {
   const requestId = req.headers.get("x-request-id")?.trim() || crypto.randomUUID();
@@ -21,7 +26,7 @@ export async function POST(req: Request) {
     const raw = await req.text();
     if (raw.length > 4_000) throw Error("INVALID");
     const data = JSON.parse(raw) as Record<string, unknown>;
-    const fullName = value(data, "fullName", 100);
+    const fullName = personName(data, "fullName");
     const mobile = value(data, "mobile", 10);
     if (!/^[6-9][0-9]{9}$/.test(mobile) || data.consent !== true) throw Error("INVALID");
     const preferredTime = value(data, "preferredTime", 30);

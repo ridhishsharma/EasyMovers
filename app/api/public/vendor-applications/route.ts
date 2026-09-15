@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { checkOrigin } from "@/lib/enquiry-session";
-import { parseVendorApplication, vendorApplicationError, vendorApplicationReference } from "@/lib/vendor-application";
+import { parseVendorApplication, vendorApplicationError, vendorApplicationReference, verifyVendorPostalLocation } from "@/lib/vendor-application";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,6 +29,12 @@ export async function POST(req: Request) {
 
     const existing = await prisma.vendorApplication.findUnique({ where: { requestId: input.requestId }, select: { referenceId: true, status: true } });
     if (existing) return reply({ success: true, data: { reference: existing.referenceId, status: existing.status, duplicate: true }, meta: { requestId, timestamp: new Date().toISOString() } });
+
+    try { await verifyVendorPostalLocation(input); }
+    catch (error) {
+      const unavailable = error instanceof Error && error.message === "POSTAL_LOOKUP_UNAVAILABLE";
+      return reply({ success: false, error: { code: unavailable ? "POSTAL_LOOKUP_UNAVAILABLE" : "VENDOR_APPLICATION_LOCATION_INVALID", message: vendorApplicationError(error) }, meta: { requestId, timestamp: new Date().toISOString() } }, unavailable ? 503 : 400);
+    }
 
     const recent = await prisma.vendorApplication.count({ where: { mobile: input.mobile, createdAt: { gte: new Date(Date.now() - 15 * 60_000) } } });
     if (recent >= 3) return reply({ success: false, error: { code: "VENDOR_APPLICATION_RATE_LIMITED", message: "Please wait before submitting another application or call EasyMovers support." }, meta: { requestId, timestamp: new Date().toISOString() } }, 429);

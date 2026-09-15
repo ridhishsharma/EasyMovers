@@ -24,6 +24,20 @@ function placeNameInput(value: string) {
   return value.replace(/[0-9]/g, "").slice(0, 100);
 }
 
+function personNameInput(value: string) {
+  return Array.from(value)
+    .filter((character) => /[\p{L}\p{M} .'-]/u.test(character))
+    .join("")
+    .slice(0, 100);
+}
+
+function addressInput(value: string) {
+  return value.replace(/[^\p{L}\p{M}\p{N}\s,.'#&/()\-:]/gu, "").slice(0, 300);
+}
+
+const comparable = (value: string) =>
+  value.normalize("NFKC").toLocaleLowerCase("en-IN").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+
 export function PartnerRegistration() {
   const [fields, setFields] = useState(defaults),
     [step, setStep] = useState(0),
@@ -46,8 +60,39 @@ export function PartnerRegistration() {
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (lock.current) return;
-    if (step < 2) {
-      setStep(step + 1);
+    if (step === 0) {
+      setStep(1);
+      return;
+    }
+    if (step === 1) {
+      if (!/^[\p{L}][\p{L}\p{M} .'-]{1,99}$/u.test(fields.ownerName.trim())) {
+        setError("Enter the owner's name using letters only.");
+        return;
+      }
+      lock.current = true;
+      setBusy(true);
+      setError("");
+      try {
+        const response = await fetch(`/api/public/postal-lookup?pin=${fields.pincode}`);
+        const data = await response.json();
+        const location = data.locations?.[0];
+        if (!response.ok || !data.success || !location?.state || !(location.district || location.locality)) {
+          throw Error(data.message || "Enter a valid Indian PIN code.");
+        }
+        const city = String(location.district || location.locality);
+        const state = String(location.state);
+        if (comparable(fields.city) !== comparable(city) || comparable(fields.state) !== comparable(state)) {
+          setFields((previous) => ({ ...previous, city, state }));
+          setError(`City and state were corrected from PIN ${fields.pincode}. Please review them and click Continue again.`);
+          return;
+        }
+        setStep(2);
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : "Unable to verify this PIN code.");
+      } finally {
+        setBusy(false);
+        lock.current = false;
+      }
       return;
     }
     lock.current = true;
@@ -108,7 +153,7 @@ export function PartnerRegistration() {
   async function requestCallback(event: FormEvent) {
     event.preventDefault();
     if (lock.current) return;
-    if (!callbackName.trim() || !/^[6-9][0-9]{9}$/.test(callbackMobile) || !callbackTime) {
+    if (!/^[\p{L}][\p{L}\p{M} .'-]{1,99}$/u.test(callbackName.trim()) || !/^[6-9][0-9]{9}$/.test(callbackMobile) || !callbackTime) {
       setCallbackMessage("Enter a contact name, valid mobile number and preferred callback time.");
       return;
     }
@@ -144,7 +189,7 @@ export function PartnerRegistration() {
         </div>
         {callbackOpen && <form className={styles.callbackPanel} onSubmit={requestCallback}>
           <p className={styles.callbackIntro}>Our partner team will call you. No onboarding account is required.</p>
-          <label className={styles.field}>Contact name<input required maxLength={100} value={callbackName} onChange={event => setCallbackName(event.target.value)} /></label>
+          <label className={styles.field}>Contact name<input required minLength={2} maxLength={100} title="Enter a name using letters only." value={callbackName} onChange={event => setCallbackName(personNameInput(event.target.value))} /></label>
           <label className={styles.field}>Mobile number<input required type="tel" inputMode="numeric" pattern="[6-9][0-9]{9}" maxLength={10} value={callbackMobile} onChange={event => setCallbackMobile(event.target.value.replace(/\D/g, ""))} /></label>
           <label className={styles.field}>Preferred callback time (India)<input required type="datetime-local" value={callbackTime} onChange={event => setCallbackTime(event.target.value)} /></label>
           <button className={styles.primary} disabled={busy}>{busy ? "Requesting…" : "Confirm callback"}</button>
@@ -267,9 +312,10 @@ export function PartnerRegistration() {
                             required
                             minLength={2}
                             maxLength={100}
+                            title="Enter the representative's name using letters only."
                             value={fields.ownerName}
                             onChange={(e) =>
-                              change("ownerName", e.target.value)
+                              change("ownerName", personNameInput(e.target.value))
                             }
                           />
                         </label>
@@ -308,9 +354,10 @@ export function PartnerRegistration() {
                           Registered address
                           <textarea
                             required
+                            minLength={5}
                             maxLength={300}
                             value={fields.address}
-                            onChange={(e) => change("address", e.target.value)}
+                            onChange={(e) => change("address", addressInput(e.target.value))}
                           />
                         </label>
                         <div className={styles.row}>

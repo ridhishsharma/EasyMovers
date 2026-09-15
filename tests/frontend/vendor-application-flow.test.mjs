@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 const component = readFileSync("components/moving/partner-registration.tsx", "utf8");
 const applicationRoute = readFileSync("app/api/public/vendor-applications/route.ts", "utf8");
 const callbackRoute = readFileSync("app/api/public/vendor-applications/callback/route.ts", "utf8");
+const postalRoute = readFileSync("app/api/public/postal-lookup/route.ts", "utf8");
 const schema = readFileSync("prisma/schema.prisma", "utf8");
 
 test("company form submits a pending public application without Supabase sign-in", () => {
@@ -38,4 +39,31 @@ test("city and state reject numeric values in the browser and API", () => {
   assert.match(validator, /function placeName/);
   assert.match(validator, /city: placeName\(data, "city"\)/);
   assert.match(validator, /state: placeName\(data, "state"\)/);
+});
+
+test("partner identity and registered address use restricted input", () => {
+  assert.match(component, /personNameInput/);
+  assert.match(component, /addressInput/);
+  assert.match(component, /ownerName", personNameInput/);
+  assert.match(callbackRoute, /const personName/);
+
+  const validator = readFileSync("lib/vendor-application.ts", "utf8");
+  assert.match(validator, /function personName/);
+  assert.match(validator, /contactName: personName/);
+  assert.match(validator, /function address/);
+  assert.match(validator, /addressLine1: address\(data\)/);
+});
+
+test("PIN is authoritative and city/state are verified before storage", () => {
+  assert.match(component, /\/api\/public\/postal-lookup\?pin=/);
+  assert.match(component, /City and state were corrected from PIN/);
+  assert.match(applicationRoute, /verifyVendorPostalLocation/);
+  assert.match(applicationRoute, /VENDOR_APPLICATION_LOCATION_INVALID/);
+  assert.match(postalRoute, /office.Pincode === pin/);
+
+  const validator = readFileSync("lib/vendor-application.ts", "utf8");
+  assert.match(validator, /export async function verifyVendorPostalLocation/);
+  assert.match(validator, /api\.postalpincode\.in\/pincode/);
+  assert.match(validator, /office.Country === "India"/);
+  assert.match(validator, /CHECK_POSTALLOCATION/);
 });

@@ -9,7 +9,7 @@ export async function GET(request: Request) {
     const data = await response.json();
     const offices = data?.[0]?.PostOffice;
     if (data?.[0]?.Status !== "Success" || !Array.isArray(offices) || !offices.length) return NextResponse.json({ success: false, message: "PIN code not found. Enter the destination manually." }, { status: 404 });
-    return NextResponse.json({ success: true, locations: offices.filter((office: { Pincode?: string }) => office.Pincode === pin).map((office: { Name?: string; District?: string; State?: string }) => ({ locality: office.Name, district: office.District, state: office.State, pin })) });
+    return NextResponse.json({ success: true, locations: offices.filter((office: { Pincode?: string }) => office.Pincode === pin).map((office: { Name?: string; District?: string; State?: string; Block?: string; Division?: string }) => ({ locality: office.Name, district: office.District, state: office.State, block: office.Block, division: office.Division, pin })) });
   } catch {
     return NextResponse.json({ success: false, message: "Postal lookup is unavailable. You can enter the destination manually." }, { status: 503 });
   }
