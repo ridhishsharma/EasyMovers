@@ -114,6 +114,7 @@ model Vendor {
   ratingSummary          VendorRating?
   reviews                VendorReview[]
   vehicles               VendorVehicle[]
+  sourceApplication      VendorApplication?      @relation("VendorApplicationCreatedVendor")
 
   @@index([deletedAt])
 }
@@ -437,22 +438,22 @@ model Booking {
 }
 
 model CallbackRequest {
-  id            String   @id @default(cuid())
-  fullName      String
-  mobile        String
-  email         String?
-  city          String?
-  serviceType   String?
-  preferredTime String?
-  message       String?
-  status        String   @default("Pending")
-  assignedTo    String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  userId        String?
+  id                  String             @id @default(cuid())
+  fullName            String
+  mobile              String
+  email               String?
+  city                String?
+  serviceType         String?
+  preferredTime       String?
+  message             String?
+  status              String             @default("Pending")
+  assignedTo          String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  userId              String?
   vendorApplicationId String?
-  User          User?    @relation(fields: [userId], references: [id])
-  vendorApplication VendorApplication? @relation(fields: [vendorApplicationId], references: [id], onDelete: SetNull)
+  User                User?              @relation(fields: [userId], references: [id])
+  vendorApplication   VendorApplication? @relation(fields: [vendorApplicationId], references: [id], onDelete: SetNull)
 
   @@index([mobile])
   @@index([status])
@@ -460,35 +461,40 @@ model CallbackRequest {
 }
 
 model VendorApplication {
-  id                 String                  @id @default(cuid())
-  referenceId        String                  @unique
-  requestId          String                  @unique @db.Uuid
-  companyName        String
-  businessType       VendorBusinessType
-  operatingCategory  String
-  gstNumber          String?
-  panNumber          String?
-  contactName        String
-  mobile             String
-  email              String
-  addressLine1       String
-  city               String
-  state              String
-  postalCode         String
-  status             VendorApplicationStatus @default(PENDING)
-  consentAt          DateTime
-  reviewedAt         DateTime?
-  reviewedBy         String?
-  reviewNotes        String?
-  createdAt          DateTime                @default(now())
-  updatedAt          DateTime                @updatedAt
-  callbackRequests   CallbackRequest[]
+  id                String                  @id @default(cuid())
+  referenceId       String                  @unique
+  requestId         String                  @unique @db.Uuid
+  companyName       String
+  businessType      VendorBusinessType
+  operatingCategory String
+  gstNumber         String?
+  panNumber         String?
+  contactName       String
+  mobile            String
+  email             String
+  addressLine1      String
+  city              String
+  state             String
+  postalCode        String
+  status            VendorApplicationStatus @default(PENDING)
+  consentAt         DateTime
+  vendorId          String?                 @unique
+  reviewedByUserId  String?
+  reviewedAt        DateTime?
+  reviewedBy        String?
+  reviewNotes       String?
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+  callbackRequests  CallbackRequest[]
+  vendor            Vendor?                 @relation("VendorApplicationCreatedVendor", fields: [vendorId], references: [id], onDelete: SetNull)
+  reviewedByUser    User?                   @relation("VendorApplicationReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
 
   @@index([mobile])
   @@index([email])
   @@index([panNumber])
   @@index([gstNumber])
   @@index([status])
+  @@index([reviewedByUserId])
   @@index([createdAt])
 }
 
@@ -502,33 +508,34 @@ enum VendorApplicationStatus {
 }
 
 model User {
-  id                     String                  @id @default(cuid())
-supabaseAuthId String? @unique @db.Uuid
-  email                  String?                 @unique
-  mobile                 String                  @unique
-  passwordHash           String
-  fullName               String
-  role                   UserRole                @default(CUSTOMER)
-  avatar                 String?
-  isActive               Boolean                 @default(true)
-  emailVerified          Boolean                 @default(false)
-  mobileVerified         Boolean                 @default(false)
-  lastLogin              DateTime?
-  createdAt              DateTime                @default(now())
-  updatedAt              DateTime                @updatedAt
-  vendorId               String?
-  bookings               Booking[]
-  callbackRequests       CallbackRequest[]
-  Corporate              Corporate?
-  Customer               Customer?
-  customerDocuments      CustomerDocument[]
-  Franchise              Franchise?
-  leads                  Lead[]
-  Notification           Notification[]
-  notificationPreference NotificationPreference?
-  payments               Payment[]
-  quotations             Quotation[]
-  vendor                 Vendor?                 @relation(fields: [vendorId], references: [id])
+  id                         String                  @id @default(cuid())
+  supabaseAuthId             String?                 @unique @db.Uuid
+  email                      String?                 @unique
+  mobile                     String                  @unique
+  passwordHash               String
+  fullName                   String
+  role                       UserRole                @default(CUSTOMER)
+  avatar                     String?
+  isActive                   Boolean                 @default(true)
+  emailVerified              Boolean                 @default(false)
+  mobileVerified             Boolean                 @default(false)
+  lastLogin                  DateTime?
+  createdAt                  DateTime                @default(now())
+  updatedAt                  DateTime                @updatedAt
+  vendorId                   String?
+  bookings                   Booking[]
+  callbackRequests           CallbackRequest[]
+  Corporate                  Corporate?
+  Customer                   Customer?
+  customerDocuments          CustomerDocument[]
+  Franchise                  Franchise?
+  leads                      Lead[]
+  Notification               Notification[]
+  notificationPreference     NotificationPreference?
+  payments                   Payment[]
+  quotations                 Quotation[]
+  vendor                     Vendor?                 @relation(fields: [vendorId], references: [id])
+  reviewedVendorApplications VendorApplication[]     @relation("VendorApplicationReviewer")
 
   @@index([mobile])
   @@index([email])
