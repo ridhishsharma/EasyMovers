@@ -14,6 +14,7 @@ export function AppBrandShell({ children }: { children: React.ReactNode }) {
               <BrandLogo />
             </Link>
             <nav aria-label="Page navigation">
+              {pathname.startsWith("/admin") && <Link href="/admin/vendor-applications">Applications</Link>}
               <Link href="/">Home</Link>
               <Link href="/track">Track / resume move</Link>
               <Link href="/partner">Become a partner</Link>
