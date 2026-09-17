@@ -294,7 +294,7 @@ export async function approveVendorApplication(input: {
       vendor: {
         id: vendor.id,
         vendorCode: vendor.vendorCode,
-        status: vendor.active ? "ACTIVE" : "PENDING",
+        status: vendor.active ? "ACTIVE" : "INACTIVE",
       },
       idempotent: false,
     };

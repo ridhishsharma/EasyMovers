@@ -65,6 +65,10 @@ test("approval is atomic, serialized, inactive and idempotent", () => {
   assert.match(reviewService, /createInitialVendorRepositoryInput/);
   assert.match(reviewService, /application\.status === "APPROVED"/);
   assert.match(reviewService, /idempotent: true/);
+assert.match(
+  reviewService,
+  /status: vendor\.active \? "ACTIVE" : "INACTIVE"/
+);
   assert.match(reviewService, /vendorId: vendor\.id/);
   assert.doesNotMatch(reviewService, /active:\s*true/);
 });
