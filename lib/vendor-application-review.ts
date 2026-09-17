@@ -61,11 +61,13 @@ async function lockApplication(
   transaction: Prisma.TransactionClient,
   applicationId: string
 ) {
-  await transaction.$queryRaw`
+  await transaction.$queryRaw<Array<{ lockAcquired: number }>>`
+  SELECT 1::int AS "lockAcquired"
+  FROM (
     SELECT pg_advisory_xact_lock(hashtext(${applicationId}))
-  `;
+  ) AS acquired
+`;
 }
-
 async function findAndLockApplication(
   transaction: Prisma.TransactionClient,
   identifier: string
