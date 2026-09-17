@@ -27,3 +27,12 @@ test("admin vendor application UI preserves approval safety", () => {
   assert.match(ui, /reason\.trim\(\)\.length < 3/);
   assert.match(ui, /window\.confirm/);
 });
+
+test("admin login is office-only and supports secure password recovery", () => {
+  const shell = readFileSync("components/brand/app-brand-shell.tsx", "utf8");
+  assert.match(shell, /isAdmin \? <span/);
+  assert.match(shell, /Office administration/);
+  assert.match(ui, /resetPasswordForEmail/);
+  assert.match(ui, /updateUser\(\{ password: newPassword \}\)/);
+  assert.match(ui, /newPassword\.length < 12/);
+});

@@ -40,6 +40,8 @@ export function VendorApplicationsAdmin({ supabaseUrl, publishableKey }: { supab
   const [signedIn, setSignedIn] = useState(false);
   const [sessionReady, setSessionReady] = useState(() => !client);
   const [email, setEmail] = useState(""); const [password, setPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [newPassword, setNewPassword] = useState(""); const [confirmPassword, setConfirmPassword] = useState("");
   const [applications, setApplications] = useState<ApplicationSummary[]>([]);
   const [selected, setSelected] = useState<ApplicationDetail | null>(null);
   const [pagination, setPagination] = useState<Pagination>({ page: 1, pageSize: 20, total: 0, totalPages: 0 });
@@ -84,7 +86,7 @@ export function VendorApplicationsAdmin({ supabaseUrl, publishableKey }: { supab
   useEffect(() => {
     if (!client) return;
     void client.auth.getSession().then(({ data }) => { setSignedIn(Boolean(data.session)); setSessionReady(true); });
-    const { data } = client.auth.onAuthStateChange((_event, session) => { setSignedIn(Boolean(session)); if (!session) { setApplications([]); setSelected(null); } });
+    const { data } = client.auth.onAuthStateChange((event, session) => { setSignedIn(Boolean(session)); if (event === "PASSWORD_RECOVERY") setChangingPassword(true); if (!session) { setApplications([]); setSelected(null); } });
     return () => data.subscription.unsubscribe();
   }, [client]);
   useEffect(() => {
@@ -97,6 +99,30 @@ export function VendorApplicationsAdmin({ supabaseUrl, publishableKey }: { supab
     event.preventDefault(); if (!client || busy) return; setBusy(true); setMessage("");
     try { const { error } = await client.auth.signInWithPassword({ email: email.trim(), password }); if (error) throw error; setPassword(""); setSignedIn(true); }
     catch { setMessage("Sign-in failed. Use an active EasyMovers administrator account."); }
+    finally { setBusy(false); }
+  }
+  async function forgotPassword() {
+    if (!client || busy) return;
+    if (!email.trim()) { setMessage("Enter your administrator email address first."); return; }
+    setBusy(true); setMessage("");
+    try {
+      const { error } = await client.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/admin/vendor-applications` });
+      if (error) throw error;
+      setMessage("If this administrator account exists, a secure password-reset email has been sent.");
+    } catch { setMessage("Password recovery is temporarily unavailable. Contact the system administrator."); }
+    finally { setBusy(false); }
+  }
+  async function changePassword(event: FormEvent) {
+    event.preventDefault(); if (!client || busy) return;
+    if (newPassword.length < 12) { setMessage("Use a password containing at least 12 characters."); return; }
+    if (newPassword !== confirmPassword) { setMessage("The new passwords do not match."); return; }
+    setBusy(true); setMessage("");
+    try {
+      const { error } = await client.auth.updateUser({ password: newPassword }); if (error) throw error;
+      setNewPassword(""); setConfirmPassword(""); setChangingPassword(false);
+      await client.auth.signOut();
+      setMessage("Password changed successfully. Sign in again with your new password.");
+    } catch { setMessage("Unable to change the password. Request a new recovery email and try again."); }
     finally { setBusy(false); }
   }
   async function review(action: "START_REVIEW" | "REQUEST_INFORMATION" | "REJECT") {
@@ -119,10 +145,11 @@ export function VendorApplicationsAdmin({ supabaseUrl, publishableKey }: { supab
 
   if (!sessionReady) return <main className={styles.page}><p className={styles.loading}>Checking administrator session…</p></main>;
   if (!client) return <main className={styles.page}><section className={styles.signIn}><h1>Administrator access</h1><p>Supabase administrator sign-in is not configured.</p></section></main>;
-  if (!signedIn) return <main className={styles.page}><form className={styles.signIn} onSubmit={signIn}><p className={styles.eyebrow}>SECURE ADMINISTRATION</p><h1>Vendor applications</h1><p>Sign in with your linked EasyMovers administrator account.</p><label>Email<input type="email" autoComplete="email" required value={email} onChange={event => setEmail(event.target.value)} /></label><label>Password<input type="password" autoComplete="current-password" required value={password} onChange={event => setPassword(event.target.value)} /></label><button className={styles.primary} disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>{message && <p className={styles.error} role="alert">{message}</p>}</form></main>;
+  if (!signedIn) return <main className={styles.page}><form className={styles.signIn} onSubmit={signIn}><p className={styles.eyebrow}>SECURE ADMINISTRATION</p><h1>Vendor applications</h1><p>Sign in with your linked EasyMovers administrator account.</p><label>Email<input type="email" autoComplete="email" required value={email} onChange={event => setEmail(event.target.value)} /></label><label>Password<input type="password" autoComplete="current-password" required value={password} onChange={event => setPassword(event.target.value)} /></label><button className={styles.primary} disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button><button type="button" className={styles.textAction} disabled={busy} onClick={() => void forgotPassword()}>Forgot password?</button>{message && <p className={styles.accountMessage} role="status">{message}</p>}</form></main>;
 
   return <main className={styles.page}>
-    <header className={styles.titleRow}><div><p className={styles.eyebrow}>PARTNER OPERATIONS</p><h1>Vendor applications</h1><p>Review company applications before creating inactive vendor profiles.</p></div><button className={styles.linkButton} onClick={() => void client.auth.signOut()}>Sign out</button></header>
+    <header className={styles.titleRow}><div><p className={styles.eyebrow}>PARTNER OPERATIONS</p><h1>Vendor applications</h1><p>Review company applications before creating inactive vendor profiles.</p></div><div className={styles.accountActions}><button className={styles.linkButton} onClick={() => { setChangingPassword(value => !value); setMessage(""); }}>Change password</button><button className={styles.linkButton} onClick={() => void client.auth.signOut()}>Sign out</button></div></header>
+    {changingPassword && <form className={styles.passwordPanel} onSubmit={changePassword}><div><h2>Change administrator password</h2><p>Use at least 12 characters. You will be signed out after the password changes.</p></div><label>New password<input type="password" autoComplete="new-password" minLength={12} required value={newPassword} onChange={event => setNewPassword(event.target.value)} /></label><label>Confirm password<input type="password" autoComplete="new-password" minLength={12} required value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} /></label><div className={styles.actionButtons}><button className={styles.primary} disabled={busy}>{busy ? "Updating…" : "Update password"}</button><button type="button" className={styles.secondary} disabled={busy} onClick={() => { setChangingPassword(false); setNewPassword(""); setConfirmPassword(""); }}>Cancel</button></div></form>}
     <section className={styles.toolbar} aria-label="Application filters">
       <form onSubmit={event => { event.preventDefault(); setAppliedSearch(search.trim()); }}><label><span className={styles.srOnly}>Search applications</span><input maxLength={100} placeholder="Search reference, company, contact…" value={search} onChange={event => setSearch(event.target.value)} /></label><button className={styles.secondary}>Search</button></form>
       <label><span className={styles.srOnly}>Filter by status</span><select value={status} onChange={event => { setStatus(event.target.value as "" | Status); setSelected(null); }}>{statuses.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
