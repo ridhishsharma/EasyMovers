@@ -35,4 +35,9 @@ test("admin login is office-only and supports secure password recovery", () => {
   assert.match(ui, /resetPasswordForEmail/);
   assert.match(ui, /updateUser\(\{ password: newPassword \}\)/);
   assert.match(ui, /newPassword\.length < 12/);
+  assert.match(ui, /Office sign in/);
+  assert.match(ui, /Vendor application administration/);
+  assert.match(ui, /Authorised EasyMovers personnel only/);
+  assert.match(ui, /New_Logo_NBG\.png/);
+  assert.match(ui, /showPassword \? "text" : "password"/);
 });

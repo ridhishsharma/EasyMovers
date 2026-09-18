@@ -1,6 +1,7 @@
 "use client";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import styles from "./vendor-applications-admin.module.css";
 
@@ -40,6 +41,7 @@ export function VendorApplicationsAdmin({ supabaseUrl, publishableKey }: { supab
   const [signedIn, setSignedIn] = useState(false);
   const [sessionReady, setSessionReady] = useState(() => !client);
   const [email, setEmail] = useState(""); const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
   const [newPassword, setNewPassword] = useState(""); const [confirmPassword, setConfirmPassword] = useState("");
   const [applications, setApplications] = useState<ApplicationSummary[]>([]);
@@ -145,7 +147,7 @@ export function VendorApplicationsAdmin({ supabaseUrl, publishableKey }: { supab
 
   if (!sessionReady) return <main className={styles.page}><p className={styles.loading}>Checking administrator session…</p></main>;
   if (!client) return <main className={styles.page}><section className={styles.signIn}><h1>Administrator access</h1><p>Supabase administrator sign-in is not configured.</p></section></main>;
-  if (!signedIn) return <main className={styles.page}><form className={styles.signIn} onSubmit={signIn}><p className={styles.eyebrow}>SECURE ADMINISTRATION</p><h1>Vendor applications</h1><p>Sign in with your linked EasyMovers administrator account.</p><label>Email<input type="email" autoComplete="email" required value={email} onChange={event => setEmail(event.target.value)} /></label><label>Password<input type="password" autoComplete="current-password" required value={password} onChange={event => setPassword(event.target.value)} /></label><button className={styles.primary} disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button><button type="button" className={styles.textAction} disabled={busy} onClick={() => void forgotPassword()}>Forgot password?</button>{message && <p className={styles.accountMessage} role="status">{message}</p>}</form></main>;
+  if (!signedIn) return <main className={styles.loginPage}><form className={styles.signIn} onSubmit={signIn}><div className={styles.loginLogo}><Image src="/image/New_Logo_NBG.png" alt="EasyMovers" width={61} height={56} priority /></div><p className={styles.eyebrow}>EASYMOVERS OPERATIONS</p><h1>Office sign in</h1><p className={styles.moduleName}>Vendor application administration</p><p className={styles.signInHelp}>Use your linked EasyMovers administrator account.</p><label>Email address<input type="email" inputMode="email" autoCapitalize="none" spellCheck={false} autoComplete="email" required value={email} onChange={event => setEmail(event.target.value)} /></label><label>Password<span className={styles.passwordInput}><input type={showPassword ? "text" : "password"} autoComplete="current-password" required value={password} onChange={event => setPassword(event.target.value)} /><button type="button" aria-pressed={showPassword} aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword(value => !value)}>{showPassword ? "Hide" : "Show"}</button></span></label><button className={styles.primary} disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button><button type="button" className={styles.textAction} disabled={busy} onClick={() => void forgotPassword()}>Forgot password?</button>{message && <p className={styles.accountMessage} role="status">{message}</p>}<aside className={styles.accessNotice}><strong>Authorised EasyMovers personnel only.</strong><span>Having trouble signing in? Contact your system administrator.</span></aside></form></main>;
 
   return <main className={styles.page}>
     <header className={styles.titleRow}><div><p className={styles.eyebrow}>PARTNER OPERATIONS</p><h1>Vendor applications</h1><p>Review company applications before creating inactive vendor profiles.</p></div><div className={styles.accountActions}><button className={styles.linkButton} onClick={() => { setChangingPassword(value => !value); setMessage(""); }}>Change password</button><button className={styles.linkButton} onClick={() => void client.auth.signOut()}>Sign out</button></div></header>
