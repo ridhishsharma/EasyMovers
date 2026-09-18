@@ -1,7 +1,7 @@
 "use client";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import styles from "./vendor-applications-admin.module.css";
 
@@ -37,11 +37,10 @@ async function accessToken(client: SupabaseClient) {
 }
 
 export function VendorApplicationsAdmin({ supabaseUrl, publishableKey }: { supabaseUrl: string; publishableKey: string }) {
+  const router = useRouter();
   const client = useMemo(() => supabaseUrl && publishableKey ? createClient(supabaseUrl, publishableKey) : null, [supabaseUrl, publishableKey]);
   const [signedIn, setSignedIn] = useState(false);
   const [sessionReady, setSessionReady] = useState(() => !client);
-  const [email, setEmail] = useState(""); const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
   const [newPassword, setNewPassword] = useState(""); const [confirmPassword, setConfirmPassword] = useState("");
   const [applications, setApplications] = useState<ApplicationSummary[]>([]);
@@ -61,11 +60,15 @@ export function VendorApplicationsAdmin({ supabaseUrl, publishableKey }: { supab
     });
     const result = await response.json().catch(() => null);
     if (!response.ok || !result?.success) {
-      if (response.status === 401 || response.status === 403) setSignedIn(false);
+      if (response.status === 401 || response.status === 403) {
+        setSignedIn(false);
+        await client.auth.signOut();
+        router.replace("/admin/login?returnTo=/admin/vendor-applications");
+      }
       throw new Error(result?.error?.message || "The administrator service is temporarily unavailable.");
     }
     return result.data;
-  }, [client]);
+  }, [client, router]);
 
   const loadApplications = useCallback(async (page = 1) => {
     const currentRequest = ++requestNumber.current; setBusy(true); setMessage("");
@@ -87,33 +90,22 @@ export function VendorApplicationsAdmin({ supabaseUrl, publishableKey }: { supab
 
   useEffect(() => {
     if (!client) return;
-    void client.auth.getSession().then(({ data }) => { setSignedIn(Boolean(data.session)); setSessionReady(true); });
-    const { data } = client.auth.onAuthStateChange((event, session) => { setSignedIn(Boolean(session)); if (event === "PASSWORD_RECOVERY") setChangingPassword(true); if (!session) { setApplications([]); setSelected(null); } });
+    void client.auth.getSession().then(({ data }) => {
+      setSignedIn(Boolean(data.session)); setSessionReady(true);
+      if (!data.session) router.replace("/admin/login?returnTo=/admin/vendor-applications");
+    });
+    const { data } = client.auth.onAuthStateChange((_event, session) => {
+      setSignedIn(Boolean(session));
+      if (!session) { setApplications([]); setSelected(null); router.replace("/admin/login?returnTo=/admin/vendor-applications"); }
+    });
     return () => data.subscription.unsubscribe();
-  }, [client]);
+  }, [client, router]);
   useEffect(() => {
     if (!signedIn) return;
     const task = window.setTimeout(() => void loadApplications(1), 0);
     return () => window.clearTimeout(task);
   }, [signedIn, loadApplications]);
 
-  async function signIn(event: FormEvent) {
-    event.preventDefault(); if (!client || busy) return; setBusy(true); setMessage("");
-    try { const { error } = await client.auth.signInWithPassword({ email: email.trim(), password }); if (error) throw error; setPassword(""); setSignedIn(true); }
-    catch { setMessage("Sign-in failed. Use an active EasyMovers administrator account."); }
-    finally { setBusy(false); }
-  }
-  async function forgotPassword() {
-    if (!client || busy) return;
-    if (!email.trim()) { setMessage("Enter your administrator email address first."); return; }
-    setBusy(true); setMessage("");
-    try {
-      const { error } = await client.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/admin/vendor-applications` });
-      if (error) throw error;
-      setMessage("If this administrator account exists, a secure password-reset email has been sent.");
-    } catch { setMessage("Password recovery is temporarily unavailable. Contact the system administrator."); }
-    finally { setBusy(false); }
-  }
   async function changePassword(event: FormEvent) {
     event.preventDefault(); if (!client || busy) return;
     if (newPassword.length < 12) { setMessage("Use a password containing at least 12 characters."); return; }
@@ -147,7 +139,7 @@ export function VendorApplicationsAdmin({ supabaseUrl, publishableKey }: { supab
 
   if (!sessionReady) return <main className={styles.page}><p className={styles.loading}>Checking administrator session…</p></main>;
   if (!client) return <main className={styles.page}><section className={styles.signIn}><h1>Administrator access</h1><p>Supabase administrator sign-in is not configured.</p></section></main>;
-  if (!signedIn) return <main className={styles.loginPage}><form className={styles.signIn} onSubmit={signIn}><div className={styles.loginLogo}><Image src="/image/New_Logo_NBG.png" alt="EasyMovers" width={61} height={56} priority /></div><p className={styles.eyebrow}>EASYMOVERS OPERATIONS</p><h1>Office sign in</h1><p className={styles.moduleName}>Vendor application administration</p><p className={styles.signInHelp}>Use your linked EasyMovers administrator account.</p><label>Email address<input type="email" inputMode="email" autoCapitalize="none" spellCheck={false} autoComplete="email" required value={email} onChange={event => setEmail(event.target.value)} /></label><label>Password<span className={styles.passwordInput}><input type={showPassword ? "text" : "password"} autoComplete="current-password" required value={password} onChange={event => setPassword(event.target.value)} /><button type="button" aria-pressed={showPassword} aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword(value => !value)}>{showPassword ? "Hide" : "Show"}</button></span></label><button className={styles.primary} disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button><button type="button" className={styles.textAction} disabled={busy} onClick={() => void forgotPassword()}>Forgot password?</button>{message && <p className={styles.accountMessage} role="status">{message}</p>}<aside className={styles.accessNotice}><strong>Authorised EasyMovers personnel only.</strong><span>Having trouble signing in? Contact your system administrator.</span></aside></form></main>;
+  if (!signedIn) return <main className={styles.page}><p className={styles.loading}>Redirecting to office sign in…</p></main>;
 
   return <main className={styles.page}>
     <header className={styles.titleRow}><div><p className={styles.eyebrow}>PARTNER OPERATIONS</p><h1>Vendor applications</h1><p>Review company applications before creating inactive vendor profiles.</p></div><div className={styles.accountActions}><button className={styles.linkButton} onClick={() => { setChangingPassword(value => !value); setMessage(""); }}>Change password</button><button className={styles.linkButton} onClick={() => void client.auth.signOut()}>Sign out</button></div></header>

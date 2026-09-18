@@ -6,6 +6,7 @@ import styles from "./brand-shell.module.css";
 export function AppBrandShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isAdmin = pathname.startsWith("/admin");
+  const isAdminLogin = pathname === "/admin/login";
   return (
     <>
       {pathname !== "/" && (
@@ -14,7 +15,7 @@ export function AppBrandShell({ children }: { children: React.ReactNode }) {
             <Link href={isAdmin ? "/admin/vendor-applications" : "/"} aria-label={isAdmin ? "EasyMovers administration" : "EasyMovers home"}>
               <BrandLogo />
             </Link>
-            {isAdmin ? <span className={styles.adminArea}>Office administration</span> : <nav aria-label="Page navigation">
+            {isAdmin ? isAdminLogin ? <span className={styles.adminArea}>Office administration</span> : <nav className={styles.adminNav} aria-label="Office navigation"><Link href="/admin/vendor-applications">Vendor applications</Link></nav> : <nav aria-label="Page navigation">
               <Link href="/">Home</Link>
               <Link href="/track">Track / resume move</Link>
               <Link href="/partner">Become a partner</Link>
