@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { authorizeAdministrator } from "@/lib/admin-auth";
+import { authorizeCrmPermission, CRM_PERMISSIONS } from "@/lib/crm-authorization";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +16,7 @@ export async function GET(
   request: Request,
   context: { params: Promise<{ applicationId: string }> }
 ) {
-  const administrator = await authorizeAdministrator(request);
+  const administrator = await authorizeCrmPermission(request, CRM_PERMISSIONS.VENDOR_APPLICATION_READ);
 
   if (!administrator.authorized) {
     return reply({

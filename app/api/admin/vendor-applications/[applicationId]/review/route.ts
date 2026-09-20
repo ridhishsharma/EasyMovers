@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { authorizeAdministrator } from "@/lib/admin-auth";
+import { authorizeCrmPermission, CRM_PERMISSIONS } from "@/lib/crm-authorization";
 import {
   reviewVendorApplication,
   VendorApplicationReviewError,
@@ -20,7 +20,7 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ applicationId: string }> }
 ) {
-  const administrator = await authorizeAdministrator(request);
+  const administrator = await authorizeCrmPermission(request, CRM_PERMISSIONS.VENDOR_APPLICATION_REVIEW);
 
   if (!administrator.authorized) {
     return reply({

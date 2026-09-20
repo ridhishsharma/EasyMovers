@@ -536,10 +536,87 @@ model User {
   quotations                 Quotation[]
   vendor                     Vendor?                 @relation(fields: [vendorId], references: [id])
   reviewedVendorApplications VendorApplication[]     @relation("VendorApplicationReviewer")
+  crmRoleAssignments         UserCrmRole[]           @relation("CrmRoleAssignedUser")
+  crmAuditLogs               CrmAuditLog[]           @relation("CrmAuditActor")
 
   @@index([mobile])
   @@index([email])
   @@index([role])
+}
+
+model CrmRole {
+  id          String              @id
+  code        String              @unique
+  name        String
+  description String?
+  isSystem    Boolean             @default(false)
+  isActive    Boolean             @default(true)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  permissions CrmRolePermission[]
+  assignments UserCrmRole[]
+
+  @@index([isActive])
+}
+
+model CrmPermission {
+  id          String              @id
+  code        String              @unique
+  module      String
+  name        String
+  description String?
+  isActive    Boolean             @default(true)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  roles       CrmRolePermission[]
+
+  @@index([module])
+  @@index([isActive])
+}
+
+model CrmRolePermission {
+  roleId       String
+  permissionId String
+  createdAt    DateTime      @default(now())
+  role         CrmRole       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   CrmPermission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+}
+
+model UserCrmRole {
+  id               String    @id
+  userId           String
+  roleId           String
+  assignedByUserId String?
+  assignedAt       DateTime  @default(now())
+  expiresAt        DateTime?
+  revokedAt        DateTime?
+  revokedByUserId  String?
+  user             User      @relation("CrmRoleAssignedUser", fields: [userId], references: [id], onDelete: Cascade)
+  role             CrmRole   @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, roleId])
+  @@index([roleId])
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+}
+
+model CrmAuditLog {
+  id          String   @id @default(cuid())
+  actorUserId String?
+  action      String
+  entityType  String
+  entityId    String?
+  metadata    Json?
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+  actor       User?    @relation("CrmAuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
 }
 
 model Customer {

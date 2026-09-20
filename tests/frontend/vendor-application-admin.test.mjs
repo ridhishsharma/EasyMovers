@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const auth = readFileSync("lib/admin-auth.ts", "utf8");
+const auth = readFileSync("lib/crm-authorization.ts", "utf8");
 const reviewService = readFileSync("lib/vendor-application-review.ts", "utf8");
 const listRoute = readFileSync("app/api/admin/vendor-applications/route.ts", "utf8");
 const detailRoute = readFileSync(
@@ -21,13 +21,17 @@ const schema = readFileSync("prisma/schema.prisma", "utf8");
 
 test("all Vendor application administration routes require verified administrators", () => {
   for (const source of [listRoute, detailRoute, reviewRoute, approvalRoute]) {
-    assert.match(source, /authorizeAdministrator\(request\)/);
+    assert.match(source, /authorizeCrmPermission\(request/);
     assert.match(source, /Cache-Control/);
   }
 
-  assert.match(auth, /"ADMIN", "SUPER_ADMIN"/);
+  assert.match(listRoute, /VENDOR_APPLICATION_READ/);
+  assert.match(detailRoute, /VENDOR_APPLICATION_READ/);
+  assert.match(reviewRoute, /VENDOR_APPLICATION_REVIEW/);
+  assert.match(approvalRoute, /VENDOR_APPLICATION_APPROVE/);
+  assert.match(auth, /legacyRoles\.includes\("SUPER_ADMIN"\)/);
   assert.match(auth, /resolveApplicationAuthentication/);
-  assert.match(auth, /ADMIN_ACCESS_REQUIRED/);
+  assert.match(auth, /CRM_PERMISSION_REQUIRED/);
 });
 
 test("admin list uses bounded pagination, validated status and selected fields", () => {
@@ -77,4 +81,23 @@ test("schema enforces one application to one created Vendor", () => {
   assert.match(schema, /vendorId\s+String\?\s+@unique/);
   assert.match(schema, /VendorApplicationCreatedVendor/);
   assert.match(schema, /VendorApplicationReviewer/);
+});
+
+test("CRM authorization supports multiple roles, expiring assignments and active permissions", () => {
+  const migration = readFileSync(
+    "prisma/migrations/20260920120000_add_crm_roles_permissions/migration.sql",
+    "utf8"
+  );
+  assert.match(schema, /model CrmRole \{/);
+  assert.match(schema, /model CrmPermission \{/);
+  assert.match(schema, /model CrmRolePermission \{/);
+  assert.match(schema, /model UserCrmRole \{/);
+  assert.match(schema, /model CrmAuditLog \{/);
+  assert.match(auth, /revokedAt: null/);
+  assert.match(auth, /expiresAt: \{ gt: new Date\(\) \}/);
+  assert.match(auth, /isActive: true/);
+  assert.match(migration, /crm-role-vendor-reviewer/);
+  assert.match(migration, /crm-role-finance-manager/);
+  assert.match(migration, /WHERE "role" = 'SUPER_ADMIN'/);
+  assert.match(migration, /WHERE "role" = 'ADMIN'/);
 });
