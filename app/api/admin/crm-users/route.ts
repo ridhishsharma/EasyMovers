@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { authorizeCrmPermission, CRM_PERMISSIONS } from "@/lib/crm-authorization";
-import { officeUserWhere } from "@/lib/crm-user-management";
+import { CrmUserManagementError, inviteCrmUser, officeUserWhere } from "@/lib/crm-user-management";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -45,5 +45,24 @@ export async function GET(request: Request) {
     return reply({ success: true, data: { users, roles, currentUserId: access.userId } });
   } catch {
     return reply({ success: false, error: { code: "CRM_USERS_UNAVAILABLE", message: "Office users are temporarily unavailable." } }, 503);
+  }
+}
+
+export async function POST(request: Request) {
+  const access = await authorizeCrmPermission(request, CRM_PERMISSIONS.CRM_USER_MANAGE);
+  if (!access.authorized) return reply({ success: false, error: { code: access.code, message: access.message } }, access.status);
+  const systemAccess = await authorizeCrmPermission(request, CRM_PERMISSIONS.SYSTEM_MANAGE);
+  try {
+    const body = await request.json();
+    const user = await inviteCrmUser({
+      actorUserId: access.userId, actorCanManageSystem: systemAccess.authorized,
+      fullName: body?.fullName, email: body?.email, mobile: body?.mobile, roleCodes: body?.roleCodes,
+      origin: new URL(request.url).origin,
+      ipAddress: request.headers.get("x-forwarded-for")?.split(",")[0]?.trim(),
+    });
+    return reply({ success: true, data: { user } }, 201);
+  } catch (error) {
+    if (error instanceof CrmUserManagementError) return reply({ success: false, error: { code: error.code, message: error.message } }, error.status);
+    return reply({ success: false, error: { code: "CRM_USER_INVITATION_FAILED", message: "Unable to create the office user." } }, 503);
   }
 }

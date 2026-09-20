@@ -35,12 +35,25 @@ test("role changes are transactional, audited and protect administrators", () =>
   assert.match(service, /revokedAt: now/);
 });
 
+test("office invitations use server-only Supabase administration and compensate failed persistence", () => {
+  assert.match(listRoute, /export async function POST/);
+  assert.match(service, /SUPABASE_SERVICE_ROLE_KEY/);
+  assert.match(service, /inviteUserByEmail/);
+  assert.match(service, /SUPABASE_AUTH_MANAGED/);
+  assert.match(service, /CRM_USER_INVITED/);
+  assert.match(service, /deleteUser\(data\.user\.id\)/);
+  assert.match(service, /Only a Super Administrator can create another Super Administrator/);
+});
+
 test("CRM user interface uses central authentication and role controls", () => {
   assert.match(page, /SUPABASE_URL/);
   assert.match(page, /SUPABASE_PUBLISHABLE_KEY/);
   assert.match(ui, /Authorization: `Bearer \$\{await token\(client\)\}`/);
   assert.match(ui, /\/api\/admin\/crm-users/);
   assert.match(ui, /method: "PATCH"/);
+  assert.match(ui, /method: "POST"/);
+  assert.match(ui, /Add office user/);
+  assert.match(ui, /Create user & send invitation/);
   assert.match(ui, /You cannot deactivate your own office account/);
   assert.match(shell, /href="\/admin\/users"/);
 });

@@ -45,7 +45,9 @@ export function OfficeLogin({ supabaseUrl, publishableKey }: { supabaseUrl: stri
   useEffect(() => {
     if (!client) return;
     void client.auth.getSession().then(({ data }) => {
-      if (data.session && new URLSearchParams(window.location.search).get("mode") !== "recovery") {
+      const recoveryMode = new URLSearchParams(window.location.search).get("mode") === "recovery";
+      if (data.session && recoveryMode) setRecovery(true);
+      if (data.session && !recoveryMode) {
         void verifyOfficeAccess(data.session.access_token);
       }
     });

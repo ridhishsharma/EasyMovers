@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { createClient } from "@supabase/supabase-js";
 import { prisma } from "@/lib/prisma";
 
 export class CrmUserManagementError extends Error {
@@ -29,6 +30,93 @@ export function officeUserWhere(search = ""): Prisma.UserWhereInput {
         }
       : {}),
   };
+}
+
+function normalizeOfficeUserInput(input: {
+  fullName: unknown; email: unknown; mobile: unknown; roleCodes: unknown;
+}) {
+  const fullName = typeof input.fullName === "string" ? input.fullName.trim().replace(/\s+/g, " ") : "";
+  const email = typeof input.email === "string" ? input.email.trim().toLowerCase() : "";
+  const mobile = typeof input.mobile === "string" ? input.mobile.replace(/\D/g, "") : "";
+  const roleCodes = Array.isArray(input.roleCodes)
+    ? [...new Set(input.roleCodes.map(value => typeof value === "string" ? value.trim().toUpperCase() : ""))]
+    : [];
+
+  if (fullName.length < 2 || fullName.length > 100 || !/^[\p{L}][\p{L}\p{M} .'-]*$/u.test(fullName)) {
+    throw new CrmUserManagementError("INVALID_FULL_NAME", "Enter a valid employee name using letters.", 400);
+  }
+  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new CrmUserManagementError("INVALID_EMAIL", "Enter a valid official email address.", 400);
+  }
+  if (!/^[6-9]\d{9}$/.test(mobile)) {
+    throw new CrmUserManagementError("INVALID_MOBILE", "Enter a valid 10-digit Indian mobile number.", 400);
+  }
+  if (!roleCodes.length || roleCodes.length > 10 || roleCodes.some(code => !/^[A-Z][A-Z0-9_]{1,49}$/.test(code))) {
+    throw new CrmUserManagementError("INVALID_CRM_ROLES", "Select at least one valid CRM role.", 400);
+  }
+  return { fullName, email, mobile, roleCodes };
+}
+
+export async function inviteCrmUser(input: {
+  actorUserId: string; actorCanManageSystem: boolean; fullName: unknown; email: unknown;
+  mobile: unknown; roleCodes: unknown; origin: string; ipAddress?: string;
+}) {
+  const normalized = normalizeOfficeUserInput(input);
+  if (normalized.roleCodes.includes("SUPER_ADMIN") && !input.actorCanManageSystem) {
+    throw new CrmUserManagementError("SYSTEM_PERMISSION_REQUIRED", "Only a Super Administrator can create another Super Administrator.", 403);
+  }
+
+  const supabaseUrl = process.env.SUPABASE_URL?.trim();
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new CrmUserManagementError("OFFICE_INVITATION_NOT_CONFIGURED", "Secure office invitations are not configured.", 503);
+  }
+
+  const [duplicate, roles] = await Promise.all([
+    prisma.user.findFirst({ where: { OR: [{ email: normalized.email }, { mobile: normalized.mobile }] }, select: { id: true } }),
+    prisma.crmRole.findMany({ where: { code: { in: normalized.roleCodes }, isActive: true }, select: { id: true, code: true } }),
+  ]);
+  if (duplicate) throw new CrmUserManagementError("CRM_USER_ALREADY_EXISTS", "An account already uses this email address or mobile number.", 409);
+  if (roles.length !== normalized.roleCodes.length) throw new CrmUserManagementError("INVALID_CRM_ROLES", "One or more CRM roles are unavailable.", 400);
+
+  const admin = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  const redirectTo = `${input.origin}/admin/login?mode=recovery&returnTo=%2Fadmin`;
+  const { data, error } = await admin.auth.admin.inviteUserByEmail(normalized.email, {
+    redirectTo,
+    data: { full_name: normalized.fullName, easymovers_office_invitation: true },
+  });
+  if (error || !data.user) {
+    throw new CrmUserManagementError("OFFICE_INVITATION_FAILED", "The secure invitation could not be sent. Confirm that the email is not already registered.", 502);
+  }
+
+  try {
+    return await prisma.$transaction(async transaction => {
+      const user = await transaction.user.create({
+        data: {
+          supabaseAuthId: data.user.id, email: normalized.email, mobile: normalized.mobile,
+          passwordHash: "SUPABASE_AUTH_MANAGED", fullName: normalized.fullName, role: "ADMIN",
+          isActive: true, emailVerified: false, mobileVerified: false,
+        },
+        select: { id: true, fullName: true, email: true, mobile: true, isActive: true },
+      });
+      await transaction.userCrmRole.createMany({
+        data: roles.map(role => ({ id: crypto.randomUUID(), userId: user.id, roleId: role.id, assignedByUserId: input.actorUserId })),
+      });
+      await transaction.crmAuditLog.create({
+        data: {
+          actorUserId: input.actorUserId, action: "CRM_USER_INVITED", entityType: "User", entityId: user.id,
+          ipAddress: input.ipAddress, metadata: { email: normalized.email, roleCodes: normalized.roleCodes },
+        },
+      });
+      return { ...user, roleCodes: normalized.roleCodes, invitationSent: true };
+    });
+  } catch (error) {
+    await admin.auth.admin.deleteUser(data.user.id).catch(() => undefined);
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      throw new CrmUserManagementError("CRM_USER_ALREADY_EXISTS", "An account already uses this email address or mobile number.", 409);
+    }
+    throw error;
+  }
 }
 
 export async function updateCrmUser(input: {
