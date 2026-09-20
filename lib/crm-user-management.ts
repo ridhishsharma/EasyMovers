@@ -97,7 +97,7 @@ export async function inviteCrmUser(input: {
         data: {
           supabaseAuthId: data.user.id, email: normalized.email, mobile: normalized.mobile,
           passwordHash: "SUPABASE_AUTH_MANAGED", fullName: normalized.fullName, role: "ADMIN",
-          isActive: true, emailVerified: false, mobileVerified: false,
+          isActive: true, emailVerified: false, mobileVerified: false, officeInvitedAt: new Date(),
         },
         select: { id: true, fullName: true, email: true, mobile: true, isActive: true },
       });

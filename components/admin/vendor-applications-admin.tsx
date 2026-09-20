@@ -51,6 +51,19 @@ export function VendorApplicationsAdmin({ supabaseUrl, publishableKey }: { supab
   const [message, setMessage] = useState(""); const [busy, setBusy] = useState(false);
   const requestNumber = useRef(0);
 
+  const signOutOffice = useCallback(async () => {
+    if (!client) return;
+    const { data } = await client.auth.getSession();
+    if (data.session) {
+      await fetch("/api/admin/session-events", {
+        method: "POST", cache: "no-store",
+        headers: { Authorization: `Bearer ${data.session.access_token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ event: "LOGOUT" }),
+      }).catch(() => undefined);
+    }
+    await client.auth.signOut();
+  }, [client]);
+
   const api = useCallback(async (path: string, init?: RequestInit) => {
     if (!client) throw new Error("Administrator sign-in is not configured.");
     const token = await accessToken(client);
@@ -114,7 +127,7 @@ export function VendorApplicationsAdmin({ supabaseUrl, publishableKey }: { supab
     try {
       const { error } = await client.auth.updateUser({ password: newPassword }); if (error) throw error;
       setNewPassword(""); setConfirmPassword(""); setChangingPassword(false);
-      await client.auth.signOut();
+      await signOutOffice();
       setMessage("Password changed successfully. Sign in again with your new password.");
     } catch { setMessage("Unable to change the password. Request a new recovery email and try again."); }
     finally { setBusy(false); }
@@ -142,7 +155,7 @@ export function VendorApplicationsAdmin({ supabaseUrl, publishableKey }: { supab
   if (!signedIn) return <main className={styles.page}><p className={styles.loading}>Redirecting to office sign in…</p></main>;
 
   return <main className={styles.page}>
-    <header className={styles.titleRow}><div><p className={styles.eyebrow}>PARTNER OPERATIONS</p><h1>Vendor applications</h1><p>Review company applications before creating inactive vendor profiles.</p></div><div className={styles.accountActions}><button className={styles.linkButton} onClick={() => { setChangingPassword(value => !value); setMessage(""); }}>Change password</button><button className={styles.linkButton} onClick={() => void client.auth.signOut()}>Sign out</button></div></header>
+    <header className={styles.titleRow}><div><p className={styles.eyebrow}>PARTNER OPERATIONS</p><h1>Vendor applications</h1><p>Review company applications before creating inactive vendor profiles.</p></div><div className={styles.accountActions}><button className={styles.linkButton} onClick={() => { setChangingPassword(value => !value); setMessage(""); }}>Change password</button><button className={styles.linkButton} onClick={() => void signOutOffice()}>Sign out</button></div></header>
     {changingPassword && <form className={styles.passwordPanel} onSubmit={changePassword}><div><h2>Change administrator password</h2><p>Use at least 12 characters. You will be signed out after the password changes.</p></div><label>New password<input type="password" autoComplete="new-password" minLength={12} required value={newPassword} onChange={event => setNewPassword(event.target.value)} /></label><label>Confirm password<input type="password" autoComplete="new-password" minLength={12} required value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} /></label><div className={styles.actionButtons}><button className={styles.primary} disabled={busy}>{busy ? "Updating…" : "Update password"}</button><button type="button" className={styles.secondary} disabled={busy} onClick={() => { setChangingPassword(false); setNewPassword(""); setConfirmPassword(""); }}>Cancel</button></div></form>}
     <section className={styles.toolbar} aria-label="Application filters">
       <form onSubmit={event => { event.preventDefault(); setAppliedSearch(search.trim()); }}><label><span className={styles.srOnly}>Search applications</span><input maxLength={100} placeholder="Search reference, company, contact…" value={search} onChange={event => setSearch(event.target.value)} /></label><button className={styles.secondary}>Search</button></form>

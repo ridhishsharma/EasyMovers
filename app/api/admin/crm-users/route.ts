@@ -30,6 +30,8 @@ export async function GET(request: Request) {
         select: {
           id: true, fullName: true, email: true, mobile: true, role: true, isActive: true,
           emailVerified: true, mobileVerified: true, lastLogin: true, createdAt: true,
+          officeInvitedAt: true, officeInvitationAcceptedAt: true, officePasswordSetAt: true,
+          officeFirstLoginAt: true, officeLastLogoutAt: true,
           crmRoleAssignments: {
             where: { revokedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] },
             select: { assignedAt: true, expiresAt: true, role: { select: { code: true, name: true } } },

@@ -27,12 +27,20 @@ export function OfficeLogin({ supabaseUrl, publishableKey }: { supabaseUrl: stri
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
 
+  const recordSessionEvent = useCallback(async (accessToken: string, event: "INVITATION_ACCEPTED" | "PASSWORD_SET" | "LOGIN" | "LOGOUT") => {
+    await fetch("/api/admin/session-events", {
+      method: "POST", cache: "no-store",
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ event }),
+    });
+  }, []);
+
   const verifyOfficeAccess = useCallback(async (accessToken: string) => {
     const response = await fetch("/api/admin/vendor-applications?page=1&pageSize=1", {
       cache: "no-store",
       headers: { Authorization: `Bearer ${accessToken}` },
     });
-    if (response.ok) { router.replace(safeDestination()); return true; }
+    if (response.ok) { await recordSessionEvent(accessToken, "LOGIN"); router.replace(safeDestination()); return true; }
     if (response.status === 401 || response.status === 403) {
       await client?.auth.signOut();
       setMessage("This account is not linked to an active EasyMovers administrator.");
@@ -40,13 +48,13 @@ export function OfficeLogin({ supabaseUrl, publishableKey }: { supabaseUrl: stri
     }
     setMessage("Office access could not be verified. Please try again.");
     return false;
-  }, [client, router]);
+  }, [client, recordSessionEvent, router]);
 
   useEffect(() => {
     if (!client) return;
     void client.auth.getSession().then(({ data }) => {
       const recoveryMode = new URLSearchParams(window.location.search).get("mode") === "recovery";
-      if (data.session && recoveryMode) setRecovery(true);
+      if (data.session && recoveryMode) { setRecovery(true); void recordSessionEvent(data.session.access_token, "INVITATION_ACCEPTED"); }
       if (data.session && !recoveryMode) {
         void verifyOfficeAccess(data.session.access_token);
       }
@@ -55,7 +63,7 @@ export function OfficeLogin({ supabaseUrl, publishableKey }: { supabaseUrl: stri
       if (event === "PASSWORD_RECOVERY") setRecovery(true);
     });
     return () => data.subscription.unsubscribe();
-  }, [client, verifyOfficeAccess]);
+  }, [client, recordSessionEvent, verifyOfficeAccess]);
 
   async function signIn(event: FormEvent) {
     event.preventDefault();
@@ -96,6 +104,11 @@ export function OfficeLogin({ supabaseUrl, publishableKey }: { supabaseUrl: stri
     try {
       const { error } = await client.auth.updateUser({ password: newPassword });
       if (error) throw error;
+      const { data } = await client.auth.getSession();
+      if (data.session) {
+        await recordSessionEvent(data.session.access_token, "PASSWORD_SET");
+        await recordSessionEvent(data.session.access_token, "LOGOUT");
+      }
       await client.auth.signOut();
       setRecovery(false); setNewPassword(""); setConfirmPassword("");
       setMessage("Password changed successfully. Sign in with your new password.");
