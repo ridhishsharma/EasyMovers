@@ -1,0 +1,94 @@
+"use client";
+
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import styles from "./crm-users-admin.module.css";
+
+type Role = { code: string; name: string; description: string | null; isSystem: boolean };
+type User = {
+  id: string; fullName: string; email: string | null; mobile: string; role: string; isActive: boolean;
+  emailVerified: boolean; mobileVerified: boolean; lastLogin: string | null; createdAt: string;
+  crmRoleAssignments: Array<{ assignedAt: string; expiresAt: string | null; role: { code: string; name: string } }>;
+};
+
+async function token(client: SupabaseClient) {
+  const { data } = await client.auth.getSession();
+  if (!data.session) throw new Error("Your session has expired. Sign in again.");
+  return data.session.access_token;
+}
+
+export function CrmUsersAdmin({ supabaseUrl, publishableKey }: { supabaseUrl: string; publishableKey: string }) {
+  const router = useRouter();
+  const client = useMemo(() => supabaseUrl && publishableKey ? createClient(supabaseUrl, publishableKey) : null, [supabaseUrl, publishableKey]);
+  const [ready, setReady] = useState(() => !client); const [signedIn, setSignedIn] = useState(false);
+  const [users, setUsers] = useState<User[]>([]); const [roles, setRoles] = useState<Role[]>([]);
+  const [currentUserId, setCurrentUserId] = useState(""); const [selected, setSelected] = useState<User | null>(null);
+  const [roleCodes, setRoleCodes] = useState<string[]>([]); const [active, setActive] = useState(true);
+  const [search, setSearch] = useState(""); const [appliedSearch, setAppliedSearch] = useState("");
+  const [busy, setBusy] = useState(false); const [message, setMessage] = useState("");
+
+  const api = useCallback(async (path: string, init?: RequestInit) => {
+    if (!client) throw new Error("Office sign-in is not configured.");
+    const response = await fetch(path, { ...init, cache: "no-store", headers: { Authorization: `Bearer ${await token(client)}`, ...(init?.body ? { "Content-Type": "application/json" } : {}), ...init?.headers } });
+    const result = await response.json().catch(() => null);
+    if (!response.ok || !result?.success) {
+      if (response.status === 401) { await client.auth.signOut(); router.replace("/admin/login?returnTo=/admin/users"); }
+      throw new Error(result?.error?.message || "The office user service is unavailable.");
+    }
+    return result.data;
+  }, [client, router]);
+
+  const load = useCallback(async () => {
+    setBusy(true); setMessage("");
+    try {
+      const query = new URLSearchParams(); if (appliedSearch) query.set("search", appliedSearch);
+      const data = await api(`/api/admin/crm-users?${query}`);
+      setUsers(data.users); setRoles(data.roles); setCurrentUserId(data.currentUserId);
+      if (selected) {
+        const refreshed = data.users.find((user: User) => user.id === selected.id) ?? null;
+        setSelected(refreshed);
+        if (refreshed) { setActive(refreshed.isActive); setRoleCodes(refreshed.crmRoleAssignments.map((item: User["crmRoleAssignments"][number]) => item.role.code)); }
+      }
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Unable to load office users."); }
+    finally { setBusy(false); }
+  }, [api, appliedSearch, selected]);
+
+  useEffect(() => {
+    if (!client) return;
+    void client.auth.getSession().then(({ data }) => { setSignedIn(Boolean(data.session)); setReady(true); if (!data.session) router.replace("/admin/login?returnTo=/admin/users"); });
+    const { data } = client.auth.onAuthStateChange((_event, session) => { setSignedIn(Boolean(session)); if (!session) router.replace("/admin/login?returnTo=/admin/users"); });
+    return () => data.subscription.unsubscribe();
+  }, [client, router]);
+  useEffect(() => { if (signedIn) void load(); }, [signedIn, appliedSearch]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function choose(user: User) {
+    setSelected(user); setActive(user.isActive); setRoleCodes(user.crmRoleAssignments.map(item => item.role.code)); setMessage("");
+  }
+  function toggleRole(code: string) { setRoleCodes(values => values.includes(code) ? values.filter(value => value !== code) : [...values, code]); }
+
+  async function save(event: FormEvent) {
+    event.preventDefault(); if (!selected || busy) return;
+    if (!roleCodes.length) { setMessage("Select at least one CRM role."); return; }
+    if (!active && selected.id === currentUserId) { setMessage("You cannot deactivate your own office account."); return; }
+    setBusy(true); setMessage("");
+    try {
+      await api(`/api/admin/crm-users/${encodeURIComponent(selected.id)}`, { method: "PATCH", body: JSON.stringify({ isActive: active, roleCodes }) });
+      await load(); setMessage(`Access updated for ${selected.fullName}.`);
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Unable to update office access."); setBusy(false); }
+  }
+
+  if (!ready) return <main className={styles.page}><p>Checking office session…</p></main>;
+  if (!client) return <main className={styles.page}><p>Office authentication is not configured.</p></main>;
+  if (!signedIn) return <main className={styles.page}><p>Redirecting to office sign in…</p></main>;
+
+  return <main className={styles.page}>
+    <header className={styles.heading}><div><p>SECURITY &amp; ACCESS</p><h1>Office users</h1><span>Assign CRM responsibilities without giving every employee unrestricted access.</span></div></header>
+    <section className={styles.toolbar}><form onSubmit={event => { event.preventDefault(); setAppliedSearch(search.trim()); }}><label><span className={styles.srOnly}>Search office users</span><input value={search} maxLength={100} placeholder="Search name, email or mobile…" onChange={event => setSearch(event.target.value)} /></label><button>Search</button></form><button className={styles.linkButton} disabled={busy} onClick={() => void load()}>Refresh</button></section>
+    {message && <p className={message.includes("updated") ? styles.success : styles.error} role="status">{message}</p>}
+    <div className={styles.workspace}>
+      <section className={styles.list} aria-label="Office users"><div className={styles.listTitle}><strong>{users.length} office user{users.length === 1 ? "" : "s"}</strong><span>Maximum 100 results</span></div>{users.map(user => <button key={user.id} className={selected?.id === user.id ? styles.selectedUser : styles.user} onClick={() => choose(user)}><span><strong>{user.fullName}</strong><small>{user.isActive ? "Active" : "Inactive"}</small></span><span>{user.email || user.mobile}</span><span>{user.crmRoleAssignments.map(item => item.role.name).join(", ") || "No active CRM role"}</span></button>)}</section>
+      <section className={styles.detail} aria-label="Office user access">{!selected ? <div className={styles.empty}><h2>Select an office user</h2><p>Review account status and assigned CRM roles.</p></div> : <form onSubmit={save}><div className={styles.person}><div><h2>{selected.fullName}</h2><p>{selected.email || "No email"} · {selected.mobile}</p></div><span className={selected.isActive ? styles.activeBadge : styles.inactiveBadge}>{selected.isActive ? "Active" : "Inactive"}</span></div><dl><dt>Legacy account role</dt><dd>{selected.role.replaceAll("_", " ")}</dd><dt>Email verified</dt><dd>{selected.emailVerified ? "Yes" : "No"}</dd><dt>Mobile verified</dt><dd>{selected.mobileVerified ? "Yes" : "No"}</dd><dt>Last login</dt><dd>{selected.lastLogin ? new Date(selected.lastLogin).toLocaleString("en-IN") : "Not recorded"}</dd></dl><fieldset><legend>CRM roles</legend><p>Permissions are inherited from the selected roles.</p>{roles.map(role => <label key={role.code}><input type="checkbox" checked={roleCodes.includes(role.code)} onChange={() => toggleRole(role.code)} /><span><strong>{role.name}</strong><small>{role.description}</small></span></label>)}</fieldset><label className={styles.statusControl}><input type="checkbox" checked={active} disabled={selected.id === currentUserId} onChange={event => setActive(event.target.checked)} /><span><strong>Office access active</strong><small>{selected.id === currentUserId ? "You cannot deactivate your own account." : "Turn off to block CRM access immediately."}</small></span></label><button className={styles.primary} disabled={busy || !roleCodes.length}>{busy ? "Saving…" : "Save access"}</button></form>}</section>
+    </div>
+  </main>;
+}
