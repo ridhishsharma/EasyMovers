@@ -7,6 +7,7 @@ const updateRoute = readFileSync("app/api/admin/crm-users/[userId]/route.ts", "u
 const service = readFileSync("lib/crm-user-management.ts", "utf8");
 const page = readFileSync("app/admin/users/page.tsx", "utf8");
 const ui = readFileSync("components/admin/crm-users-admin.tsx", "utf8");
+const uiStyles = readFileSync("components/admin/crm-users-admin.module.css", "utf8");
 const shell = readFileSync("components/brand/app-brand-shell.tsx", "utf8");
 
 test("CRM user APIs enforce separate read and manage permissions", () => {
@@ -37,6 +38,7 @@ test("role changes are transactional, audited and protect administrators", () =>
 
 test("office invitations use server-only Supabase administration and compensate failed persistence", () => {
   assert.match(listRoute, /export async function POST/);
+  assert.match(service, /SUPABASE_SECRET_KEY/);
   assert.match(service, /SUPABASE_SERVICE_ROLE_KEY/);
   assert.match(service, /inviteUserByEmail/);
   assert.match(service, /SUPABASE_AUTH_MANAGED/);
@@ -53,7 +55,15 @@ test("CRM user interface uses central authentication and role controls", () => {
   assert.match(ui, /method: "PATCH"/);
   assert.match(ui, /method: "POST"/);
   assert.match(ui, /Add office user/);
+  assert.match(ui, /Welcome, \{firstName\}/);
+  assert.match(ui, /OFFICE ACCESS MANAGEMENT/);
   assert.match(ui, /Create user & send invitation/);
+  assert.match(ui, /administratorBadge/);
+  assert.match(ui, /operationalBadge/);
+  assert.match(uiStyles, /grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+  assert.match(uiStyles, /\.administratorRole\{/);
+  assert.match(uiStyles, /\.operationalRole\{/);
+  assert.match(uiStyles, /\.actionFooter\{/);
   assert.match(ui, /You cannot deactivate your own office account/);
   assert.match(shell, /href="\/admin\/users"/);
 });

@@ -67,8 +67,10 @@ export async function inviteCrmUser(input: {
   }
 
   const supabaseUrl = process.env.SUPABASE_URL?.trim();
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  if (!supabaseUrl || !serviceRoleKey) {
+  const secretKey = (
+    process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY
+  )?.trim();
+  if (!supabaseUrl || !secretKey) {
     throw new CrmUserManagementError("OFFICE_INVITATION_NOT_CONFIGURED", "Secure office invitations are not configured.", 503);
   }
 
@@ -79,7 +81,7 @@ export async function inviteCrmUser(input: {
   if (duplicate) throw new CrmUserManagementError("CRM_USER_ALREADY_EXISTS", "An account already uses this email address or mobile number.", 409);
   if (roles.length !== normalized.roleCodes.length) throw new CrmUserManagementError("INVALID_CRM_ROLES", "One or more CRM roles are unavailable.", 400);
 
-  const admin = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  const admin = createClient(supabaseUrl, secretKey, { auth: { persistSession: false, autoRefreshToken: false } });
   const redirectTo = `${input.origin}/admin/login?mode=recovery&returnTo=%2Fadmin`;
   const { data, error } = await admin.auth.admin.inviteUserByEmail(normalized.email, {
     redirectTo,
