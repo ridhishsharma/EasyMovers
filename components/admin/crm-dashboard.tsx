@@ -62,19 +62,20 @@ export function CrmDashboard({ supabaseUrl, publishableKey }: { supabaseUrl: str
 
     <section className={styles.cards} aria-label="CRM summary">
       {data.vendorApplications && <>
-        <article className={styles.attention}><span>Applications requiring action</span><strong>{openApplications}</strong><small>{data.vendorApplications.staleCount} waiting more than 3 days</small></article>
-        <article className={data.vendorApplications.oldestOpenAgeDays >= 3 ? styles.ageing : styles.information}><span>Oldest open application</span><strong>{data.vendorApplications.oldestOpenAgeDays} days</strong><small>{data.vendorApplications.oldestOpenAgeDays >= 3 ? "Attention required" : "Within review target"}</small></article>
-        <article className={styles.success}><span>Approved applications</span><strong>{data.vendorApplications.counts.APPROVED ?? 0}</strong><small>Converted to vendor profiles</small></article>
+        <Link className={styles.cardLink} href="/admin/vendor-applications"><article className={styles.attention}><span>Applications requiring action</span><strong>{openApplications}</strong><small>{data.vendorApplications.staleCount} waiting more than 3 days · View →</small></article></Link>
+        <Link className={styles.cardLink} href="/admin/vendor-applications"><article className={data.vendorApplications.oldestOpenAgeDays >= 3 ? styles.ageing : styles.information}><span>Oldest open application</span><strong>{data.vendorApplications.oldestOpenAgeDays} days</strong><small>{data.vendorApplications.oldestOpenAgeDays >= 3 ? "Attention required · View →" : "Within review target · View →"}</small></article></Link>
+        <Link className={styles.cardLink} href="/admin/vendor-applications"><article className={styles.success}><span>Approved applications</span><strong>{data.vendorApplications.counts.APPROVED ?? 0}</strong><small>Converted to vendor profiles · View →</small></article></Link>
       </>}
       {data.vendors && <>
-        <article className={styles.active}><span>Active vendors</span><strong>{data.vendors.counts.ACTIVE ?? 0}</strong><small>{data.vendors.counts.PENDING ?? 0} pending verification</small></article>
-        <article className={styles.inactive}><span>Inactive vendors</span><strong>{data.vendors.counts.INACTIVE ?? 0}</strong><small>Require activation review</small></article>
+        <Link className={styles.cardLink} href="/admin/vendors?status=ACTIVE"><article className={styles.active}><span>Active vendors</span><strong>{data.vendors.counts.ACTIVE ?? 0}</strong><small>Operational network · View →</small></article></Link>
+        <Link className={styles.cardLink} href="/admin/vendors?status=INACTIVE"><article className={styles.inactive}><span>Inactive vendors</span><strong>{data.vendors.counts.INACTIVE ?? 0}</strong><small>Require activation review · View →</small></article></Link>
+        <Link className={styles.cardLink} href="/admin/vendors?status=PENDING"><article className={styles.verification}><span>Pending verification</span><strong>{data.vendors.counts.PENDING ?? 0}</strong><small>Vendor profiles awaiting checks · View →</small></article></Link>
         <article className={styles.cities}><span>Active service cities</span><strong>{data.vendors.activeCities}</strong><small>Enabled origin cities</small></article>
       </>}
-      {data.officeUsers && <article className={styles.invitations}><span>Pending staff invitations</span><strong>{data.officeUsers.pendingInvitations}</strong><small>Passwords not configured</small></article>}
+      {data.officeUsers && <Link className={styles.cardLink} href="/admin/users"><article className={styles.invitations}><span>Pending staff invitations</span><strong>{data.officeUsers.pendingInvitations}</strong><small>Passwords not configured · View →</small></article></Link>}
       {data.leads && <>
-        <article className={styles.sales}><span>Open sales pipeline</span><strong>{pipelineLeads}</strong><small>Active prospects</small></article>
-        <article className={styles.leads}><span>New leads today</span><strong>{data.leads.newToday}</strong><small>Received since midnight</small></article>
+        <Link className={styles.cardLink} href="/admin/leads?status=OPEN"><article className={styles.sales}><span>Open sales pipeline</span><strong>{pipelineLeads}</strong><small>Active prospects · View →</small></article></Link>
+        <Link className={styles.cardLink} href="/admin/leads?period=today"><article className={styles.leads}><span>New leads today</span><strong>{data.leads.newToday}</strong><small>Received since midnight · View →</small></article></Link>
       </>}
     </section>
 
@@ -83,7 +84,8 @@ export function CrmDashboard({ supabaseUrl, publishableKey }: { supabaseUrl: str
       <div className={styles.actions}>
         {data.vendorApplications && <Link href="/admin/vendor-applications"><strong>Review vendor applications</strong><span>{openApplications} currently require attention →</span></Link>}
         {data.officeUsers && <Link href="/admin/users"><strong>Manage office access</strong><span>{data.officeUsers.pendingInvitations} invitations awaiting password setup →</span></Link>}
-        {data.leads && <div className={styles.coming}><strong>Sales pipeline</strong><span>Role access is ready; workflow screen is the next commercial module.</span></div>}
+        {data.vendors && <Link href="/admin/vendors"><strong>Open vendor directory</strong><span>Review verification and operational capacity →</span></Link>}
+        {data.leads && <Link href="/admin/leads?status=OPEN"><strong>Manage sales pipeline</strong><span>{pipelineLeads} open leads require follow-up →</span></Link>}
       </div>
     </section>
   </main>;
