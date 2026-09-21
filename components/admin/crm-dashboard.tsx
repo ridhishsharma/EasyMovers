@@ -53,7 +53,7 @@ export function CrmDashboard({ supabaseUrl, publishableKey }: { supabaseUrl: str
   return <main className={styles.page}>
     <header className={styles.heading}>
       <div><p className={styles.eyebrow}>EASYMOVERS CRM</p><h1>Welcome, {firstName}</h1><p>Your priorities and operational position for today.</p></div>
-      <button className={styles.refresh} onClick={() => void load()}>Refresh dashboard</button>
+      <div className={styles.refreshGroup}><span>Updated {new Date(data.generatedAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}</span><button className={styles.refresh} onClick={() => void load()}>Refresh dashboard</button></div>
     </header>
     <section className={styles.identity} aria-label="Current office access">
       <span>Signed in as <strong>{data.user.email || data.user.fullName}</strong></span>
@@ -62,19 +62,19 @@ export function CrmDashboard({ supabaseUrl, publishableKey }: { supabaseUrl: str
 
     <section className={styles.cards} aria-label="CRM summary">
       {data.vendorApplications && <>
-        <article className={styles.priority}><span>Applications requiring action</span><strong>{openApplications}</strong><small>{data.vendorApplications.staleCount} waiting more than 3 days</small></article>
-        <article><span>Oldest open application</span><strong>{data.vendorApplications.oldestOpenAgeDays} days</strong><small>Age from original submission</small></article>
-        <article><span>Approved applications</span><strong>{data.vendorApplications.counts.APPROVED ?? 0}</strong><small>Converted to vendor profiles</small></article>
+        <article className={styles.attention}><span>Applications requiring action</span><strong>{openApplications}</strong><small>{data.vendorApplications.staleCount} waiting more than 3 days</small></article>
+        <article className={data.vendorApplications.oldestOpenAgeDays >= 3 ? styles.ageing : styles.information}><span>Oldest open application</span><strong>{data.vendorApplications.oldestOpenAgeDays} days</strong><small>{data.vendorApplications.oldestOpenAgeDays >= 3 ? "Attention required" : "Within review target"}</small></article>
+        <article className={styles.success}><span>Approved applications</span><strong>{data.vendorApplications.counts.APPROVED ?? 0}</strong><small>Converted to vendor profiles</small></article>
       </>}
       {data.vendors && <>
-        <article><span>Active vendors</span><strong>{data.vendors.counts.ACTIVE ?? 0}</strong><small>{data.vendors.counts.PENDING ?? 0} pending verification</small></article>
-        <article><span>Inactive vendors</span><strong>{data.vendors.counts.INACTIVE ?? 0}</strong><small>Require activation review</small></article>
-        <article><span>Active service cities</span><strong>{data.vendors.activeCities}</strong><small>Distinct enabled origin cities</small></article>
+        <article className={styles.active}><span>Active vendors</span><strong>{data.vendors.counts.ACTIVE ?? 0}</strong><small>{data.vendors.counts.PENDING ?? 0} pending verification</small></article>
+        <article className={styles.inactive}><span>Inactive vendors</span><strong>{data.vendors.counts.INACTIVE ?? 0}</strong><small>Require activation review</small></article>
+        <article className={styles.cities}><span>Active service cities</span><strong>{data.vendors.activeCities}</strong><small>Enabled origin cities</small></article>
       </>}
-      {data.officeUsers && <article><span>Pending staff invitations</span><strong>{data.officeUsers.pendingInvitations}</strong><small>Passwords not configured</small></article>}
+      {data.officeUsers && <article className={styles.invitations}><span>Pending staff invitations</span><strong>{data.officeUsers.pendingInvitations}</strong><small>Passwords not configured</small></article>}
       {data.leads && <>
-        <article><span>Open sales pipeline</span><strong>{pipelineLeads}</strong><small>New, contacted and qualified leads</small></article>
-        <article><span>New leads today</span><strong>{data.leads.newToday}</strong><small>Received since midnight</small></article>
+        <article className={styles.sales}><span>Open sales pipeline</span><strong>{pipelineLeads}</strong><small>Active prospects</small></article>
+        <article className={styles.leads}><span>New leads today</span><strong>{data.leads.newToday}</strong><small>Received since midnight</small></article>
       </>}
     </section>
 
@@ -86,6 +86,5 @@ export function CrmDashboard({ supabaseUrl, publishableKey }: { supabaseUrl: str
         {data.leads && <div className={styles.coming}><strong>Sales pipeline</strong><span>Role access is ready; workflow screen is the next commercial module.</span></div>}
       </div>
     </section>
-    <p className={styles.updated}>Updated {new Date(data.generatedAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}</p>
   </main>;
 }
