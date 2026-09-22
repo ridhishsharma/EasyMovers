@@ -17,7 +17,15 @@ export async function GET(request: Request, context: { params: Promise<{ locatio
   if (!access.authorized) return reply({ success: false, error: { code: access.code, message: access.message } }, access.status);
   try {
     const { locationId } = await context.params;
-    return reply({ success: true, data: await getServiceLocation(locationId) });
+    const [data, manageAccess, activateAccess] = await Promise.all([
+      getServiceLocation(locationId),
+      authorizeCrmPermission(request, CRM_PERMISSIONS.SERVICE_LOCATION_MANAGE),
+      authorizeCrmPermission(request, CRM_PERMISSIONS.SERVICE_LOCATION_ACTIVATE),
+    ]);
+    return reply({ success: true, data: {
+      ...data,
+      capabilities: { canManage: manageAccess.authorized, canActivate: activateAccess.authorized },
+    } });
   } catch (error) { return failure(error); }
 }
 

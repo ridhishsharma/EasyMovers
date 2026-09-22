@@ -13,6 +13,7 @@ test("CRM dashboard requires dashboard permission and returns no-store data", ()
   assert.match(api, /Cache-Control": "no-store/);
   assert.match(api, /permissionSet\.has\(CRM_PERMISSIONS\.VENDOR_APPLICATION_READ\)/);
   assert.match(api, /permissionSet\.has\(CRM_PERMISSIONS\.LEAD_READ\)/);
+  assert.match(api, /permissionSet\.has\(CRM_PERMISSIONS\.SERVICE_LOCATION_READ\)/);
 });
 
 test("dashboard reports operational counts and pending-work ageing", () => {
@@ -23,6 +24,8 @@ test("dashboard reports operational counts and pending-work ageing", () => {
   assert.match(ui, /Applications requiring action/);
   assert.match(ui, /Oldest open application/);
   assert.match(ui, /Only modules permitted for your assigned roles are shown/);
+  assert.match(ui, /Active service locations/);
+  assert.match(ui, /Locations ready to launch/);
 });
 
 test("office entry point and navigation use the central CRM dashboard", () => {

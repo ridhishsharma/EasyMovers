@@ -15,6 +15,10 @@ const failure = (error: unknown) => error instanceof ServiceLocationError
 export async function GET(request: Request) {
   const access = await authorizeCrmPermission(request, CRM_PERMISSIONS.SERVICE_LOCATION_READ);
   if (!access.authorized) return reply({ success: false, error: { code: access.code, message: access.message } }, access.status);
+  const [manageAccess, activateAccess] = await Promise.all([
+    authorizeCrmPermission(request, CRM_PERMISSIONS.SERVICE_LOCATION_MANAGE),
+    authorizeCrmPermission(request, CRM_PERMISSIONS.SERVICE_LOCATION_ACTIVATE),
+  ]);
   const params = new URL(request.url).searchParams;
   const search = params.get("search")?.trim() ?? "";
   const statusValue = params.get("status")?.trim().toUpperCase() ?? "";
@@ -46,7 +50,11 @@ export async function GET(request: Request) {
       }),
       prisma.serviceLocation.count({ where }),
     ]);
-    return reply({ success: true, data: { locations, pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) } } });
+    return reply({ success: true, data: {
+      locations,
+      capabilities: { canManage: manageAccess.authorized, canActivate: activateAccess.authorized },
+      pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
+    } });
   } catch (error) { return failure(error); }
 }
 

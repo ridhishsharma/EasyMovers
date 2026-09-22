@@ -63,10 +63,11 @@ export async function GET(request: Request) {
     const canSeeVendors = permissionSet.has(CRM_PERMISSIONS.VENDOR_READ);
     const canSeeUsers = permissionSet.has(CRM_PERMISSIONS.CRM_USER_READ);
     const canSeeLeads = permissionSet.has(CRM_PERMISSIONS.LEAD_READ);
+    const canSeeServiceLocations = permissionSet.has(CRM_PERMISSIONS.SERVICE_LOCATION_READ);
     const staleBefore = new Date(Date.now() - 3 * 86_400_000);
     const today = new Date(); today.setHours(0, 0, 0, 0);
 
-    const [applicationGroups, oldestApplication, staleApplications, vendorGroups, cities, pendingInvitations, leadGroups, newLeadsToday] = await Promise.all([
+    const [applicationGroups, oldestApplication, staleApplications, vendorGroups, cities, pendingInvitations, leadGroups, newLeadsToday, serviceLocationGroups] = await Promise.all([
       canSeeApplications ? prisma.vendorApplication.groupBy({ by: ["status"], _count: { _all: true } }) : Promise.resolve([]),
       canSeeApplications ? prisma.vendorApplication.findFirst({
         where: { status: { in: ["PENDING", "UNDER_REVIEW", "NEEDS_INFORMATION"] } },
@@ -83,6 +84,7 @@ export async function GET(request: Request) {
       canSeeUsers ? prisma.user.count({ where: { officeInvitedAt: { not: null }, officePasswordSetAt: null, isActive: true } }) : Promise.resolve(0),
       canSeeLeads ? prisma.lead.groupBy({ by: ["status"], _count: { _all: true } }) : Promise.resolve([]),
       canSeeLeads ? prisma.lead.count({ where: { createdAt: { gte: today } } }) : Promise.resolve(0),
+      canSeeServiceLocations ? prisma.serviceLocation.groupBy({ by: ["status"], _count: { _all: true } }) : Promise.resolve([]),
     ]);
 
     return reply({ success: true, data: {
@@ -97,6 +99,9 @@ export async function GET(request: Request) {
       officeUsers: canSeeUsers ? { pendingInvitations } : null,
       leads: canSeeLeads ? {
         counts: Object.fromEntries(leadGroups.map(item => [item.status, item._count._all])), newToday: newLeadsToday,
+      } : null,
+      serviceLocations: canSeeServiceLocations ? {
+        counts: Object.fromEntries(serviceLocationGroups.map(item => [item.status, item._count._all])),
       } : null,
       generatedAt: new Date().toISOString(),
     } });

@@ -15,6 +15,7 @@ type DashboardData = {
   vendors: { counts: Counts; activeCities: number } | null;
   officeUsers: { pendingInvitations: number } | null;
   leads: { counts: Counts; newToday: number } | null;
+  serviceLocations: { counts: Counts } | null;
   generatedAt: string;
 };
 
@@ -73,6 +74,10 @@ export function CrmDashboard({ supabaseUrl, publishableKey }: { supabaseUrl: str
         <article className={styles.cities}><span>Active service cities</span><strong>{data.vendors.activeCities}</strong><small>Enabled origin cities</small></article>
       </>}
       {data.officeUsers && <Link className={styles.cardLink} href="/admin/users"><article className={styles.invitations}><span>Pending staff invitations</span><strong>{data.officeUsers.pendingInvitations}</strong><small>Passwords not configured · View →</small></article></Link>}
+      {data.serviceLocations && <>
+        <Link className={styles.cardLink} href="/admin/service-locations?status=ACTIVE"><article className={styles.cities}><span>Active service locations</span><strong>{data.serviceLocations.counts.ACTIVE ?? 0}</strong><small>Controlled launch cities · View →</small></article></Link>
+        <Link className={styles.cardLink} href="/admin/service-locations?status=READY"><article className={styles.verification}><span>Locations ready to launch</span><strong>{data.serviceLocations.counts.READY ?? 0}</strong><small>Awaiting authorised activation · View →</small></article></Link>
+      </>}
       {data.leads && <>
         <Link className={styles.cardLink} href="/admin/leads?status=OPEN"><article className={styles.sales}><span>Open sales pipeline</span><strong>{pipelineLeads}</strong><small>Active prospects · View →</small></article></Link>
         <Link className={styles.cardLink} href="/admin/leads?period=today"><article className={styles.leads}><span>New leads today</span><strong>{data.leads.newToday}</strong><small>Received since midnight · View →</small></article></Link>
@@ -86,6 +91,7 @@ export function CrmDashboard({ supabaseUrl, publishableKey }: { supabaseUrl: str
         {data.officeUsers && <Link href="/admin/users"><strong>Manage office access</strong><span>{data.officeUsers.pendingInvitations} invitations awaiting password setup →</span></Link>}
         {data.vendors && <Link href="/admin/vendors"><strong>Open vendor directory</strong><span>Review verification and operational capacity →</span></Link>}
         {data.leads && <Link href="/admin/leads?status=OPEN"><strong>Manage sales pipeline</strong><span>{pipelineLeads} open leads require follow-up →</span></Link>}
+        {data.serviceLocations && <Link href="/admin/service-locations"><strong>Manage service locations</strong><span>Review service readiness and launch capacity →</span></Link>}
       </div>
     </section>
   </main>;
