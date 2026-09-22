@@ -628,8 +628,14 @@ model ServiceLocation {
   id                       String                         @id @default(cuid())
   code                     String                         @unique
   city                     String
+  district                 String?
   state                    String
   countryCode              String                         @default("IN")
+  stateCode                String?
+  verificationPostalCode   String?
+  locationSource           ServiceLocationSource          @default(MANUAL_REVIEW)
+  locationVerifiedAt       DateTime?
+  locationVerifiedByUserId String?
   serviceablePostalCodes   String[]                       @default([])
   status                   ServiceLocationStatus          @default(DRAFT)
   operationsContactName    String?
@@ -693,6 +699,12 @@ enum ServiceLocationStatus {
   READY
   ACTIVE
   SUSPENDED
+}
+
+enum ServiceLocationSource {
+  CATALOG
+  POSTAL_LOOKUP
+  MANUAL_REVIEW
 }
 
 enum LocationServiceStatus {

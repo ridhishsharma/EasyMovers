@@ -7,6 +7,7 @@ import {
   VendorServiceType,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { catalogLocation, verifyPostalLocation } from "@/lib/india-location-catalog";
 
 export class ServiceLocationError extends Error {
   constructor(
@@ -23,8 +24,13 @@ const locationSelect = {
   id: true,
   code: true,
   city: true,
+  district: true,
   state: true,
   countryCode: true,
+  stateCode: true,
+  verificationPostalCode: true,
+  locationSource: true,
+  locationVerifiedAt: true,
   serviceablePostalCodes: true,
   status: true,
   operationsContactName: true,
@@ -140,6 +146,29 @@ function serviceInput(body: Record<string, unknown>) {
   return { scope, serviceType, fulfilmentMode, status, instantPricingAvailable, surveyRequired, minimumVerifiedVendors };
 }
 
+async function verifiedLocationIdentity(body: Record<string, unknown>) {
+  const source = typeof body.locationSource === "string" ? body.locationSource.toUpperCase() : "";
+  if (source === "CATALOG") {
+    const location = catalogLocation(body.city, body.state);
+    if (!location) throw new ServiceLocationError("UNVERIFIED_SERVICE_LOCATION", "Choose a city from the selected state's approved catalogue or verify it using a PIN code.", 400);
+    return { ...location, verificationPostalCode: null, locationSource: "CATALOG" as const };
+  }
+  if (source === "POSTAL_LOOKUP") {
+    const pin = typeof body.verificationPostalCode === "string" ? body.verificationPostalCode.trim() : "";
+    if (!/^[1-9][0-9]{5}$/.test(pin)) throw new ServiceLocationError("INVALID_LOCATION_VERIFICATION_PIN", "Enter a valid six-digit PIN to verify this city.", 400);
+    try {
+      const location = await verifyPostalLocation({ pin, city: body.city, district: body.district, state: body.state });
+      if (!location) throw new ServiceLocationError("POSTAL_LOCATION_MISMATCH", "The selected city, district and state do not match this PIN code.", 400);
+      return { ...location, verificationPostalCode: pin, locationSource: "POSTAL_LOOKUP" as const };
+    } catch (error) {
+      if (error instanceof ServiceLocationError) throw error;
+      if (error instanceof Error && error.message === "POSTAL_CODE_NOT_FOUND") throw new ServiceLocationError("POSTAL_CODE_NOT_FOUND", "No Indian postal location was found for this PIN code.", 404);
+      throw new ServiceLocationError("POSTAL_LOOKUP_UNAVAILABLE", "Postal verification is temporarily unavailable. Try again before creating the location.", 503);
+    }
+  }
+  throw new ServiceLocationError("LOCATION_VERIFICATION_REQUIRED", "Select a catalogue city or verify an unlisted city using its PIN code.", 400);
+}
+
 async function verifiedVendorCount(
   transaction: Prisma.TransactionClient,
   location: { city: string; state: string },
@@ -192,10 +221,13 @@ async function readiness(transaction: Prisma.TransactionClient, locationId: stri
 }
 
 export async function createServiceLocation(body: Record<string, unknown>, actorUserId: string, ipAddress?: string | null) {
-  const city = locationName(body.city, "City");
-  const state = locationName(body.state, "State");
+  const identity = await verifiedLocationIdentity(body);
+  const city = locationName(identity.city, "City");
+  const state = locationName(identity.state, "State");
   const data = {
-    code: code(body.code, city, state), city, state, countryCode: "IN",
+    code: code(body.code, city, state), city, district: identity.district, state, countryCode: "IN", stateCode: identity.stateCode,
+    verificationPostalCode: identity.verificationPostalCode, locationSource: identity.locationSource,
+    locationVerifiedAt: new Date(), locationVerifiedByUserId: actorUserId,
     serviceablePostalCodes: postalCodes(body.serviceablePostalCodes) ?? [],
     operationsContactName: optionalText(body.operationsContactName, "Operations contact name", 100),
     operationsContactMobile: optionalMobile(body.operationsContactMobile),
@@ -221,6 +253,11 @@ export async function updateServiceLocation(locationId: string, body: Record<str
     const current = await transaction.serviceLocation.findUnique({ where: { id: locationId } });
     if (!current) throw new ServiceLocationError("SERVICE_LOCATION_NOT_FOUND", "Service location was not found.", 404);
     if (current.status === ServiceLocationStatus.ACTIVE) throw new ServiceLocationError("ACTIVE_LOCATION_LOCKED", "Suspend the location before changing its configuration.", 409);
+    if ((body.city !== undefined && String(body.city).trim().toLowerCase() !== current.city.toLowerCase()) ||
+        (body.state !== undefined && String(body.state).trim().toLowerCase() !== current.state.toLowerCase()) ||
+        (body.code !== undefined && String(body.code).trim().toUpperCase() !== current.code)) {
+      throw new ServiceLocationError("LOCATION_IDENTITY_LOCKED", "City, state and location code cannot be changed after verification. Create a separate service location instead.", 409);
+    }
     const city = body.city === undefined ? current.city : locationName(body.city, "City");
     const state = body.state === undefined ? current.state : locationName(body.state, "State");
     const location = await transaction.serviceLocation.update({
@@ -238,6 +275,38 @@ export async function updateServiceLocation(locationId: string, body: Record<str
       select: locationSelect,
     });
     await transaction.crmAuditLog.create({ data: { actorUserId, action: "SERVICE_LOCATION_UPDATED", entityType: "ServiceLocation", entityId: location.id, ipAddress: ipAddress ?? null } });
+    return location;
+  });
+}
+
+export async function verifyExistingServiceLocation(locationId: string, body: Record<string, unknown>, actorUserId: string, ipAddress?: string | null) {
+  const current = await prisma.serviceLocation.findUnique({ where: { id: locationId } });
+  if (!current) throw new ServiceLocationError("SERVICE_LOCATION_NOT_FOUND", "Service location was not found.", 404);
+  if (current.locationSource !== "MANUAL_REVIEW") throw new ServiceLocationError("LOCATION_ALREADY_VERIFIED", "This service location already has canonical geography verification.", 409);
+  const identity = await verifiedLocationIdentity({
+    locationSource: body.locationSource,
+    city: current.city,
+    state: current.state,
+    district: current.district || current.city,
+    verificationPostalCode: body.verificationPostalCode,
+  });
+  if (identity.city.toLowerCase() !== current.city.toLowerCase() || identity.state.toLowerCase() !== current.state.toLowerCase()) {
+    throw new ServiceLocationError("POSTAL_LOCATION_MISMATCH", "The verified PIN does not identify this existing city and state.", 409);
+  }
+  return prisma.$transaction(async transaction => {
+    const location = await transaction.serviceLocation.update({
+      where: { id: current.id, locationSource: "MANUAL_REVIEW" },
+      data: {
+        district: identity.district,
+        stateCode: identity.stateCode,
+        verificationPostalCode: identity.verificationPostalCode,
+        locationSource: identity.locationSource,
+        locationVerifiedAt: new Date(),
+        locationVerifiedByUserId: actorUserId,
+      },
+      select: locationSelect,
+    });
+    await transaction.crmAuditLog.create({ data: { actorUserId, action: "SERVICE_LOCATION_GEOGRAPHY_VERIFIED", entityType: "ServiceLocation", entityId: current.id, ipAddress: ipAddress ?? null, metadata: { locationSource: identity.locationSource, stateCode: identity.stateCode, district: identity.district, verificationPostalCode: identity.verificationPostalCode } } });
     return location;
   });
 }
