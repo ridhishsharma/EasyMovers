@@ -54,3 +54,12 @@ test("activation is serialized audited and requires an explicit ready state", ()
   assert.match(service, /SERVICE_LOCATION_\$\{action\}/);
   assert.match(service, /Suspend the location before changing its service matrix/);
 });
+
+test("standard services are added atomically without overwriting existing configuration", () => {
+  assert.match(matrixRoute, /export async function POST/);
+  assert.match(service, /addStandardLocationServices/);
+  assert.match(service, /skipDuplicates: true/);
+  assert.match(service, /SERVICE_LOCATION_STANDARD_SERVICES_ADDED/);
+  assert.match(service, /fulfilmentMode: ServiceFulfilmentMode\.QUOTATION/);
+  assert.match(service, /status: LocationServiceStatus\.DRAFT/);
+});

@@ -98,6 +98,11 @@
 .reverifyPin button{border:1px solid #1762a7;border-radius:7px;background:#fff;color:#145796;padding:8px 11px;font:inherit;font-weight:750;cursor:pointer}
 .reverifyPin button:disabled{opacity:.45;cursor:not-allowed}
 .emptyServices+.serviceForm{margin-top:10px}
+.standardSetup{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:-4px 0 18px;padding:13px 14px;border:1px solid #a9cfe9;border-left:4px solid #287cb9;border-radius:9px;background:#eef7fd}
+.standardSetup>div{display:grid;gap:4px}
+.standardSetup strong{color:#0c4979}
+.standardSetup span{color:#59758d;font-size:12px}
+.standardSetup button{white-space:nowrap}
 @media(max-width:1050px){.workspace{grid-template-columns:330px minmax(0,1fr)}
 .serviceGrid{grid-template-columns:repeat(2,1fr)}
 }
@@ -113,6 +118,7 @@
 .detailScroll{max-height:none}
 .locationForm{height:auto}
 .manualReview{grid-template-columns:1fr}
+.standardSetup{align-items:stretch;flex-direction:column}
 .reverifyPin input{flex:1;width:auto}
 }
 @media(max-width:560px){.heading{display:block}

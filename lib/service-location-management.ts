@@ -331,6 +331,42 @@ export async function upsertLocationService(locationId: string, body: Record<str
   });
 }
 
+export async function addStandardLocationServices(locationId: string, body: Record<string, unknown>, actorUserId: string, ipAddress?: string | null) {
+  if (!Array.isArray(body.serviceTypes) || body.serviceTypes.length < 1 || body.serviceTypes.length > Object.values(VendorServiceType).length) {
+    throw new ServiceLocationError("INVALID_STANDARD_SERVICES", "Select one or more supported services.", 400);
+  }
+  const serviceTypes = [...new Set(body.serviceTypes.map(item => enumValue(item, Object.values(VendorServiceType), "Service type")))];
+  return prisma.$transaction(async transaction => {
+    await transaction.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${locationId}))`;
+    const location = await transaction.serviceLocation.findUnique({ where: { id: locationId }, select: { id: true, status: true } });
+    if (!location) throw new ServiceLocationError("SERVICE_LOCATION_NOT_FOUND", "Service location was not found.", 404);
+    if (location.status === ServiceLocationStatus.ACTIVE) throw new ServiceLocationError("ACTIVE_LOCATION_LOCKED", "Suspend the location before changing its service matrix.", 409);
+    const existing = await transaction.serviceLocationService.findMany({
+      where: { serviceLocationId: location.id, scope: VendorServiceScope.WITHIN_CITY, serviceType: { in: serviceTypes } },
+      select: { serviceType: true },
+    });
+    const existingTypes = new Set(existing.map(service => service.serviceType));
+    const missingTypes = serviceTypes.filter(serviceType => !existingTypes.has(serviceType));
+    if (missingTypes.length) {
+      await transaction.serviceLocationService.createMany({
+        data: missingTypes.map(serviceType => ({
+          serviceLocationId: location.id,
+          scope: VendorServiceScope.WITHIN_CITY,
+          serviceType,
+          fulfilmentMode: ServiceFulfilmentMode.QUOTATION,
+          status: LocationServiceStatus.DRAFT,
+          instantPricingAvailable: false,
+          surveyRequired: true,
+          minimumVerifiedVendors: 1,
+        })),
+        skipDuplicates: true,
+      });
+      await transaction.crmAuditLog.create({ data: { actorUserId, action: "SERVICE_LOCATION_STANDARD_SERVICES_ADDED", entityType: "ServiceLocation", entityId: location.id, ipAddress: ipAddress ?? null, metadata: { scope: VendorServiceScope.WITHIN_CITY, serviceTypes: missingTypes } } });
+    }
+    return { createdCount: missingTypes.length, skippedCount: serviceTypes.length - missingTypes.length };
+  });
+}
+
 export async function changeServiceLocationStatus(locationId: string, body: Record<string, unknown>, actorUserId: string, ipAddress?: string | null) {
   const action = typeof body.action === "string" ? body.action.toUpperCase() : "";
   const reason = action === "SUSPEND" ? text(body.reason, "Suspension reason", 3, 1000) : optionalText(body.reason, "Status reason", 1000);
