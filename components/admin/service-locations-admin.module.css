@@ -11,19 +11,19 @@
 .danger{background:#fff3f3;border-color:#c94a4a;color:#a52323}
 .toolbar{display:flex;gap:10px;padding:12px 14px;background:#fff;border:1px solid #d6e1ec;border-top:4px solid #efbd3d;border-radius:10px;margin-bottom:14px}
 .toolbar form{display:flex;flex:1;gap:8px}
-.toolbar input,.toolbar select,.locationForm input,.locationForm select,.serviceForm input,.serviceForm select{border:1px solid #bfd1e2;border-radius:8px;background:#fff;color:#0c355c;padding:10px 12px;font:inherit}
+.toolbar input,.toolbar select,.locationForm input,.locationForm select,.serviceForm input,.serviceForm select{box-sizing:border-box;border:1px solid #bfd1e2;border-radius:8px;background:#fff;color:#0c355c;padding:10px 12px;font:inherit}
 .toolbar input{width:100%}
 .toolbar select{min-width:180px}
 .success,.error{box-sizing:border-box;margin-bottom:12px;padding:10px 14px;border-radius:8px}
 .success{background:#e3f5ea;border:1px solid #abd9bd;color:#17663c}
 .error{background:#fde9e9;border:1px solid #f2bcbc;color:#a82929}
-.workspace{display:grid;grid-template-columns:minmax(280px,32%) minmax(0,1fr);gap:16px;height:calc(100vh - 264px);min-height:540px}
+.workspace{display:grid;grid-template-columns:minmax(280px,32%) minmax(0,1fr);align-items:start;gap:16px;min-height:540px}
 .listPanel,.detailPanel{background:#fff;border:1px solid #d6e1ec;border-radius:11px;overflow:hidden;box-shadow:0 8px 26px rgba(20,64,103,.05)}
 .detailPanel{border-top:5px solid #efbd3d}
-.listPanel{display:grid;grid-template-rows:auto 1fr auto}
+.listPanel{display:grid;grid-template-rows:auto minmax(0,1fr) auto;min-height:540px;max-height:calc(100vh - 230px);position:sticky;top:84px}
 .listTitle,.pagination{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid #e2e9f0}
 .listTitle span{color:#698096}
-.locationList,.detailScroll,.locationForm{overflow-y:auto}
+.locationList{overflow-y:auto}
 .locationCard,.selectedLocation{display:block;width:100%;padding:15px 18px;border:0;border-bottom:1px solid #e2e9f0;background:#fff;color:#3d5f7c;text-align:left;font:inherit;cursor:pointer}
 .selectedLocation{background:#eaf4fd;box-shadow:inset 5px 0 #1f70b7}
 .locationCard>span,.selectedLocation>span{display:flex;justify-content:space-between;gap:10px;align-items:center}
@@ -39,7 +39,7 @@
 .empty{padding:35px 18px;color:#6b8094}
 .emptyDetail{display:grid;height:100%;place-content:center;text-align:center;color:#6b8094}
 .emptyDetail h2{margin-bottom:4px;color:#355c7d}
-.detailScroll{height:100%;padding:20px 24px 90px}
+.detailScroll{padding:20px 24px 28px}
 .detailTitle,.panelTitle,.sectionTitle{display:flex;justify-content:space-between;align-items:flex-start;gap:18px}
 .detailTitle h2,.panelTitle h2{font-size:27px;font-weight:570;margin:8px 0 4px}
 .detailTitle p,.panelTitle p,.sectionTitle p{margin:0}
@@ -65,24 +65,26 @@
 .textButton{padding:5px 8px;background:transparent;border-color:#b8cee1;color:#1762a7}
 .emptyServices{padding:20px;background:#f7fafc;color:#6a8094;border-radius:8px}
 .serviceForm,.locationForm{margin-top:18px;padding:18px;background:#f8fbfe;border:1px solid #dbe6ef;border-radius:10px}
-.serviceGrid,.formGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:12px 0}
+.serviceGrid,.formGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:12px;margin:12px 0}
 .serviceGrid{grid-template-columns:repeat(4,minmax(130px,1fr))}
-.serviceGrid label,.formGrid label{display:grid;gap:5px;color:#214b6e;font-size:13px;font-weight:700}
+.serviceGrid label,.formGrid label{display:grid;grid-auto-rows:max-content;align-content:start;gap:5px;color:#214b6e;font-size:13px;font-weight:700}
 .serviceGrid input,.serviceGrid select,.formGrid input{min-width:0}
 .check{display:flex!important;align-items:center;gap:8px!important;align-self:end;min-height:42px}
 .check input{width:18px;height:18px}
 .wide{grid-column:1/-1}
 .formActions,.launchActions{margin-top:16px}
-.launchActions{position:sticky;bottom:-90px;padding:13px 0 0;background:#fff;border-top:1px solid #dce5ed}
+.launchActions{padding:13px 0 0;background:#fff;border-top:1px solid #dce5ed}
 .panelTitle>button{border:0;background:transparent;color:#496a86;font-size:26px;cursor:pointer}
-.locationForm{height:calc(100% - 36px);box-sizing:border-box;margin:18px}
+.locationForm{box-sizing:border-box;margin:18px;padding:20px 22px}
 .locationForm .formGrid{margin-top:20px}
+.locationForm .formGrid>label>input,.locationForm .formGrid>label>select{width:100%;height:52px;min-height:52px}
 .locationMethod{display:flex;gap:8px;margin-top:18px;padding:5px;background:#eaf1f7;border-radius:9px}
 .method,.activeMethod{flex:1;border:0;border-radius:7px;padding:10px;font:inherit;font-weight:750;cursor:pointer}
 .method{background:transparent;color:#496984}
 .activeMethod{background:#fff;color:#145796;box-shadow:0 2px 8px rgba(20,64,103,.12)}
-.formGrid label small{color:#6a8094;font-size:11px;font-weight:500}
+.formGrid label small{min-height:14px;color:#6a8094;font-size:11px;font-weight:500}
 .pinLookup{display:grid;grid-template-columns:1fr auto;gap:8px}
+.pinLookup input,.pinLookup button{height:52px}
 .pinLookup button{border:1px solid #1762a7;border-radius:8px;background:#fff;color:#145796;padding:9px 15px;font:inherit;font-weight:750;cursor:pointer}
 .pinLookup button:disabled{opacity:.45;cursor:not-allowed}
 .verifiedLocation{grid-column:1/-1;display:grid;gap:4px;padding:12px 14px;border:1px solid #a9d9bd;background:#effaf3;border-radius:8px;color:#17663c}
@@ -102,7 +104,7 @@
 @media(max-width:800px){.page{padding-top:18px}
 .heading{align-items:flex-start}
 .workspace{display:block;height:auto}
-.listPanel{height:390px;margin-bottom:14px}
+.listPanel{height:390px;min-height:0;max-height:none;margin-bottom:14px;position:static}
 .detailPanel{min-height:560px}
 .toolbar{flex-wrap:wrap}
 .toolbar form{min-width:100%}

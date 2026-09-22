@@ -48,7 +48,11 @@ test("service form supports every move service and fulfilment mode", () => {
 });
 
 test("location workspace is compact responsive and status-coloured", () => {
-  assert.match(styles, /height:calc\(100vh - 264px\)/);
+  assert.match(styles, /align-items:start/);
+  assert.match(styles, /max-height:calc\(100vh - 230px\)/);
+  assert.match(styles, /grid-auto-rows:max-content/);
+  assert.match(styles, /height:52px;min-height:52px/);
+  assert.doesNotMatch(styles, /\.detailScroll\{height:100%;/);
   assert.match(styles, /\.DRAFT\{/);
   assert.match(styles, /\.READY\{/);
   assert.match(styles, /\.ACTIVE\{/);
