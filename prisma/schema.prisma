@@ -624,6 +624,90 @@ model CrmAuditLog {
   @@index([createdAt])
 }
 
+model ServiceLocation {
+  id                       String                         @id @default(cuid())
+  code                     String                         @unique
+  city                     String
+  state                    String
+  countryCode              String                         @default("IN")
+  serviceablePostalCodes   String[]                       @default([])
+  status                   ServiceLocationStatus          @default(DRAFT)
+  operationsContactName    String?
+  operationsContactMobile  String?
+  operationsContactEmail   String?
+  plannedLaunchAt          DateTime?
+  createdByUserId          String?
+  approvedByUserId         String?
+  approvedAt               DateTime?
+  activatedByUserId        String?
+  activatedAt              DateTime?
+  suspendedByUserId        String?
+  suspendedAt              DateTime?
+  suspensionReason         String?
+  createdAt                DateTime                       @default(now())
+  updatedAt                DateTime                       @updatedAt
+  services                 ServiceLocationService[]
+  statusHistory            ServiceLocationStatusHistory[]
+
+  @@unique([city, state, countryCode])
+  @@index([status])
+  @@index([state])
+  @@index([plannedLaunchAt])
+}
+
+model ServiceLocationService {
+  id                       String                 @id @default(cuid())
+  serviceLocationId        String
+  scope                    VendorServiceScope
+  serviceType              VendorServiceType
+  fulfilmentMode           ServiceFulfilmentMode
+  status                   LocationServiceStatus  @default(DRAFT)
+  instantPricingAvailable  Boolean                @default(false)
+  surveyRequired           Boolean                @default(false)
+  minimumVerifiedVendors   Int                    @default(1)
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
+  serviceLocation          ServiceLocation        @relation(fields: [serviceLocationId], references: [id], onDelete: Cascade)
+
+  @@unique([serviceLocationId, scope, serviceType])
+  @@index([status])
+  @@index([scope, serviceType])
+}
+
+model ServiceLocationStatusHistory {
+  id                 String                @id @default(cuid())
+  serviceLocationId  String
+  fromStatus         ServiceLocationStatus?
+  toStatus           ServiceLocationStatus
+  changedByUserId    String?
+  reason             String?
+  createdAt          DateTime              @default(now())
+  serviceLocation    ServiceLocation       @relation(fields: [serviceLocationId], references: [id], onDelete: Cascade)
+
+  @@index([serviceLocationId, createdAt])
+  @@index([changedByUserId])
+}
+
+enum ServiceLocationStatus {
+  DRAFT
+  READY
+  ACTIVE
+  SUSPENDED
+}
+
+enum LocationServiceStatus {
+  DRAFT
+  READY
+  ACTIVE
+  SUSPENDED
+}
+
+enum ServiceFulfilmentMode {
+  INSTANT_RATE
+  QUOTATION
+  SURVEY_AND_QUOTATION
+}
+
 model Customer {
   id              String    @id @default(cuid())
   userId          String    @unique
