@@ -181,29 +181,52 @@ async function verifiedLocationIdentity(body: Record<string, unknown>) {
   throw new ServiceLocationError("LOCATION_VERIFICATION_REQUIRED", "Select a catalogue city or verify an unlisted city using its PIN code.", 400);
 }
 
+function verifiedVendorWhere(
+  location: { city: string; state: string },
+  service: { scope: VendorServiceScope; serviceType: VendorServiceType }
+): Prisma.VendorWhereInput {
+  return {
+    deletedAt: null,
+    status: "ACTIVE",
+    serviceAreas: {
+      some: {
+        active: true,
+        scope: service.scope,
+        ...(service.scope === VendorServiceScope.WITHIN_CITY
+          ? { originCity: { equals: location.city, mode: "insensitive" } }
+          : service.scope === VendorServiceScope.WITHIN_STATE
+            ? { originState: { equals: location.state, mode: "insensitive" } }
+            : {}),
+      },
+    },
+    serviceOfferings: { some: { active: true, serviceType: service.serviceType } },
+  };
+}
+
+async function verifiedVendorCapacity(
+  transaction: Prisma.TransactionClient,
+  location: { city: string; state: string },
+  service: { scope: VendorServiceScope; serviceType: VendorServiceType }
+) {
+  const where = verifiedVendorWhere(location, service);
+  const [count, vendors] = await Promise.all([
+    transaction.vendor.count({ where }),
+    transaction.vendor.findMany({
+      where,
+      select: { id: true, vendorCode: true, companyName: true },
+      orderBy: [{ companyName: "asc" }, { vendorCode: "asc" }],
+      take: 10,
+    }),
+  ]);
+  return { count, vendors, additionalVendors: Math.max(0, count - vendors.length) };
+}
+
 async function verifiedVendorCount(
   transaction: Prisma.TransactionClient,
   location: { city: string; state: string },
   service: { scope: VendorServiceScope; serviceType: VendorServiceType }
 ) {
-  return transaction.vendor.count({
-    where: {
-      deletedAt: null,
-      status: "ACTIVE",
-      serviceAreas: {
-        some: {
-          active: true,
-          scope: service.scope,
-          ...(service.scope === VendorServiceScope.WITHIN_CITY
-            ? { originCity: { equals: location.city, mode: "insensitive" } }
-            : service.scope === VendorServiceScope.WITHIN_STATE
-              ? { originState: { equals: location.state, mode: "insensitive" } }
-              : {}),
-        },
-      },
-      serviceOfferings: { some: { active: true, serviceType: service.serviceType } },
-    },
-  });
+  return transaction.vendor.count({ where: verifiedVendorWhere(location, service) });
 }
 
 async function readiness(transaction: Prisma.TransactionClient, locationId: string) {
@@ -213,15 +236,18 @@ async function readiness(transaction: Prisma.TransactionClient, locationId: stri
   });
   if (!location) throw new ServiceLocationError("SERVICE_LOCATION_NOT_FOUND", "Service location was not found.", 404);
   const services = await Promise.all(location.services.map(async service => {
-    const verifiedVendors = await verifiedVendorCount(transaction, location, service);
+    const capacity = await verifiedVendorCapacity(transaction, location, service);
     return {
       id: service.id,
       scope: service.scope,
       serviceType: service.serviceType,
       status: service.status,
-      verifiedVendors,
+      verifiedVendors: capacity.count,
+      qualifyingVendors: capacity.vendors,
+      additionalVendors: capacity.additionalVendors,
       minimumVerifiedVendors: service.minimumVerifiedVendors,
-      ready: verifiedVendors >= service.minimumVerifiedVendors,
+      shortage: Math.max(0, service.minimumVerifiedVendors - capacity.count),
+      ready: capacity.count >= service.minimumVerifiedVendors,
     };
   }));
   return {

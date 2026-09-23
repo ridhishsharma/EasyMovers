@@ -62,6 +62,15 @@
 .serviceTable td strong,.serviceTable td small{display:block}
 .serviceTable td strong{color:#113b61}
 .serviceTable td small{margin-top:4px;color:#73889b;font-size:11px}
+.capacity{display:grid;gap:2px;min-width:120px}
+.capacity>strong{font-size:14px}
+.capacityReady{color:#17663c!important}
+.capacityShort{color:#a25a00!important}
+.capacity details{position:relative;margin-top:3px}
+.capacity summary{color:#1762a7;font-size:11px;font-weight:750;cursor:pointer}
+.capacity details>span{display:grid;gap:1px;margin-top:6px;padding:6px 8px;border-left:2px solid #9fc8e5;background:#f3f8fc;color:#173f63;font-size:11px}
+.capacity details>span small{margin:0}
+.capacity details>em{display:block;margin-top:5px;color:#60758a;font-size:11px}
 .textButton{padding:5px 8px;background:transparent;border-color:#b8cee1;color:#1762a7}
 .emptyServices{padding:20px;background:#f7fafc;color:#6a8094;border-radius:8px}
 .serviceForm,.locationForm{margin-top:18px;padding:18px;background:#f8fbfe;border:1px solid #dbe6ef;border-radius:10px}

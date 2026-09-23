@@ -32,6 +32,10 @@ test("location workspace covers creation service readiness and lifecycle actions
   assert.match(ui, /Add location/);
   assert.match(ui, /Service matrix/);
   assert.match(ui, /Capacity blockers/);
+  assert.match(ui, /View vendors/);
+  assert.match(ui, /No qualifying active vendor/);
+  assert.match(ui, /Capacity met/);
+  assert.match(ui, /more verified vendor/);
   assert.match(ui, /MARK_READY/);
   assert.match(ui, /ACTIVATE/);
   assert.match(ui, /SUSPEND/);
