@@ -51,6 +51,18 @@ const locationSelect = {
   },
 } satisfies Prisma.ServiceLocationSelect;
 
+async function lockServiceLocation(
+  transaction: Prisma.TransactionClient,
+  locationId: string
+) {
+  await transaction.$queryRaw<Array<{ lockAcquired: number }>>`
+    SELECT 1::int AS "lockAcquired"
+    FROM (
+      SELECT pg_advisory_xact_lock(hashtext(${locationId}))
+    ) AS acquired
+  `;
+}
+
 function text(value: unknown, name: string, minimum: number, maximum: number) {
   if (typeof value !== "string" || value.trim().length < minimum || value.trim().length > maximum) {
     throw new ServiceLocationError("INVALID_SERVICE_LOCATION", `${name} must contain ${minimum} to ${maximum} characters.`, 400);
@@ -337,7 +349,7 @@ export async function addStandardLocationServices(locationId: string, body: Reco
   }
   const serviceTypes = [...new Set(body.serviceTypes.map(item => enumValue(item, Object.values(VendorServiceType), "Service type")))];
   return prisma.$transaction(async transaction => {
-    await transaction.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${locationId}))`;
+    await lockServiceLocation(transaction, locationId);
     const location = await transaction.serviceLocation.findUnique({ where: { id: locationId }, select: { id: true, status: true } });
     if (!location) throw new ServiceLocationError("SERVICE_LOCATION_NOT_FOUND", "Service location was not found.", 404);
     if (location.status === ServiceLocationStatus.ACTIVE) throw new ServiceLocationError("ACTIVE_LOCATION_LOCKED", "Suspend the location before changing its service matrix.", 409);
@@ -379,7 +391,7 @@ export async function changeServiceLocationStatus(locationId: string, body: Reco
   const reason = action === "SUSPEND" ? text(body.reason, "Suspension reason", 3, 1000) : optionalText(body.reason, "Status reason", 1000);
   if (!["MARK_READY", "ACTIVATE", "SUSPEND"].includes(action)) throw new ServiceLocationError("INVALID_LOCATION_ACTION", "Use MARK_READY, ACTIVATE or SUSPEND.", 400);
   return prisma.$transaction(async transaction => {
-    await transaction.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${locationId}))`;
+    await lockServiceLocation(transaction, locationId);
     const current = await transaction.serviceLocation.findUnique({ where: { id: locationId } });
     if (!current) throw new ServiceLocationError("SERVICE_LOCATION_NOT_FOUND", "Service location was not found.", 404);
     const check = await readiness(transaction, current.id);
