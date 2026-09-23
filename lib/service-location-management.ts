@@ -348,22 +348,26 @@ export async function addStandardLocationServices(locationId: string, body: Reco
     const existingTypes = new Set(existing.map(service => service.serviceType));
     const missingTypes = serviceTypes.filter(serviceType => !existingTypes.has(serviceType));
     if (missingTypes.length) {
-      const created = await transaction.serviceLocationService.createMany({
-        data: missingTypes.map(serviceType => ({
-          serviceLocationId: location.id,
-          scope: VendorServiceScope.WITHIN_CITY,
-          serviceType,
-          fulfilmentMode: ServiceFulfilmentMode.QUOTATION,
-          status: LocationServiceStatus.DRAFT,
-          instantPricingAvailable: false,
-          surveyRequired: true,
-          minimumVerifiedVendors: 1,
-        })),
-        skipDuplicates: true,
-      });
-      await transaction.crmAuditLog.create({ data: { actorUserId, action: "SERVICE_LOCATION_STANDARD_SERVICES_ADDED", entityType: "ServiceLocation", entityId: location.id, ipAddress: ipAddress ?? null, metadata: { scope: VendorServiceScope.WITHIN_CITY, serviceTypes: missingTypes, createdCount: created.count } } });
+      const createdIds: string[] = [];
+      for (const serviceType of missingTypes) {
+        const service = await transaction.serviceLocationService.create({
+          data: {
+            serviceLocationId: location.id,
+            scope: VendorServiceScope.WITHIN_CITY,
+            serviceType,
+            fulfilmentMode: ServiceFulfilmentMode.QUOTATION,
+            status: LocationServiceStatus.DRAFT,
+            instantPricingAvailable: false,
+            surveyRequired: true,
+            minimumVerifiedVendors: 1,
+          },
+          select: { id: true },
+        });
+        createdIds.push(service.id);
+      }
+      await transaction.crmAuditLog.create({ data: { actorUserId, action: "SERVICE_LOCATION_STANDARD_SERVICES_ADDED", entityType: "ServiceLocation", entityId: location.id, ipAddress: ipAddress ?? null, metadata: { scope: VendorServiceScope.WITHIN_CITY, serviceTypes: missingTypes, createdCount: createdIds.length } } });
       const services = await transaction.serviceLocationService.findMany({ where: { serviceLocationId: location.id }, orderBy: [{ scope: "asc" }, { serviceType: "asc" }] });
-      return { createdCount: created.count, skippedCount: serviceTypes.length - created.count, services };
+      return { createdCount: createdIds.length, skippedCount: serviceTypes.length - createdIds.length, services };
     }
     const services = await transaction.serviceLocationService.findMany({ where: { serviceLocationId: location.id }, orderBy: [{ scope: "asc" }, { serviceType: "asc" }] });
     return { createdCount: 0, skippedCount: serviceTypes.length, services };

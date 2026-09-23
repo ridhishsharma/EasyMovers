@@ -28,6 +28,8 @@ export async function POST(request: Request, context: { params: Promise<{ locati
     return reply({ success: true, data: result });
   } catch (error) {
     if (error instanceof ServiceLocationError) return reply({ success: false, error: { code: error.code, message: error.message } }, error.status);
-    return reply({ success: false, error: { code: "STANDARD_LOCATION_SERVICES_FAILED", message: "The standard services could not be added." } }, 503);
+    const reference = request.headers.get("x-railway-request-id") || crypto.randomUUID();
+    console.error(`[STANDARD_LOCATION_SERVICES_FAILED:${reference}]`, error);
+    return reply({ success: false, error: { code: "STANDARD_LOCATION_SERVICES_FAILED", message: `The standard services could not be added. Reference: ${reference}` } }, 503);
   }
 }

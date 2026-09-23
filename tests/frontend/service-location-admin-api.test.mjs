@@ -57,9 +57,11 @@ test("activation is serialized audited and requires an explicit ready state", ()
 
 test("standard services are added atomically without overwriting existing configuration", () => {
   assert.match(matrixRoute, /export async function POST/);
+  assert.match(matrixRoute, /STANDARD_LOCATION_SERVICES_FAILED:/);
   assert.match(service, /addStandardLocationServices/);
-  assert.match(service, /skipDuplicates: true/);
-  assert.match(service, /createdCount: created\.count/);
+  assert.match(service, /for \(const serviceType of missingTypes\)/);
+  assert.match(service, /serviceLocationService\.create/);
+  assert.match(service, /createdCount: createdIds\.length/);
   assert.match(service, /serviceLocationService\.findMany/);
   assert.match(service, /SERVICE_LOCATION_STANDARD_SERVICES_ADDED/);
   assert.match(service, /fulfilmentMode: ServiceFulfilmentMode\.QUOTATION/);
