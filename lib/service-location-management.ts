@@ -348,7 +348,7 @@ export async function addStandardLocationServices(locationId: string, body: Reco
     const existingTypes = new Set(existing.map(service => service.serviceType));
     const missingTypes = serviceTypes.filter(serviceType => !existingTypes.has(serviceType));
     if (missingTypes.length) {
-      await transaction.serviceLocationService.createMany({
+      const created = await transaction.serviceLocationService.createMany({
         data: missingTypes.map(serviceType => ({
           serviceLocationId: location.id,
           scope: VendorServiceScope.WITHIN_CITY,
@@ -361,9 +361,12 @@ export async function addStandardLocationServices(locationId: string, body: Reco
         })),
         skipDuplicates: true,
       });
-      await transaction.crmAuditLog.create({ data: { actorUserId, action: "SERVICE_LOCATION_STANDARD_SERVICES_ADDED", entityType: "ServiceLocation", entityId: location.id, ipAddress: ipAddress ?? null, metadata: { scope: VendorServiceScope.WITHIN_CITY, serviceTypes: missingTypes } } });
+      await transaction.crmAuditLog.create({ data: { actorUserId, action: "SERVICE_LOCATION_STANDARD_SERVICES_ADDED", entityType: "ServiceLocation", entityId: location.id, ipAddress: ipAddress ?? null, metadata: { scope: VendorServiceScope.WITHIN_CITY, serviceTypes: missingTypes, createdCount: created.count } } });
+      const services = await transaction.serviceLocationService.findMany({ where: { serviceLocationId: location.id }, orderBy: [{ scope: "asc" }, { serviceType: "asc" }] });
+      return { createdCount: created.count, skippedCount: serviceTypes.length - created.count, services };
     }
-    return { createdCount: missingTypes.length, skippedCount: serviceTypes.length - missingTypes.length };
+    const services = await transaction.serviceLocationService.findMany({ where: { serviceLocationId: location.id }, orderBy: [{ scope: "asc" }, { serviceType: "asc" }] });
+    return { createdCount: 0, skippedCount: serviceTypes.length, services };
   });
 }
 

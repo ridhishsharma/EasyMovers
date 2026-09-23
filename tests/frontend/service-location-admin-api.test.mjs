@@ -59,6 +59,8 @@ test("standard services are added atomically without overwriting existing config
   assert.match(matrixRoute, /export async function POST/);
   assert.match(service, /addStandardLocationServices/);
   assert.match(service, /skipDuplicates: true/);
+  assert.match(service, /createdCount: created\.count/);
+  assert.match(service, /serviceLocationService\.findMany/);
   assert.match(service, /SERVICE_LOCATION_STANDARD_SERVICES_ADDED/);
   assert.match(service, /fulfilmentMode: ServiceFulfilmentMode\.QUOTATION/);
   assert.match(service, /status: LocationServiceStatus\.DRAFT/);

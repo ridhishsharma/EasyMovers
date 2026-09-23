@@ -103,6 +103,10 @@
 .standardSetup strong{color:#0c4979}
 .standardSetup span{color:#59758d;font-size:12px}
 .standardSetup button{white-space:nowrap}
+.serviceNotice{margin:-8px 0 16px;padding:10px 12px;border-radius:8px;font-size:13px}
+.serviceSuccess{border:1px solid #abd9bd;background:#e8f7ee;color:#17663c}
+.serviceError{border:1px solid #efb1b1;background:#fff0f0;color:#a52323}
+.serviceInfo{border:1px solid #b8d4e8;background:#f0f7fc;color:#245f8c}
 @media(max-width:1050px){.workspace{grid-template-columns:330px minmax(0,1fr)}
 .serviceGrid{grid-template-columns:repeat(2,1fr)}
 }

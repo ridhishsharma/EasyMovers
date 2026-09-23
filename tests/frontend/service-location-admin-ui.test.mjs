@@ -47,6 +47,9 @@ test("service form supports every move service and fulfilment mode", () => {
   assert.match(ui, /Instant pricing available/);
   assert.match(ui, /Add all remaining services/);
   assert.match(ui, /standard within-city services are already configured/);
+  assert.match(ui, /Ready — requires verified vendor capacity/);
+  assert.match(ui, /At least one Ready service must meet its verified-vendor requirement/);
+  assert.match(ui, /setServiceMessage/);
 });
 
 test("location workspace is compact responsive and status-coloured", () => {
