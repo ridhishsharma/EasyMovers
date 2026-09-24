@@ -47,6 +47,8 @@ test("readiness requires active matching vendors before service launch", () => {
   assert.match(service, /qualifyingVendors: capacity\.vendors/);
   assert.match(service, /additionalVendors/);
   assert.match(service, /shortage: Math\.max/);
+  assert.match(service, /capacityGaps: services\.filter\(service => !service\.ready\)/);
+  assert.match(service, /blockers: services\.filter\(service => service\.status === "READY" && !service\.ready\)/);
 });
 
 test("activation is serialized audited and requires an explicit ready state", () => {

@@ -47,6 +47,7 @@
 .summaryCards article{padding:13px 15px;background:#f5f9fc;border:1px solid #dce6ef;border-top:3px solid #3b91c8;border-radius:9px}
 .summaryCards span{display:block;color:#637a8f;font-size:13px}
 .summaryCards strong{display:block;margin-top:6px;font-size:25px}
+.summaryCards small{display:block;margin-top:4px;color:#637a8f;font-size:11px}
 .summaryCards .warningCard{background:#fff9e9;border-top-color:#e8a919}
 .summaryCards .goodCard{background:#f0faf4;border-top-color:#3aa96b}
 .locationMeta{display:grid;grid-template-columns:145px 1fr;gap:8px 15px;padding:14px 0;border-top:1px solid #e1e8ef;border-bottom:1px solid #e1e8ef}

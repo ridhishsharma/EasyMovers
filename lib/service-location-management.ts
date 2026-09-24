@@ -254,6 +254,7 @@ async function readiness(transaction: Prisma.TransactionClient, locationId: stri
     locationStatus: location.status,
     services,
     readyServices: services.filter(service => service.status === "READY" && service.ready).length,
+    capacityGaps: services.filter(service => !service.ready),
     blockers: services.filter(service => service.status === "READY" && !service.ready),
   };
 }

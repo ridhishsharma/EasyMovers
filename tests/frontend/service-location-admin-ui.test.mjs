@@ -31,7 +31,9 @@ test("service location APIs expose permission-aware capabilities", () => {
 test("location workspace covers creation service readiness and lifecycle actions", () => {
   assert.match(ui, /Add location/);
   assert.match(ui, /Service matrix/);
-  assert.match(ui, /Capacity blockers/);
+  assert.match(ui, /Launch blockers/);
+  assert.match(ui, /Services needing vendors/);
+  assert.match(ui, /Capacity requirement not met/);
   assert.match(ui, /View vendors/);
   assert.match(ui, /No qualifying active vendor/);
   assert.match(ui, /Capacity met/);
