@@ -4,7 +4,14 @@ import test from "node:test";
 
 const service = readFileSync("lib/vendor-operational-readiness.ts", "utf8");
 const route = readFileSync("app/api/admin/vendors/[vendorId]/route.ts", "utf8");
-const configurationRoute = readFileSync("app/api/admin/vendors/[vendorId]/configuration/route.ts", "utf8");
+const configurationRoute = readFileSync(
+  "app/api/admin/vendors/[vendorId]/configuration/route.ts",
+  "utf8",
+);
+const operationsRoute = readFileSync(
+  "app/api/admin/vendors/[vendorId]/operations/route.ts",
+  "utf8",
+);
 const ui = readFileSync("components/admin/vendor-operations-admin.tsx", "utf8");
 
 test("vendor readiness detail is permission protected and field bounded", () => {
@@ -17,7 +24,14 @@ test("vendor readiness detail is permission protected and field bounded", () => 
 });
 
 test("vendor readiness reports operational activation blockers", () => {
-  for (const value of ["SERVICE_AREA_REQUIRED", "SERVICE_OFFERING_REQUIRED", "ACTIVE_VEHICLE_REQUIRED", "MANDATORY_DOCUMENTS_PENDING", "BANK_VERIFICATION_REQUIRED"]) assert.match(service, new RegExp(value));
+  for (const value of [
+    "SERVICE_AREA_REQUIRED",
+    "SERVICE_OFFERING_REQUIRED",
+    "ACTIVE_VEHICLE_REQUIRED",
+    "MANDATORY_DOCUMENTS_PENDING",
+    "BANK_VERIFICATION_REQUIRED",
+  ])
+    assert.match(service, new RegExp(value));
   assert.match(service, /operationallyReady: blockers\.length === 0/);
 });
 
@@ -39,4 +53,19 @@ test("vendor service configuration is validated transactional and audited", () =
   assert.match(service, /vendorServiceArea\.deleteMany/);
   assert.match(service, /vendorServiceOffering\.upsert/);
   assert.match(service, /VENDOR_SERVICE_CONFIGURATION_REPLACED/);
+});
+
+test("vendor operational evidence and activation are permission guarded and audited", () => {
+  assert.match(operationsRoute, /CRM_PERMISSIONS\.VENDOR_MANAGE/);
+  assert.match(operationsRoute, /CRM_PERMISSIONS\.VENDOR_ACTIVATE/);
+  assert.match(service, /ADD_VEHICLE/);
+  assert.match(service, /ADD_DOCUMENT/);
+  assert.match(service, /REVIEW_DOCUMENT/);
+  assert.match(service, /ADD_BANK_ACCOUNT/);
+  assert.match(service, /VERIFY_BANK_ACCOUNT/);
+  assert.match(service, /pg_advisory_xact_lock/);
+  assert.match(service, /VENDOR_NOT_READY/);
+  assert.match(service, /VENDOR_ACTIVATED/);
+  assert.match(ui, /Operational verification/);
+  assert.match(ui, /Activate vendor/);
 });
