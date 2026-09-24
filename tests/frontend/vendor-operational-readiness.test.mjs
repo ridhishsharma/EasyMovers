@@ -63,9 +63,14 @@ test("vendor operational evidence and activation are permission guarded and audi
   assert.match(service, /REVIEW_DOCUMENT/);
   assert.match(service, /ADD_BANK_ACCOUNT/);
   assert.match(service, /VERIFY_BANK_ACCOUNT/);
+  assert.match(service, /DEACTIVATE_VEHICLE/);
+  assert.match(service, /DEACTIVATE_DOCUMENT/);
+  assert.match(service, /DEACTIVATE_BANK_ACCOUNT/);
   assert.match(service, /pg_advisory_xact_lock/);
   assert.match(service, /VENDOR_NOT_READY/);
   assert.match(service, /VENDOR_ACTIVATED/);
   assert.match(ui, /Operational verification/);
   assert.match(ui, /Activate vendor/);
+  assert.match(ui, /Operational records/);
+  assert.match(ui, /setActivePanel/);
 });

@@ -354,6 +354,31 @@
   border-radius: 9px;
   background: #fff;
 }
+.vendorTabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-top: 16px;
+  padding: 5px;
+  border: 1px solid #d7e3ed;
+  border-radius: 9px;
+  background: #eaf2f8;
+}
+.vendorTabs button {
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #496984;
+  padding: 10px;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+.vendorTabs .activeTab {
+  background: #fff;
+  color: #145796;
+  box-shadow: 0 1px 4px #aac0d455;
+}
 .operations > h3,
 .records > h3 {
   margin: 0 0 4px;
@@ -406,6 +431,15 @@
   font: inherit;
   font-weight: 750;
   cursor: pointer;
+}
+.operationGrid form > button {
+  margin-top: auto;
+}
+.operationGrid .dateField {
+  display: grid;
+  align-items: stretch;
+  gap: 5px;
+  color: #496984;
 }
 .records h4 {
   margin: 15px 0 5px;
@@ -486,5 +520,8 @@
   }
   .records p > span:last-child {
     flex-wrap: wrap;
+  }
+  .vendorTabs {
+    grid-template-columns: 1fr;
   }
 }

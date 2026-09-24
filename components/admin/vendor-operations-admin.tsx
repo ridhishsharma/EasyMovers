@@ -142,6 +142,9 @@ export function VendorOperationsAdmin({
   const [search, setSearch] = useState("");
   const [areas, setAreas] = useState<AreaDraft[]>([]);
   const [offerings, setOfferings] = useState<string[]>([]);
+  const [activePanel, setActivePanel] = useState<
+    "services" | "verification" | "records"
+  >("services");
   const [vehicle, setVehicle] = useState({
     registrationNumber: "",
     vehicleType: "MINI_TRUCK",
@@ -357,7 +360,10 @@ export function VendorOperationsAdmin({
               className={
                 selected?.vendor.id === vendor.id ? styles.selected : ""
               }
-              onClick={() => void open(vendor.id)}
+              onClick={() => {
+                setActivePanel("services");
+                void open(vendor.id);
+              }}
             >
               <span>
                 <b>{vendor.companyName}</b>
@@ -436,7 +442,32 @@ export function VendorOperationsAdmin({
                   ))}
                 </div>
               )}
-              {editable && (
+              <nav
+                className={styles.vendorTabs}
+                aria-label="Vendor readiness sections"
+              >
+                <button
+                  className={activePanel === "services" ? styles.activeTab : ""}
+                  onClick={() => setActivePanel("services")}
+                >
+                  Services
+                </button>
+                <button
+                  className={
+                    activePanel === "verification" ? styles.activeTab : ""
+                  }
+                  onClick={() => setActivePanel("verification")}
+                >
+                  Verification
+                </button>
+                <button
+                  className={activePanel === "records" ? styles.activeTab : ""}
+                  onClick={() => setActivePanel("records")}
+                >
+                  Operational records
+                </button>
+              </nav>
+              {editable && activePanel === "services" && (
                 <form
                   className={styles.configuration}
                   onSubmit={saveConfiguration}
@@ -583,13 +614,14 @@ export function VendorOperationsAdmin({
                 </form>
               )}
               {selected.vendor.status === "ACTIVE" &&
-                selected.capabilities.canManage && (
+                selected.capabilities.canManage &&
+                activePanel === "services" && (
                   <p className={styles.next}>
                     Suspend this active vendor before changing service areas or
                     offerings.
                   </p>
                 )}
-              {editable && (
+              {editable && activePanel === "verification" && (
                 <section className={styles.operations}>
                   <h3>Operational verification</h3>
                   <p>
@@ -680,7 +712,7 @@ export function VendorOperationsAdmin({
                           }))
                         }
                       />
-                      <label>
+                      <label className={styles.dateField}>
                         Insurance expiry
                         <input
                           required
@@ -766,7 +798,7 @@ export function VendorOperationsAdmin({
                           }))
                         }
                       />
-                      <label>
+                      <label className={styles.dateField}>
                         Document expiry (when applicable)
                         <input
                           type="date"
@@ -877,119 +909,192 @@ export function VendorOperationsAdmin({
                   </div>
                 </section>
               )}
-              <section className={styles.records}>
-                <h3>Operational records</h3>
-                <h4>Vehicles</h4>
-                {selected.vendor.vehicles.length ? (
-                  selected.vendor.vehicles.map((item) => (
-                    <p key={item.id}>
-                      <span>
-                        <b>{item.registrationNumber}</b> ·{" "}
-                        {label(item.vehicleType)} · {label(item.status)}
-                      </span>
-                      <em>{item.isActive ? "Operational" : "Inactive"}</em>
-                    </p>
-                  ))
-                ) : (
-                  <p>No vehicles configured.</p>
-                )}
-                <h4>Compliance documents</h4>
-                {selected.vendor.documents.length ? (
-                  selected.vendor.documents.map((item) => (
-                    <p key={item.id}>
-                      <span>
-                        <b>{label(item.documentType)}</b> ·{" "}
-                        <a href={item.fileUrl} target="_blank" rel="noreferrer">
-                          {item.fileName}
-                        </a>{" "}
-                        · {item.isMandatory ? "Mandatory" : "Optional"}
-                      </span>
-                      <span>
-                        <em className={styles[item.verificationStatus]}>
-                          {label(item.verificationStatus)}
-                        </em>
-                        {editable && item.verificationStatus !== "VERIFIED" && (
-                          <button
-                            onClick={() =>
-                              void operate(
-                                {
-                                  action: "REVIEW_DOCUMENT",
-                                  documentId: item.id,
-                                  verificationStatus: "VERIFIED",
-                                },
-                                `${label(item.documentType)} verified.`,
-                              )
+              {activePanel === "records" && (
+                <section className={styles.records}>
+                  <h3>Operational records</h3>
+                  <h4>Vehicles</h4>
+                  {selected.vendor.vehicles.length ? (
+                    selected.vendor.vehicles.map((item) => (
+                      <p key={item.id}>
+                        <span>
+                          <b>{item.registrationNumber}</b> ·{" "}
+                          {label(item.vehicleType)} · {label(item.status)}
+                        </span>
+                        <span>
+                          <em>{item.isActive ? "Operational" : "Inactive"}</em>
+                          {editable && item.isActive && (
+                            <button
+                              className={styles.danger}
+                              onClick={() => {
+                                if (
+                                  window.confirm(
+                                    `Deactivate vehicle ${item.registrationNumber}?`,
+                                  )
+                                )
+                                  void operate(
+                                    {
+                                      action: "DEACTIVATE_VEHICLE",
+                                      vehicleId: item.id,
+                                    },
+                                    "Vehicle deactivated.",
+                                  );
+                              }}
+                            >
+                              Deactivate
+                            </button>
+                          )}
+                        </span>
+                      </p>
+                    ))
+                  ) : (
+                    <p>No vehicles configured.</p>
+                  )}
+                  <h4>Compliance documents</h4>
+                  {selected.vendor.documents.length ? (
+                    selected.vendor.documents.map((item) => (
+                      <p key={item.id}>
+                        <span>
+                          <b>{label(item.documentType)}</b> ·{" "}
+                          <a
+                            href={item.fileUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {item.fileName}
+                          </a>{" "}
+                          · {item.isMandatory ? "Mandatory" : "Optional"}
+                        </span>
+                        <span>
+                          <em className={styles[item.verificationStatus]}>
+                            {label(item.verificationStatus)}
+                          </em>
+                          {editable &&
+                            item.verificationStatus !== "VERIFIED" && (
+                              <button
+                                onClick={() =>
+                                  void operate(
+                                    {
+                                      action: "REVIEW_DOCUMENT",
+                                      documentId: item.id,
+                                      verificationStatus: "VERIFIED",
+                                    },
+                                    `${label(item.documentType)} verified.`,
+                                  )
+                                }
+                              >
+                                Verify
+                              </button>
+                            )}
+                          {editable &&
+                            item.verificationStatus === "PENDING" && (
+                              <button
+                                className={styles.danger}
+                                onClick={() => {
+                                  const reason = window.prompt(
+                                    "Reason for rejecting this document?",
+                                  );
+                                  if (reason)
+                                    void operate(
+                                      {
+                                        action: "REVIEW_DOCUMENT",
+                                        documentId: item.id,
+                                        verificationStatus: "REJECTED",
+                                        rejectionReason: reason,
+                                      },
+                                      `${label(item.documentType)} rejected.`,
+                                    );
+                                }}
+                              >
+                                Reject
+                              </button>
+                            )}
+                          {editable && item.isActive && (
+                            <button
+                              className={styles.danger}
+                              onClick={() => {
+                                if (
+                                  window.confirm(
+                                    `Remove ${label(item.documentType)} from active records?`,
+                                  )
+                                )
+                                  void operate(
+                                    {
+                                      action: "DEACTIVATE_DOCUMENT",
+                                      documentId: item.id,
+                                    },
+                                    "Document removed from active records.",
+                                  );
+                              }}
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </span>
+                      </p>
+                    ))
+                  ) : (
+                    <p>No documents configured.</p>
+                  )}
+                  <h4>Bank accounts</h4>
+                  {selected.vendor.bankAccounts.length ? (
+                    selected.vendor.bankAccounts.map((item) => (
+                      <p key={item.id}>
+                        <span>
+                          <b>{item.bankName}</b> · {item.accountHolderName} ·{" "}
+                          {item.ifscCode} · {label(item.accountType)}
+                        </span>
+                        <span>
+                          <em
+                            className={
+                              item.verified ? styles.VERIFIED : styles.PENDING
                             }
                           >
-                            Verify
-                          </button>
-                        )}
-                        {editable && item.verificationStatus === "PENDING" && (
-                          <button
-                            className={styles.danger}
-                            onClick={() => {
-                              const reason = window.prompt(
-                                "Reason for rejecting this document?",
-                              );
-                              if (reason)
+                            {item.verified ? "Verified" : "Pending"}
+                          </em>
+                          {editable && !item.verified && (
+                            <button
+                              onClick={() =>
                                 void operate(
                                   {
-                                    action: "REVIEW_DOCUMENT",
-                                    documentId: item.id,
-                                    verificationStatus: "REJECTED",
-                                    rejectionReason: reason,
+                                    action: "VERIFY_BANK_ACCOUNT",
+                                    bankAccountId: item.id,
                                   },
-                                  `${label(item.documentType)} rejected.`,
-                                );
-                            }}
-                          >
-                            Reject
-                          </button>
-                        )}
-                      </span>
-                    </p>
-                  ))
-                ) : (
-                  <p>No documents configured.</p>
-                )}
-                <h4>Bank accounts</h4>
-                {selected.vendor.bankAccounts.length ? (
-                  selected.vendor.bankAccounts.map((item) => (
-                    <p key={item.id}>
-                      <span>
-                        <b>{item.bankName}</b> · {item.accountHolderName} ·{" "}
-                        {item.ifscCode} · {label(item.accountType)}
-                      </span>
-                      <span>
-                        <em
-                          className={
-                            item.verified ? styles.VERIFIED : styles.PENDING
-                          }
-                        >
-                          {item.verified ? "Verified" : "Pending"}
-                        </em>
-                        {editable && !item.verified && (
-                          <button
-                            onClick={() =>
-                              void operate(
-                                {
-                                  action: "VERIFY_BANK_ACCOUNT",
-                                  bankAccountId: item.id,
-                                },
-                                "Bank account verified and set as primary.",
-                              )
-                            }
-                          >
-                            Verify
-                          </button>
-                        )}
-                      </span>
-                    </p>
-                  ))
-                ) : (
-                  <p>No bank accounts configured.</p>
-                )}
-              </section>
+                                  "Bank account verified and set as primary.",
+                                )
+                              }
+                            >
+                              Verify
+                            </button>
+                          )}
+                          {editable && (
+                            <button
+                              className={styles.danger}
+                              onClick={() => {
+                                if (
+                                  window.confirm(
+                                    `Remove ${item.bankName} account from active records?`,
+                                  )
+                                )
+                                  void operate(
+                                    {
+                                      action: "DEACTIVATE_BANK_ACCOUNT",
+                                      bankAccountId: item.id,
+                                    },
+                                    "Bank account removed from active records.",
+                                  );
+                              }}
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </span>
+                      </p>
+                    ))
+                  ) : (
+                    <p>No bank accounts configured.</p>
+                  )}
+                </section>
+              )}
               {selected.capabilities.canActivate && (
                 <div className={styles.activation}>
                   <div>
@@ -1034,31 +1139,33 @@ export function VendorOperationsAdmin({
                   )}
                 </div>
               )}
-              <section className={styles.matrix}>
-                <h3>Current service areas</h3>
-                {selected.vendor.serviceAreas.length ? (
-                  selected.vendor.serviceAreas.map((area) => (
-                    <p key={area.id}>
-                      <b>{label(area.scope)}</b> —{" "}
-                      {area.originCity || area.originState || "Pan India"}{" "}
-                      <em>{area.active ? "Active" : "Inactive"}</em>
-                    </p>
-                  ))
-                ) : (
-                  <p>No service areas configured.</p>
-                )}
-                <h3>Current service offerings</h3>
-                {selected.vendor.serviceOfferings.length ? (
-                  selected.vendor.serviceOfferings.map((offering) => (
-                    <p key={offering.id}>
-                      <b>{label(offering.serviceType)}</b>{" "}
-                      <em>{offering.active ? "Active" : "Inactive"}</em>
-                    </p>
-                  ))
-                ) : (
-                  <p>No service offerings configured.</p>
-                )}
-              </section>
+              {activePanel === "services" && (
+                <section className={styles.matrix}>
+                  <h3>Current service areas</h3>
+                  {selected.vendor.serviceAreas.length ? (
+                    selected.vendor.serviceAreas.map((area) => (
+                      <p key={area.id}>
+                        <b>{label(area.scope)}</b> —{" "}
+                        {area.originCity || area.originState || "Pan India"}{" "}
+                        <em>{area.active ? "Active" : "Inactive"}</em>
+                      </p>
+                    ))
+                  ) : (
+                    <p>No service areas configured.</p>
+                  )}
+                  <h3>Current service offerings</h3>
+                  {selected.vendor.serviceOfferings.length ? (
+                    selected.vendor.serviceOfferings.map((offering) => (
+                      <p key={offering.id}>
+                        <b>{label(offering.serviceType)}</b>{" "}
+                        <em>{offering.active ? "Active" : "Inactive"}</em>
+                      </p>
+                    ))
+                  ) : (
+                    <p>No service offerings configured.</p>
+                  )}
+                </section>
+              )}
             </>
           )}
         </section>

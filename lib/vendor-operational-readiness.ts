@@ -565,6 +565,79 @@ export async function performVendorOperationalAction(
         );
         return { action, bankAccountId };
       }
+      if (action === "DEACTIVATE_VEHICLE") {
+        await requireEditableVendor(transaction, vendorId);
+        const vehicleId = textValue(body.vehicleId, "Vehicle ID", 100);
+        const result = await transaction.vendorVehicle.updateMany({
+          where: { id: vehicleId, vendorId, isActive: true },
+          data: { isActive: false, status: VehicleStatus.INACTIVE },
+        });
+        if (!result.count)
+          throw new VendorOperationsError(
+            "VENDOR_VEHICLE_NOT_FOUND",
+            "Active vendor vehicle was not found.",
+            404,
+          );
+        await audit(
+          transaction,
+          actorUserId,
+          "VENDOR_VEHICLE_DEACTIVATED",
+          vendorId,
+          { vehicleId },
+          ipAddress,
+        );
+        return { action, vehicleId };
+      }
+      if (action === "DEACTIVATE_DOCUMENT") {
+        await requireEditableVendor(transaction, vendorId);
+        const documentId = textValue(body.documentId, "Document ID", 100);
+        const result = await transaction.vendorDocument.updateMany({
+          where: { id: documentId, vendorId, isActive: true },
+          data: { isActive: false },
+        });
+        if (!result.count)
+          throw new VendorOperationsError(
+            "VENDOR_DOCUMENT_NOT_FOUND",
+            "Active vendor document was not found.",
+            404,
+          );
+        await audit(
+          transaction,
+          actorUserId,
+          "VENDOR_DOCUMENT_DEACTIVATED",
+          vendorId,
+          { documentId },
+          ipAddress,
+        );
+        return { action, documentId };
+      }
+      if (action === "DEACTIVATE_BANK_ACCOUNT") {
+        await requireEditableVendor(transaction, vendorId);
+        const bankAccountId = textValue(
+          body.bankAccountId,
+          "Bank account ID",
+          100,
+        );
+        const result = await transaction.vendorBankAccount.updateMany({
+          where: { id: bankAccountId, vendorId, isActive: true },
+          data: { isActive: false, verified: false, isPrimary: false },
+        });
+        if (!result.count)
+          throw new VendorOperationsError(
+            "VENDOR_BANK_ACCOUNT_NOT_FOUND",
+            "Active vendor bank account was not found.",
+            404,
+          );
+        await audit(
+          transaction,
+          actorUserId,
+          "VENDOR_BANK_ACCOUNT_DEACTIVATED",
+          vendorId,
+          { bankAccountId },
+          ipAddress,
+        );
+        return { action, bankAccountId };
+      }
       throw new VendorOperationsError(
         "INVALID_VENDOR_OPERATION",
         "Unsupported vendor operational action.",
