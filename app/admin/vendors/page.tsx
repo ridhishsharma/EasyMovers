@@ -1,6 +1,6 @@
-import { CrmDirectory } from "@/components/admin/crm-directory";
+import { VendorOperationsAdmin } from "@/components/admin/vendor-operations-admin";
 
 export const dynamic = "force-dynamic";
 export default function AdminVendorsPage() {
-  return <CrmDirectory kind="vendors" supabaseUrl={process.env.SUPABASE_URL || ""} publishableKey={process.env.SUPABASE_PUBLISHABLE_KEY || ""} />;
+  return <VendorOperationsAdmin supabaseUrl={process.env.SUPABASE_URL || ""} publishableKey={process.env.SUPABASE_PUBLISHABLE_KEY || ""} />;
 }
