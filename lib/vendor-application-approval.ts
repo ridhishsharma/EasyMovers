@@ -11,6 +11,7 @@ export interface ApprovableVendorApplication {
   referenceId: string;
   companyName: string;
   businessType: string;
+  engagementMode: string;
   operatingCategory: string;
   gstNumber: string | null;
   panNumber: string | null;

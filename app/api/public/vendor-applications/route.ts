@@ -42,6 +42,7 @@ export async function POST(req: Request) {
     const created = await prisma.vendorApplication.create({ data: {
       referenceId: vendorApplicationReference(), requestId: input.requestId,
       companyName: input.companyName, businessType: input.businessType,
+      engagementMode: input.engagementMode,
       operatingCategory: input.operatingCategory, gstNumber: input.gstNumber,
       panNumber: input.panNumber, contactName: input.contactName, mobile: input.mobile,
       email: input.email, addressLine1: input.addressLine1, city: input.city,

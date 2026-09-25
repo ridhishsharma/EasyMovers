@@ -21,8 +21,8 @@ test("dashboard reports operational counts and pending-work ageing", () => {
   assert.match(api, /oldestOpenAgeDays/);
   assert.match(api, /pendingInvitations/);
   assert.match(api, /activeCities/);
-  assert.match(ui, /Applications requiring action/);
-  assert.match(ui, /Oldest open application/);
+  assert.match(ui, /Applications awaiting action/);
+  assert.match(ui, /oldest \{data\.vendorApplications\.oldestOpenAgeDays\} days/);
   assert.match(ui, /Only modules permitted for your assigned roles are shown/);
   assert.match(ui, /Active service locations/);
   assert.match(ui, /Locations ready to launch/);
@@ -40,5 +40,6 @@ test("dashboard uses compact responsive cards and semantic status colours", () =
   assert.match(styles, /article\.success/);
   assert.match(styles, /article\.invitations/);
   assert.match(styles, /@media\(max-width:560px\)/);
-  assert.match(ui, /oldestOpenAgeDays >= 3/);
+  assert.match(ui, /Dashboard filters/);
+  assert.match(ui, /Most requested services/);
 });

@@ -20,6 +20,13 @@ export async function GET(request: Request) {
   }
 
   try {
+    const params = new URL(request.url).searchParams;
+    const period = params.get("period") ?? "30";
+    const periodDays = ["7", "30", "90"].includes(period) ? Number(period) : 30;
+    const city = params.get("city")?.trim().slice(0, 100) ?? "";
+    const state = params.get("state")?.trim().slice(0, 100) ?? "";
+    const serviceType = params.get("serviceType")?.trim().toUpperCase().slice(0, 50) ?? "";
+    const periodStart = new Date(Date.now() - periodDays * 86_400_000);
     const [user, assignments, allPermissions] = await prisma.$transaction([
       prisma.user.findUnique({
         where: { id: access.userId },
@@ -66,8 +73,20 @@ export async function GET(request: Request) {
     const canSeeServiceLocations = permissionSet.has(CRM_PERMISSIONS.SERVICE_LOCATION_READ);
     const staleBefore = new Date(Date.now() - 3 * 86_400_000);
     const today = new Date(); today.setHours(0, 0, 0, 0);
+    const vendorFilter = {
+      deletedAt: null,
+      ...(city ? { serviceAreas: { some: { active: true, originCity: { equals: city, mode: "insensitive" as const } } } } : {}),
+      ...(state ? { state: { equals: state, mode: "insensitive" as const } } : {}),
+      ...(serviceType ? { serviceOfferings: { some: { active: true, serviceType: serviceType as never } } } : {}),
+    };
+    const leadPeriodFilter = {
+      createdAt: { gte: periodStart },
+      ...(city ? { pickupCity: { equals: city, mode: "insensitive" as const } } : {}),
+      ...(state ? { pickupState: { equals: state, mode: "insensitive" as const } } : {}),
+      ...(serviceType ? { shiftingType: { equals: serviceType, mode: "insensitive" as const } } : {}),
+    };
 
-    const [applicationGroups, oldestApplication, staleApplications, vendorGroups, cities, pendingInvitations, leadGroups, newLeadsToday, serviceLocationGroups] = await Promise.all([
+    const [applicationGroups, oldestApplication, staleApplications, vendorGroups, cities, pendingInvitations, leadGroups, newLeadsToday, serviceLocationGroups, vendorsAdded, leadsInPeriod, topServices] = await Promise.all([
       canSeeApplications ? prisma.vendorApplication.groupBy({ by: ["status"], _count: { _all: true } }) : Promise.resolve([]),
       canSeeApplications ? prisma.vendorApplication.findFirst({
         where: { status: { in: ["PENDING", "UNDER_REVIEW", "NEEDS_INFORMATION"] } },
@@ -76,7 +95,7 @@ export async function GET(request: Request) {
       canSeeApplications ? prisma.vendorApplication.count({
         where: { status: { in: ["PENDING", "UNDER_REVIEW", "NEEDS_INFORMATION"] }, createdAt: { lt: staleBefore } },
       }) : Promise.resolve(0),
-      canSeeVendors ? prisma.vendor.groupBy({ by: ["status"], where: { deletedAt: null }, _count: { _all: true } }) : Promise.resolve([]),
+      canSeeVendors ? prisma.vendor.groupBy({ by: ["status"], where: vendorFilter, _count: { _all: true } }) : Promise.resolve([]),
       canSeeVendors ? prisma.vendorServiceArea.findMany({
         where: { active: true, originCity: { not: null }, vendor: { deletedAt: null } },
         distinct: ["originCity"], select: { originCity: true },
@@ -85,6 +104,9 @@ export async function GET(request: Request) {
       canSeeLeads ? prisma.lead.groupBy({ by: ["status"], _count: { _all: true } }) : Promise.resolve([]),
       canSeeLeads ? prisma.lead.count({ where: { createdAt: { gte: today } } }) : Promise.resolve(0),
       canSeeServiceLocations ? prisma.serviceLocation.groupBy({ by: ["status"], _count: { _all: true } }) : Promise.resolve([]),
+      canSeeVendors ? prisma.vendor.count({ where: { ...vendorFilter, createdAt: { gte: periodStart } } }) : Promise.resolve(0),
+      canSeeLeads ? prisma.lead.count({ where: leadPeriodFilter }) : Promise.resolve(0),
+      canSeeLeads ? prisma.lead.groupBy({ by: ["shiftingType"], where: { ...leadPeriodFilter, shiftingType: { not: null } }, _count: { _all: true }, orderBy: { _count: { shiftingType: "desc" } }, take: 5 }) : Promise.resolve([]),
     ]);
 
     return reply({ success: true, data: {
@@ -103,6 +125,7 @@ export async function GET(request: Request) {
       serviceLocations: canSeeServiceLocations ? {
         counts: Object.fromEntries(serviceLocationGroups.map(item => [item.status, item._count._all])),
       } : null,
+      analytics: { periodDays, city: city || null, state: state || null, serviceType: serviceType || null, vendorsAdded, leadsInPeriod, topServices: topServices.map(item => ({ serviceType: item.shiftingType, count: item._count._all })) },
       generatedAt: new Date().toISOString(),
     } });
   } catch {

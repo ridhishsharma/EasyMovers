@@ -271,6 +271,10 @@ export async function approveVendorApplication(input: {
     }
 
     const vendor = await repository.create(repositoryInput);
+    await transaction.vendor.update({
+      where: { id: vendor.id },
+      data: { engagementMode: application.engagementMode },
+    });
     const reviewNotes =
       typeof input.notes === "string" && input.notes.trim()
         ? input.notes.trim().slice(0, 1000)

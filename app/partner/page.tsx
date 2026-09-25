@@ -7,8 +7,8 @@ export default function PartnerPage() {
     <h1>Partner with EasyMovers</h1>
     <p className={styles.intro}>Choose how you operate.</p>
     <div className={styles.choices}>
-      <Link href="/partner/company" className={styles.choice}><Building2 size={32} /><h2>Register Moving Company</h2><p>For moving businesses managing teams, packing services and fleets.</p><span>Company registration <ArrowRight size={18} /></span></Link>
-      <Link href="/partner/individual" className={styles.choice}><Truck size={32} /><h2>Register Individual Transporter</h2><p>For independent drivers and vehicle owners offering local transport.</p><span>Prepare application <ArrowRight size={18} /></span></Link>
+      <Link href="/partner/company" className={styles.choice}><Building2 size={32} /><h2>Register Moving Company</h2><p>For moving firms offering surveyed quotations, verified-fleet instant work, or both.</p><span>Company registration <ArrowRight size={18} /></span></Link>
+      <Link href="/partner/individual" className={styles.choice}><Truck size={32} /><h2>Register Individual Carrier</h2><p>For independent owner-drivers joining the verified within-city instant fleet.</p><span>Prepare application <ArrowRight size={18} /></span></Link>
     </div>
   </div></main>;
 }

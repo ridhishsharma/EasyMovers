@@ -8,6 +8,7 @@ const defaults = {
   gstNumber: "",
   panNumber: "",
   businessType: "SOLE_PROPRIETOR",
+  engagementMode: "QUOTATION",
   category: "LOCAL",
   ownerName: "",
   ownerMobile: "",
@@ -110,6 +111,7 @@ export function PartnerRegistration() {
           requestId: requestId.current,
           companyName: fields.companyName,
           businessType: fields.businessType,
+          engagementMode: fields.engagementMode,
           operatingCategory: fields.category,
           gstNumber: fields.gstNumber || undefined,
           panNumber: fields.panNumber || undefined,
@@ -270,6 +272,18 @@ export function PartnerRegistration() {
                             <option value="REGIONAL">Regional</option>
                             <option value="NATIONAL">National</option>
                           </select>
+                        </label>
+                        <label className={styles.field}>
+                          How will you accept work?
+                          <select
+                            value={fields.engagementMode}
+                            onChange={(e) => change("engagementMode", e.target.value)}
+                          >
+                            <option value="QUOTATION">Quotation after survey or move assessment</option>
+                            <option value="INSTANT_RATE">Instant-rate jobs using registered vehicles</option>
+                            <option value="HYBRID">Both quotation and instant-rate jobs</option>
+                          </select>
+                          <small>Instant-rate work requires verified vehicles before availability is published.</small>
                         </label>
                         <div className={styles.row}>
                           <label className={styles.field}>

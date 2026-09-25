@@ -4,6 +4,7 @@ export type PublicVendorApplicationInput = {
   requestId: string;
   companyName: string;
   businessType: "SOLE_PROPRIETOR" | "REGISTERED_BUSINESS";
+  engagementMode: "QUOTATION" | "INSTANT_RATE" | "HYBRID";
   operatingCategory: "LOCAL" | "REGIONAL" | "NATIONAL";
   gstNumber?: string;
   panNumber?: string;
@@ -116,6 +117,8 @@ export function parseVendorApplication(value: unknown): PublicVendorApplicationI
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)) throw Error("CHECK_REQUESTID");
   const businessType = required(data, "businessType", 30);
   if (businessType !== "SOLE_PROPRIETOR" && businessType !== "REGISTERED_BUSINESS") throw Error("CHECK_BUSINESSTYPE");
+  const engagementMode = required(data, "engagementMode", 20);
+  if (!("QUOTATION" === engagementMode || "INSTANT_RATE" === engagementMode || "HYBRID" === engagementMode)) throw Error("CHECK_ENGAGEMENTMODE");
   const operatingCategory = required(data, "operatingCategory", 20);
   if (!(["LOCAL", "REGIONAL", "NATIONAL"] as const).includes(operatingCategory as "LOCAL")) throw Error("CHECK_OPERATINGCATEGORY");
   const mobile = required(data, "mobile", 10);
@@ -133,6 +136,7 @@ export function parseVendorApplication(value: unknown): PublicVendorApplicationI
     requestId,
     companyName: required(data, "companyName", 150),
     businessType,
+    engagementMode: engagementMode as PublicVendorApplicationInput["engagementMode"],
     operatingCategory: operatingCategory as PublicVendorApplicationInput["operatingCategory"],
     gstNumber,
     panNumber,

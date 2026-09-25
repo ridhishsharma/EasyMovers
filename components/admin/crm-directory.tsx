@@ -58,7 +58,7 @@ export function CrmDirectory({ kind, supabaseUrl, publishableKey }: { kind: "ven
     <section className={styles.toolbar} aria-label={`${heading} filters`}>
       <form onSubmit={searchRecords}><input maxLength={100} aria-label={`Search ${kind}`} placeholder={kind === "vendors" ? "Search vendor, code, owner, city…" : "Search lead, reference, mobile, city…"} value={search} onChange={event => setSearch(event.target.value)} /><button>Search</button></form>
       <select aria-label={`Filter ${kind} by status`} value={status} onChange={event => setStatus(event.target.value)}>{filterOptions.map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select>
-      {kind === "leads" && <select aria-label="Filter leads by date" value={period} onChange={event => setPeriod(event.target.value)}><option value="">Any date</option><option value="today">Received today</option></select>}
+      {kind === "leads" && <select aria-label="Filter leads by date" value={period} onChange={event => setPeriod(event.target.value)}><option value="">Any date</option><option value="today">Received today</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option></select>}
     </section>
     {message && <p className={styles.error} role="alert">{message}</p>}
     <section className={styles.panel}>

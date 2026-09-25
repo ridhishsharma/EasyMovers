@@ -69,6 +69,7 @@ model Vendor {
   companyName            String
   ownerName              String
   businessType           VendorBusinessType      @default(UNSPECIFIED)
+  engagementMode         VendorEngagementMode    @default(QUOTATION)
   gstNumber              String?
   serviceCities          String
   householdService       Boolean                 @default(false)
@@ -117,6 +118,7 @@ model Vendor {
   sourceApplication      VendorApplication?      @relation("VendorApplicationCreatedVendor")
 
   @@index([deletedAt])
+  @@index([engagementMode])
 }
 
 enum VendorBusinessType {
@@ -124,6 +126,12 @@ enum VendorBusinessType {
   INDIVIDUAL_OWNER_DRIVER
   SOLE_PROPRIETOR
   REGISTERED_BUSINESS
+}
+
+enum VendorEngagementMode {
+  QUOTATION
+  INSTANT_RATE
+  HYBRID
 }
 
 model VendorServiceArea {
@@ -466,6 +474,7 @@ model VendorApplication {
   requestId         String                  @unique @db.Uuid
   companyName       String
   businessType      VendorBusinessType
+  engagementMode    VendorEngagementMode    @default(QUOTATION)
   operatingCategory String
   gstNumber         String?
   panNumber         String?
@@ -496,6 +505,7 @@ model VendorApplication {
   @@index([status])
   @@index([reviewedByUserId])
   @@index([createdAt])
+  @@index([engagementMode])
 }
 
 enum VendorApplicationStatus {
@@ -662,18 +672,18 @@ model ServiceLocation {
 }
 
 model ServiceLocationService {
-  id                       String                 @id @default(cuid())
-  serviceLocationId        String
-  scope                    VendorServiceScope
-  serviceType              VendorServiceType
-  fulfilmentMode           ServiceFulfilmentMode
-  status                   LocationServiceStatus  @default(DRAFT)
-  instantPricingAvailable  Boolean                @default(false)
-  surveyRequired           Boolean                @default(false)
-  minimumVerifiedVendors   Int                    @default(1)
-  createdAt                DateTime               @default(now())
-  updatedAt                DateTime               @updatedAt
-  serviceLocation          ServiceLocation        @relation(fields: [serviceLocationId], references: [id], onDelete: Cascade)
+  id                      String                @id @default(cuid())
+  serviceLocationId       String
+  scope                   VendorServiceScope
+  serviceType             VendorServiceType
+  fulfilmentMode          ServiceFulfilmentMode
+  status                  LocationServiceStatus @default(DRAFT)
+  instantPricingAvailable Boolean               @default(false)
+  surveyRequired          Boolean               @default(false)
+  minimumVerifiedVendors  Int                   @default(1)
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
+  serviceLocation         ServiceLocation       @relation(fields: [serviceLocationId], references: [id], onDelete: Cascade)
 
   @@unique([serviceLocationId, scope, serviceType])
   @@index([status])
@@ -681,14 +691,14 @@ model ServiceLocationService {
 }
 
 model ServiceLocationStatusHistory {
-  id                 String                @id @default(cuid())
-  serviceLocationId  String
-  fromStatus         ServiceLocationStatus?
-  toStatus           ServiceLocationStatus
-  changedByUserId    String?
-  reason             String?
-  createdAt          DateTime              @default(now())
-  serviceLocation    ServiceLocation       @relation(fields: [serviceLocationId], references: [id], onDelete: Cascade)
+  id                String                 @id @default(cuid())
+  serviceLocationId String
+  fromStatus        ServiceLocationStatus?
+  toStatus          ServiceLocationStatus
+  changedByUserId   String?
+  reason            String?
+  createdAt         DateTime               @default(now())
+  serviceLocation   ServiceLocation        @relation(fields: [serviceLocationId], references: [id], onDelete: Cascade)
 
   @@index([serviceLocationId, createdAt])
   @@index([changedByUserId])

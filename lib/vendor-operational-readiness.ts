@@ -34,6 +34,7 @@ export async function getVendorOperationalReadiness(vendorId: string) {
         ownerMobile: true,
         ownerEmail: true,
         businessType: true,
+        engagementMode: true,
         city: true,
         state: true,
         pincode: true,
@@ -139,6 +140,9 @@ export async function getVendorOperationalReadiness(vendorId: string) {
       "COMMERCIAL_GOODS",
     ].includes(offering.serviceType),
   );
+  const registeredFleetRequired =
+    vendor.businessType === "INDIVIDUAL_OWNER_DRIVER" ||
+    vendor.engagementMode !== "QUOTATION";
   const normalizeEvidence = (value: string | null | undefined) =>
     value?.toUpperCase().replace(/[^A-Z0-9]/g, "") || "";
   const eligibleTransportVehicle = activeVehicles.some((vehicle) => {
@@ -185,7 +189,7 @@ export async function getVendorOperationalReadiness(vendorId: string) {
           },
         ]
       : []),
-    ...(!activeVehicles.length
+    ...(registeredFleetRequired && !activeVehicles.length
       ? [
           {
             code: "ACTIVE_VEHICLE_REQUIRED",
@@ -193,7 +197,7 @@ export async function getVendorOperationalReadiness(vendorId: string) {
           },
         ]
       : []),
-    ...(transportRequired && !eligibleTransportVehicle
+    ...(registeredFleetRequired && transportRequired && !eligibleTransportVehicle
       ? [
           {
             code: "TRANSPORT_EVIDENCE_REQUIRED",
@@ -238,6 +242,8 @@ export async function getVendorOperationalReadiness(vendorId: string) {
       verifiedMandatoryDocuments: verifiedMandatoryDocuments.length,
       mandatoryDocuments: mandatoryDocuments.length,
       verifiedBankAccounts: verifiedBankAccounts.length,
+      quotationEligible: blockers.every((blocker) => !["SERVICE_AREA_REQUIRED", "SERVICE_OFFERING_REQUIRED", "PAN_VERIFICATION_REQUIRED", "MANDATORY_DOCUMENTS_PENDING", "BANK_VERIFICATION_REQUIRED"].includes(blocker.code)),
+      instantRateEligible: registeredFleetRequired && blockers.length === 0,
       blockers,
       operationallyReady: blockers.length === 0,
     },
@@ -675,6 +681,7 @@ export async function changeVendorOperationalStatus(
         id: true,
         status: true,
         businessType: true,
+        engagementMode: true,
         serviceAreas: { where: { active: true }, select: { id: true } },
         serviceOfferings: {
           where: { active: true },
@@ -719,7 +726,11 @@ export async function changeVendorOperationalStatus(
         blockers.push("Add an active service area.");
       if (!vendor.serviceOfferings.length)
         blockers.push("Add an active service offering.");
-      if (!vendor.vehicles.length) blockers.push("Add an operational vehicle.");
+      const registeredFleetRequired =
+        vendor.businessType === "INDIVIDUAL_OWNER_DRIVER" ||
+        vendor.engagementMode !== "QUOTATION";
+      if (registeredFleetRequired && !vendor.vehicles.length)
+        blockers.push("Add an operational vehicle for instant-rate eligibility.");
       if (
         !vendor.documents.some(
           (document) =>
@@ -771,7 +782,7 @@ export async function changeVendorOperationalStatus(
           ),
         );
       });
-      if (transportRequired && !eligibleVehicle)
+      if (registeredFleetRequired && transportRequired && !eligibleVehicle)
         blockers.push(
           "Verify matching vehicle RC and unexpired insurance evidence.",
         );

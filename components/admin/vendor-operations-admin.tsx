@@ -1,7 +1,7 @@
 "use client";
 
 import { createClient } from "@supabase/supabase-js";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -43,6 +43,7 @@ type Detail = {
     ownerMobile: string;
     ownerEmail: string | null;
     businessType: string;
+    engagementMode: "QUOTATION" | "INSTANT_RATE" | "HYBRID";
     pincode: string | null;
     serviceAreas: Array<{
       id: string;
@@ -99,6 +100,8 @@ type Detail = {
     verifiedBankAccounts: number;
     blockers: Array<{ code: string; message: string }>;
     operationallyReady: boolean;
+    quotationEligible: boolean;
+    instantRateEligible: boolean;
   };
   capabilities: { canManage: boolean; canActivate: boolean };
 };
@@ -127,6 +130,7 @@ export function VendorOperationsAdmin({
   publishableKey: string;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const client = useMemo(
     () =>
       supabaseUrl && publishableKey
@@ -140,6 +144,7 @@ export function VendorOperationsAdmin({
   const [message, setMessage] = useState("");
   const [messageSuccess, setMessageSuccess] = useState(false);
   const [search, setSearch] = useState("");
+  const [status, setStatus] = useState(() => searchParams.get("status")?.toUpperCase() ?? "");
   const [areas, setAreas] = useState<AreaDraft[]>([]);
   const [offerings, setOfferings] = useState<string[]>([]);
   const [activePanel, setActivePanel] = useState<
@@ -199,6 +204,7 @@ export function VendorOperationsAdmin({
     try {
       const query = new URLSearchParams({ page: "1", pageSize: "100" });
       if (search.trim()) query.set("search", search.trim());
+      if (status) query.set("status", status);
       const data = await request(`/api/admin/vendors?${query}`);
       setVendors(data.vendors);
     } catch (error) {
@@ -208,7 +214,7 @@ export function VendorOperationsAdmin({
     } finally {
       setLoading(false);
     }
-  }, [request, search]);
+  }, [request, search, status]);
   const open = useCallback(
     async (id: string) => {
       setLoading(true);
@@ -344,6 +350,12 @@ export function VendorOperationsAdmin({
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search vendor, code, owner or city…"
         />
+        <select aria-label="Filter vendors by status" value={status} onChange={(event) => setStatus(event.target.value)}>
+          <option value="">All statuses</option>
+          <option value="ACTIVE">Active</option>
+          <option value="INACTIVE">Inactive</option>
+          <option value="PENDING">Pending verification</option>
+        </select>
         <button>Search</button>
       </form>
       {message && (
@@ -405,7 +417,7 @@ export function VendorOperationsAdmin({
                   </em>
                   <h2>{selected.vendor.companyName}</h2>
                   <p>
-                    {selected.vendor.vendorCode} · {selected.vendor.ownerName}
+                    {selected.vendor.vendorCode} · {selected.vendor.ownerName} · {label(selected.vendor.engagementMode)}
                   </p>
                 </div>
               </div>
@@ -433,6 +445,11 @@ export function VendorOperationsAdmin({
                   <span>Verified banks</span>
                   <strong>{selected.readiness.verifiedBankAccounts}</strong>
                 </article>
+              </div>
+              <div className={styles.next}>
+                <strong>Work eligibility</strong>
+                <p>Quotation: {selected.readiness.quotationEligible ? "Eligible" : "Blocked"} · Instant rate: {selected.readiness.instantRateEligible ? "Eligible" : "Not yet eligible"}</p>
+                <small>Quotation vendors nominate vehicles after work award. Instant-rate and individual operators require a verified registered vehicle before activation.</small>
               </div>
               {selected.readiness.blockers.length > 0 && (
                 <div className={styles.blockers}>

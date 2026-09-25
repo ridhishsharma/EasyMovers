@@ -116,6 +116,7 @@ export async function GET(request: Request) {
           referenceId: true,
           companyName: true,
           businessType: true,
+          engagementMode: true,
           operatingCategory: true,
           contactName: true,
           mobile: true,

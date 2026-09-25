@@ -33,6 +33,9 @@ test("vendor readiness reports operational activation blockers", () => {
   ])
     assert.match(service, new RegExp(value));
   assert.match(service, /operationallyReady: blockers\.length === 0/);
+  assert.match(service, /engagementMode !== "QUOTATION"/);
+  assert.match(service, /quotationEligible/);
+  assert.match(service, /instantRateEligible/);
 });
 
 test("vendor CRM provides a responsive readiness workspace", () => {

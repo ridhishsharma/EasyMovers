@@ -1,13 +1,13 @@
 "use client";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import styles from "./vendor-applications-admin.module.css";
 
 type Status = "PENDING" | "UNDER_REVIEW" | "NEEDS_INFORMATION" | "APPROVED" | "REJECTED" | "WITHDRAWN";
 type ApplicationSummary = {
-  id: string; referenceId: string; companyName: string; businessType: string; operatingCategory: string;
+  id: string; referenceId: string; companyName: string; businessType: string; engagementMode: string; operatingCategory: string;
   contactName: string; mobile: string; email: string; city: string; state: string; postalCode: string;
   status: Status; createdAt: string; updatedAt: string; reviewedAt: string | null;
   vendor: { id: string; vendorCode: string; status: string } | null; _count: { callbackRequests: number };
@@ -38,6 +38,7 @@ async function accessToken(client: SupabaseClient) {
 
 export function VendorApplicationsAdmin({ supabaseUrl, publishableKey }: { supabaseUrl: string; publishableKey: string }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const client = useMemo(() => supabaseUrl && publishableKey ? createClient(supabaseUrl, publishableKey) : null, [supabaseUrl, publishableKey]);
   const [signedIn, setSignedIn] = useState(false);
   const [sessionReady, setSessionReady] = useState(() => !client);
@@ -46,7 +47,10 @@ export function VendorApplicationsAdmin({ supabaseUrl, publishableKey }: { supab
   const [applications, setApplications] = useState<ApplicationSummary[]>([]);
   const [selected, setSelected] = useState<ApplicationDetail | null>(null);
   const [pagination, setPagination] = useState<Pagination>({ page: 1, pageSize: 20, total: 0, totalPages: 0 });
-  const [status, setStatus] = useState<"" | Status>(""); const [search, setSearch] = useState("");
+  const [status, setStatus] = useState<"" | Status>(() => {
+    const requested = searchParams.get("status")?.toUpperCase() ?? "";
+    return statuses.some((item) => item.value === requested) ? requested as "" | Status : "";
+  }); const [search, setSearch] = useState("");
   const [appliedSearch, setAppliedSearch] = useState(""); const [reason, setReason] = useState("");
   const [message, setMessage] = useState(""); const [busy, setBusy] = useState(false);
   const requestNumber = useRef(0);
@@ -172,7 +176,7 @@ export function VendorApplicationsAdmin({ supabaseUrl, publishableKey }: { supab
       <section className={styles.detailPanel} aria-label="Application detail">
         {!selected ? <div className={styles.emptyDetail}><h2>Select an application</h2><p>Review its business, contact and callback details here.</p></div> : <>
           <div className={styles.detailTitle}><div><span className={`${styles.badge} ${styles[selected.status]}`}>{statusLabel(selected.status)}</span><h2>{selected.companyName}</h2><p>{selected.referenceId}</p></div><button className={styles.close} aria-label="Close application details" onClick={() => setSelected(null)}>×</button></div>
-          <dl className={styles.details}><dt>Business type</dt><dd>{statusLabel(selected.businessType)}</dd><dt>Operating category</dt><dd>{statusLabel(selected.operatingCategory)}</dd><dt>Contact</dt><dd>{selected.contactName}<br/><a href={`tel:+91${selected.mobile}`}>+91 {selected.mobile}</a><br/><a href={`mailto:${selected.email}`}>{selected.email}</a></dd><dt>Registered address</dt><dd>{selected.addressLine1}, {selected.city}, {selected.state} {selected.postalCode}</dd><dt>GST / PAN</dt><dd>{selected.gstNumber || "Not provided"} / {selected.panNumber || "Not provided"}</dd><dt>Consent recorded</dt><dd>{dateTime(selected.consentAt)}</dd><dt>Reviewer</dt><dd>{selected.reviewedByUser ? `${selected.reviewedByUser.fullName} (${selected.reviewedByUser.role})` : "Not assigned"}</dd><dt>Review completed</dt><dd>{dateTime(selected.reviewedAt)}</dd>{selected.vendor && <><dt>Vendor profile</dt><dd><strong>{selected.vendor.vendorCode}</strong> · {selected.vendor.status}</dd></>}</dl>
+          <dl className={styles.details}><dt>Business type</dt><dd>{statusLabel(selected.businessType)}</dd><dt>Work model</dt><dd>{statusLabel(selected.engagementMode)}</dd><dt>Operating category</dt><dd>{statusLabel(selected.operatingCategory)}</dd><dt>Contact</dt><dd>{selected.contactName}<br/><a href={`tel:+91${selected.mobile}`}>+91 {selected.mobile}</a><br/><a href={`mailto:${selected.email}`}>{selected.email}</a></dd><dt>Registered address</dt><dd>{selected.addressLine1}, {selected.city}, {selected.state} {selected.postalCode}</dd><dt>GST / PAN</dt><dd>{selected.gstNumber || "Not provided"} / {selected.panNumber || "Not provided"}</dd><dt>Consent recorded</dt><dd>{dateTime(selected.consentAt)}</dd><dt>Reviewer</dt><dd>{selected.reviewedByUser ? `${selected.reviewedByUser.fullName} (${selected.reviewedByUser.role})` : "Not assigned"}</dd><dt>Review completed</dt><dd>{dateTime(selected.reviewedAt)}</dd>{selected.vendor && <><dt>Vendor profile</dt><dd><strong>{selected.vendor.vendorCode}</strong> · {selected.vendor.status}</dd></>}</dl>
           {selected.callbackRequests.length > 0 && <section className={styles.callbacks}><h3>Callback requests ({selected.callbackRequests.length})</h3>{selected.callbackRequests.map(callback => <p key={callback.id}><strong>{callback.fullName}</strong> · {callback.mobile}<br/><span>{dateTime(callback.preferredTime)} · {statusLabel(callback.status)}</span></p>)}</section>}
           {!(["APPROVED", "REJECTED", "WITHDRAWN"] as Status[]).includes(selected.status) && <section className={styles.actions}><h3>Review decision</h3><label>Review note or reason<textarea maxLength={1000} rows={4} value={reason} onChange={event => setReason(event.target.value)} placeholder="Required when requesting information or rejecting" /></label><div className={styles.actionButtons}>{selected.status !== "UNDER_REVIEW" && <button disabled={busy} className={styles.secondary} onClick={() => void review("START_REVIEW")}>Start review</button>}<button disabled={busy || reason.trim().length < 3} className={styles.secondary} onClick={() => void review("REQUEST_INFORMATION")}>Request information</button><button disabled={busy || selected.status !== "UNDER_REVIEW"} className={styles.primary} onClick={() => void approve()}>Approve</button><button disabled={busy || reason.trim().length < 3} className={styles.danger} onClick={() => void review("REJECT")}>Reject</button></div></section>}
         </>}

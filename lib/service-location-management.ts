@@ -183,30 +183,43 @@ async function verifiedLocationIdentity(body: Record<string, unknown>) {
 
 function verifiedVendorWhere(
   location: { city: string; state: string },
-  service: { scope: VendorServiceScope; serviceType: VendorServiceType }
+  service: { scope: VendorServiceScope; serviceType: VendorServiceType; fulfilmentMode: ServiceFulfilmentMode }
 ): Prisma.VendorWhereInput {
+  const coverage = service.scope === VendorServiceScope.WITHIN_CITY
+    ? { OR: [
+        { scope: VendorServiceScope.WITHIN_CITY, originCity: { equals: location.city, mode: "insensitive" as const } },
+        { scope: VendorServiceScope.WITHIN_STATE, originState: { equals: location.state, mode: "insensitive" as const } },
+        { scope: VendorServiceScope.PAN_INDIA },
+      ] }
+    : service.scope === VendorServiceScope.WITHIN_STATE
+      ? { OR: [
+          { scope: VendorServiceScope.WITHIN_STATE, originState: { equals: location.state, mode: "insensitive" as const } },
+          { scope: VendorServiceScope.PAN_INDIA },
+        ] }
+      : { scope: VendorServiceScope.PAN_INDIA };
   return {
     deletedAt: null,
     status: "ACTIVE",
+    engagementMode: service.fulfilmentMode === ServiceFulfilmentMode.INSTANT_RATE
+      ? { in: ["INSTANT_RATE", "HYBRID"] }
+      : { in: ["QUOTATION", "HYBRID"] },
     serviceAreas: {
       some: {
         active: true,
-        scope: service.scope,
-        ...(service.scope === VendorServiceScope.WITHIN_CITY
-          ? { originCity: { equals: location.city, mode: "insensitive" } }
-          : service.scope === VendorServiceScope.WITHIN_STATE
-            ? { originState: { equals: location.state, mode: "insensitive" } }
-            : {}),
+        ...coverage,
       },
     },
     serviceOfferings: { some: { active: true, serviceType: service.serviceType } },
+    ...(service.fulfilmentMode === ServiceFulfilmentMode.INSTANT_RATE
+      ? { vehicles: { some: { isActive: true, status: "AVAILABLE", insuranceExpiry: { gt: new Date() } } } }
+      : {}),
   };
 }
 
 async function verifiedVendorCapacity(
   transaction: Prisma.TransactionClient,
   location: { city: string; state: string },
-  service: { scope: VendorServiceScope; serviceType: VendorServiceType }
+  service: { scope: VendorServiceScope; serviceType: VendorServiceType; fulfilmentMode: ServiceFulfilmentMode }
 ) {
   const where = verifiedVendorWhere(location, service);
   const [count, vendors] = await Promise.all([
@@ -224,7 +237,7 @@ async function verifiedVendorCapacity(
 async function verifiedVendorCount(
   transaction: Prisma.TransactionClient,
   location: { city: string; state: string },
-  service: { scope: VendorServiceScope; serviceType: VendorServiceType }
+  service: { scope: VendorServiceScope; serviceType: VendorServiceType; fulfilmentMode: ServiceFulfilmentMode }
 ) {
   return transaction.vendor.count({ where: verifiedVendorWhere(location, service) });
 }

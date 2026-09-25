@@ -51,6 +51,7 @@ export async function GET(
         referenceId: true,
         companyName: true,
         businessType: true,
+        engagementMode: true,
         operatingCategory: true,
         gstNumber: true,
         panNumber: true,
