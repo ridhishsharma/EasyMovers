@@ -16,6 +16,7 @@ type DashboardData = {
   officeUsers: { pendingInvitations: number } | null;
   leads: { counts: Counts; newToday: number } | null;
   serviceLocations: { counts: Counts } | null;
+  vendorChanges: { pending: number } | null;
   analytics: { periodDays: number; city: string | null; state: string | null; serviceType: string | null; vendorsAdded: number; leadsInPeriod: number; topServices: Array<{ serviceType: string | null; count: number }> };
   generatedAt: string;
 };
@@ -25,6 +26,7 @@ const total = (counts: Counts, statuses: string[]) => statuses.reduce((sum, stat
 const accessModules = [
   { name: "Vendor applications", href: "/admin/vendor-applications", permissions: [["vendor_application.read", "View"], ["vendor_application.review", "Review"], ["vendor_application.approve", "Approve"]] },
   { name: "Vendor operations", href: "/admin/vendors", permissions: [["vendor.read", "View"], ["vendor.manage", "Modify"], ["vendor.activate", "Activate / suspend"]] },
+  { name: "Change approvals", href: "/admin/vendor-changes", permissions: [["vendor.verify", "Approve / reject"]] },
   { name: "Service locations", href: "/admin/service-locations", permissions: [["service_location.read", "View"], ["service_location.manage", "Modify"], ["service_location.activate", "Activate / suspend"]] },
   { name: "Office users", href: "/admin/users", permissions: [["crm_user.read", "View"], ["crm_user.manage", "Invite / assign roles"]] },
   { name: "Sales leads", href: "/admin/leads", permissions: [["lead.read", "View"], ["lead.manage", "Modify"], ["lead.assign", "Assign"]] },
@@ -122,6 +124,7 @@ export function CrmDashboard({ supabaseUrl, publishableKey }: { supabaseUrl: str
         <Link className={styles.cardLink} href="/admin/vendors?coverage=ACTIVE"><article className={styles.cities}><span>Vendor-covered cities</span><strong>{data.vendors.activeCities}</strong><small>Open vendors with active coverage · View →</small></article></Link>
         <Link className={styles.cardLink} href={`/admin/vendors?createdWithin=${data.analytics.periodDays}`}><article className={styles.information}><span>Vendors added</span><strong>{data.analytics.vendorsAdded}</strong><small>Added during the selected period · View →</small></article></Link>
       </>}
+      {data.vendorChanges && <Link className={styles.cardLink} href="/admin/vendor-changes?status=PENDING"><article className={styles.verification}><span>Vendor changes awaiting approval</span><strong>{data.vendorChanges.pending}</strong><small>Independent checker action required · View →</small></article></Link>}
       {data.officeUsers && <Link className={styles.cardLink} href="/admin/users"><article className={styles.invitations}><span>Pending staff invitations</span><strong>{data.officeUsers.pendingInvitations}</strong><small>Passwords not configured · View →</small></article></Link>}
       {data.serviceLocations && <>
         <Link className={styles.cardLink} href="/admin/service-locations?status=ACTIVE"><article className={styles.cities}><span>Active service locations</span><strong>{data.serviceLocations.counts.ACTIVE ?? 0}</strong><small>Controlled launch cities · View →</small></article></Link>
@@ -142,6 +145,7 @@ export function CrmDashboard({ supabaseUrl, publishableKey }: { supabaseUrl: str
         {data.vendorApplications && <Link href="/admin/vendor-applications"><strong>{can("vendor_application.approve") ? "Review and approve vendor applications" : can("vendor_application.review") ? "Review vendor applications" : "View vendor applications"}</strong><span>{openApplications} currently require attention →</span></Link>}
         {data.officeUsers && <Link href="/admin/users"><strong>{can("crm_user.manage") ? "Manage office access" : "View office users"}</strong><span>{data.officeUsers.pendingInvitations} invitations awaiting password setup →</span></Link>}
         {data.vendors && <Link href="/admin/vendors"><strong>{can("vendor.activate") ? "Verify and activate vendors" : can("vendor.manage") ? "Maintain vendor records" : "View vendor directory"}</strong><span>{vendorExceptionTotal} operational exceptions require attention →</span></Link>}
+        {data.vendorChanges && <Link href="/admin/vendor-changes"><strong>Review vendor record changes</strong><span>{data.vendorChanges.pending} changes await an independent checker →</span></Link>}
         {data.leads && <Link href="/admin/leads?status=OPEN"><strong>{can("lead.manage") ? "Manage sales pipeline" : "View sales pipeline"}</strong><span>{pipelineLeads} open leads require follow-up →</span></Link>}
         {data.serviceLocations && <Link href="/admin/service-locations"><strong>{can("service_location.activate") ? "Control service location launches" : can("service_location.manage") ? "Maintain service locations" : "View service locations"}</strong><span>Review service readiness and launch capacity →</span></Link>}
       </div>

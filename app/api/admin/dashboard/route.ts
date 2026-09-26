@@ -68,6 +68,7 @@ export async function GET(request: Request) {
 
     const canSeeApplications = permissionSet.has(CRM_PERMISSIONS.VENDOR_APPLICATION_READ);
     const canSeeVendors = permissionSet.has(CRM_PERMISSIONS.VENDOR_READ);
+    const canVerifyVendorChanges = permissionSet.has(CRM_PERMISSIONS.VENDOR_VERIFY);
     const canSeeUsers = permissionSet.has(CRM_PERMISSIONS.CRM_USER_READ);
     const canSeeLeads = permissionSet.has(CRM_PERMISSIONS.LEAD_READ);
     const canSeeServiceLocations = permissionSet.has(CRM_PERMISSIONS.SERVICE_LOCATION_READ);
@@ -86,7 +87,7 @@ export async function GET(request: Request) {
       ...(serviceType ? { shiftingType: { equals: serviceType, mode: "insensitive" as const } } : {}),
     };
 
-    const [applicationGroups, oldestApplication, staleApplications, vendorGroups, cities, pendingInvitations, leadGroups, newLeadsToday, serviceLocationGroups, vendorsAdded, leadsInPeriod, topServices, activeVendorReadinessGaps, pendingVendorDocuments, instantVendorsWithExpiredInsurance] = await Promise.all([
+    const [applicationGroups, oldestApplication, staleApplications, vendorGroups, cities, pendingInvitations, leadGroups, newLeadsToday, serviceLocationGroups, vendorsAdded, leadsInPeriod, topServices, activeVendorReadinessGaps, pendingVendorDocuments, instantVendorsWithExpiredInsurance, pendingVendorChanges] = await Promise.all([
       canSeeApplications ? prisma.vendorApplication.groupBy({ by: ["status"], _count: { _all: true } }) : Promise.resolve([]),
       canSeeApplications ? prisma.vendorApplication.findFirst({
         where: { status: { in: ["PENDING", "UNDER_REVIEW", "NEEDS_INFORMATION"] } },
@@ -119,6 +120,7 @@ export async function GET(request: Request) {
           ],
         },
       }) : Promise.resolve(0),
+      canVerifyVendorChanges ? prisma.vendorChangeRequest.count({ where: { status: "PENDING" } }) : Promise.resolve(0),
       canSeeVendors ? prisma.vendorDocument.count({
         where: { isActive: true, verificationStatus: "PENDING", vendor: { deletedAt: null } },
       }) : Promise.resolve(0),
@@ -150,6 +152,7 @@ export async function GET(request: Request) {
       serviceLocations: canSeeServiceLocations ? {
         counts: Object.fromEntries(serviceLocationGroups.map(item => [item.status, item._count._all])),
       } : null,
+      vendorChanges: canVerifyVendorChanges ? { pending: pendingVendorChanges } : null,
       analytics: { periodDays, city: city || null, state: state || null, serviceType: serviceType || null, vendorsAdded, leadsInPeriod, topServices: topServices.map(item => ({ serviceType: item.shiftingType, count: item._count._all })) },
       generatedAt: new Date().toISOString(),
     } });

@@ -23,7 +23,7 @@ export async function GET(request: Request) {
   if (!Object.values(VendorChangeStatus).includes(value as VendorChangeStatus))
     return reply({ success: false, error: { code: "INVALID_STATUS", message: "Vendor change status is invalid." } }, 400);
   const changes = await listVendorChanges(value as VendorChangeStatus);
-  return reply({ success: true, data: { changes } });
+  return reply({ success: true, data: { changes, currentUserId: access.userId } });
 }
 
 export async function POST(request: Request) {

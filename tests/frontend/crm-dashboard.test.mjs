@@ -20,6 +20,7 @@ test("dashboard reports operational counts and pending-work ageing", () => {
   assert.match(api, /staleBefore/);
   assert.match(api, /oldestOpenAgeDays/);
   assert.match(api, /pendingInvitations/);
+  assert.match(api, /pendingVendorChanges/);
   assert.match(api, /activeCities/);
   assert.match(ui, /Applications awaiting action/);
   assert.match(ui, /oldest \{data\.vendorApplications\.oldestOpenAgeDays\} days/);
@@ -30,6 +31,7 @@ test("dashboard reports operational counts and pending-work ageing", () => {
   assert.match(api, /pendingVendorDocuments/);
   assert.match(api, /instantVendorsWithExpiredInsurance/);
   assert.match(ui, /Problems requiring attention/);
+  assert.match(ui, /Vendor changes awaiting approval/);
   assert.match(ui, /Active status and work eligibility are checked separately/);
 });
 
@@ -51,6 +53,7 @@ test("office entry point and navigation use the central CRM dashboard", () => {
   assert.match(adminPage, /redirect\("\/admin\/dashboard"\)/);
   assert.match(shell, /href="\/admin\/dashboard">Dashboard/);
   assert.match(shell, /href="\/admin\/vendors">Vendor operations/);
+  assert.match(shell, /href="\/admin\/vendor-changes">Change approvals/);
   assert.match(ui, /returnTo=\/admin\/dashboard/);
 });
 
