@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import styles from "./office-login.module.css";
 
-const DEFAULT_DESTINATION = "/admin/vendor-applications";
+const DEFAULT_DESTINATION = "/admin/dashboard";
 
 function safeDestination() {
   const requested = new URLSearchParams(window.location.search).get("returnTo");

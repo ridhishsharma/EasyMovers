@@ -113,23 +113,7 @@ export function CrmUsersAdmin({ supabaseUrl, publishableKey }: { supabaseUrl: st
     } catch (error) { setMessage(error instanceof Error ? error.message : "Unable to invite the office user."); setBusy(false); }
   }
 
-  async function signOutOffice() {
-    if (!client || busy) return;
-    setBusy(true);
-    try {
-      const accessToken = await token(client);
-      await fetch("/api/admin/session-events", {
-        method: "POST", cache: "no-store",
-        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ event: "LOGOUT" }),
-      });
-    } finally {
-      await client.auth.signOut();
-      router.replace("/admin/login");
-    }
-  }
-
-  const roleChoices = <fieldset><legend>CRM roles</legend><p>Permissions are inherited from the selected roles. Administrator roles are highlighted in gold.</p>{roles.map(role => {
+    const roleChoices = <fieldset><legend>CRM roles</legend><p>Permissions are inherited from the selected roles. Administrator roles are highlighted in gold.</p>{roles.map(role => {
     const selectedRole = roleCodes.includes(role.code);
     const roleTone = isAdministratorRole(role.code) ? styles.administratorRole : styles.operationalRole;
     return <label key={role.code} className={`${styles.roleOption} ${roleTone} ${selectedRole ? styles.selectedRole : ""}`}><input type="checkbox" checked={selectedRole} onChange={() => toggleRole(role.code)} /><span><strong>{role.name}</strong><small>{role.description}</small></span></label>;
@@ -143,7 +127,12 @@ export function CrmUsersAdmin({ supabaseUrl, publishableKey }: { supabaseUrl: st
   const firstName = currentUser?.fullName.trim().split(/\s+/)[0] || "Administrator";
 
   return <main className={styles.page}>
-    <header className={styles.heading}><div><p>OFFICE ACCESS MANAGEMENT</p><h1>Welcome, {firstName}</h1><span>Manage office users, invitations and role-based access.</span></div><div className={styles.headingActions}><button className={styles.secondary} disabled={busy} onClick={() => void signOutOffice()}>Sign out</button><button className={styles.primary} onClick={beginCreate}>Add office user</button></div></header>
+    <header className={styles.heading}><div><p>OFFICE ACCESS MANAGEMENT</p><h1>Welcome, {firstName}</h1><span>Manage office users, invitations and role-based access.</span></div><div className={styles.headingActions}>
+  <button className={styles.primary} onClick={beginCreate}>
+    Add office user
+  </button>
+</div>
+</header>
     <section className={styles.toolbar}><form onSubmit={event => { event.preventDefault(); setAppliedSearch(search.trim()); }}><label><span className={styles.srOnly}>Search office users</span><input value={search} maxLength={100} placeholder="Search name, email or mobile…" onChange={event => setSearch(event.target.value)} /></label><button>Search</button></form><button className={styles.linkButton} disabled={busy} onClick={() => void load()}>Refresh</button></section>
     {message && <p className={message.includes("updated") || message.includes("sent") ? styles.success : styles.error} role="status">{message}</p>}
     <div className={styles.workspace}>
