@@ -6,6 +6,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type FormEvent,
 } from "react";
@@ -124,6 +125,33 @@ const serviceTypes = [
   "INSTALLATION_UNINSTALLATION",
 ];
 
+const emptyVehicle = () => ({
+  registrationNumber: "",
+  vehicleType: "MINI_TRUCK",
+  ownership: "OWNED",
+  currentCity: "",
+  insuranceNumber: "",
+  insuranceExpiry: "",
+});
+
+const emptyDocument = () => ({
+  documentType: "PAN",
+  documentNumber: "",
+  fileName: "",
+  fileUrl: "",
+  expiryDate: "",
+  isMandatory: true,
+  verifyManually: true,
+});
+
+const emptyBank = () => ({
+  accountHolderName: "",
+  bankName: "",
+  accountNumber: "",
+  ifscCode: "",
+  accountType: "CURRENT",
+});
+
 export function VendorOperationsAdmin({
   supabaseUrl,
   publishableKey,
@@ -154,31 +182,17 @@ export function VendorOperationsAdmin({
   const [activePanel, setActivePanel] = useState<
     "services" | "verification" | "records"
   >("services");
-  const [vehicle, setVehicle] = useState({
-    registrationNumber: "",
-    vehicleType: "MINI_TRUCK",
-    ownership: "OWNED",
-    currentCity: "",
-    insuranceNumber: "",
-    insuranceExpiry: "",
-  });
+  const [vehicle, setVehicle] = useState(emptyVehicle);
   const [editingVehicleId, setEditingVehicleId] = useState<string | null>(null);
-  const [document, setDocument] = useState({
-    documentType: "PAN",
-    documentNumber: "",
-    fileName: "",
-    fileUrl: "",
-    expiryDate: "",
-    isMandatory: true,
-    verifyManually: true,
-  });
-  const [bank, setBank] = useState({
-    accountHolderName: "",
-    bankName: "",
-    accountNumber: "",
-    ifscCode: "",
-    accountType: "CURRENT",
-  });
+  const [document, setDocument] = useState(emptyDocument);
+  const [bank, setBank] = useState(emptyBank);
+  const openRequest = useRef(0);
+  const resetVendorDrafts = useCallback(() => {
+    setVehicle(emptyVehicle());
+    setEditingVehicleId(null);
+    setDocument(emptyDocument());
+    setBank(emptyBank());
+  }, []);
   const request = useCallback(
     async (path: string, init?: RequestInit) => {
       if (!client) throw new Error("Office authentication is not configured.");
@@ -224,13 +238,16 @@ export function VendorOperationsAdmin({
     }
   }, [coverage, createdWithin, request, search, status]);
   const open = useCallback(
-    async (id: string) => {
+    async (id: string, resetDrafts = false) => {
+      const requestNumber = ++openRequest.current;
+      if (resetDrafts) resetVendorDrafts();
       setLoading(true);
       setMessage("");
       try {
         const detail: Detail = await request(
           `/api/admin/vendors/${encodeURIComponent(id)}`,
         );
+        if (requestNumber !== openRequest.current) return;
         setSelected(detail);
         setOfferings(
           detail.vendor.serviceOfferings
@@ -256,16 +273,17 @@ export function VendorOperationsAdmin({
             })),
         );
       } catch (error) {
+        if (requestNumber !== openRequest.current) return;
         setMessage(
           error instanceof Error
             ? error.message
             : "Unable to load vendor readiness.",
         );
       } finally {
-        setLoading(false);
+        if (requestNumber === openRequest.current) setLoading(false);
       }
     },
-    [request],
+    [request, resetVendorDrafts],
   );
   useEffect(() => {
     void load();
@@ -318,6 +336,14 @@ export function VendorOperationsAdmin({
         method: "POST",
         body: JSON.stringify(body),
       });
+      if (body.action === "ADD_VEHICLE" || body.action === "UPDATE_VEHICLE") {
+        setVehicle(emptyVehicle());
+        setEditingVehicleId(null);
+      } else if (body.action === "ADD_DOCUMENT") {
+        setDocument(emptyDocument());
+      } else if (body.action === "ADD_BANK_ACCOUNT") {
+        setBank(emptyBank());
+      }
       await open(selected.vendor.id);
       await load();
       setMessageSuccess(true);
@@ -392,7 +418,7 @@ export function VendorOperationsAdmin({
               }
               onClick={() => {
                 setActivePanel("services");
-                void open(vendor.id);
+                void open(vendor.id, true);
               }}
             >
               <span>
@@ -689,7 +715,6 @@ export function VendorOperationsAdmin({
                             ? "Vehicle details updated."
                             : "Operational vehicle added.",
                         );
-                        setEditingVehicleId(null);
                       }}
                     >
                       <h4>{editingVehicleId ? "Update vehicle" : "Add vehicle"}</h4>

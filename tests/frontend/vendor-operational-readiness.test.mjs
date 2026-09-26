@@ -48,6 +48,15 @@ test("vendor CRM provides a responsive readiness workspace", () => {
   assert.match(ui, /registered EasyMovers service locations/);
 });
 
+test("vendor-specific operational drafts cannot leak between selections", () => {
+  assert.match(ui, /const resetVendorDrafts = useCallback/);
+  assert.match(ui, /setVehicle\(emptyVehicle\(\)\)/);
+  assert.match(ui, /setDocument\(emptyDocument\(\)\)/);
+  assert.match(ui, /setBank\(emptyBank\(\)\)/);
+  assert.match(ui, /void open\(vendor\.id, true\)/);
+  assert.match(ui, /requestNumber !== openRequest\.current/);
+});
+
 test("vendor service configuration is validated transactional and audited", () => {
   assert.match(configurationRoute, /CRM_PERMISSIONS\.VENDOR_MANAGE/);
   assert.match(configurationRoute, /replaceVendorServiceConfiguration/);
