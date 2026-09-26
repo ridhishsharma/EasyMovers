@@ -35,7 +35,7 @@ type LocationOption = {
   status: string;
 };
 type AreaDraft = {
-  scope: "WITHIN_CITY" | "WITHIN_STATE" | "PAN_INDIA";
+  scope: "" | "WITHIN_CITY" | "WITHIN_STATE" | "PAN_INDIA";
   locationId: string;
   pins: string;
 };
@@ -565,8 +565,8 @@ export function VendorOperationsAdmin({
                         setAreas((current) => [
                           ...current,
                           {
-                            scope: "WITHIN_CITY",
-                            locationId: selected.locationOptions[0]?.id || "",
+                            scope: "",
+                            locationId: "",
                             pins: "",
                           },
                         ])
@@ -584,22 +584,26 @@ export function VendorOperationsAdmin({
                         >
                           <select
                             aria-label={`Area ${index + 1} scope`}
+                            required
                             value={area.scope}
                             onChange={(event) =>
                               updateArea(index, {
                                 scope: event.target.value as AreaDraft["scope"],
-                                locationId:
+                                locationId: "",
+                                pins:
                                   event.target.value === "PAN_INDIA"
                                     ? ""
-                                    : area.locationId,
+                                    : area.pins,
                               })
                             }
                           >
+                            <option value="">Select coverage type</option>
                             <option value="WITHIN_CITY">Within city</option>
                             <option value="WITHIN_STATE">Within state</option>
                             <option value="PAN_INDIA">Pan India</option>
                           </select>
-                          {area.scope !== "PAN_INDIA" && (
+                          {(area.scope === "WITHIN_CITY" ||
+                            area.scope === "WITHIN_STATE") && (
                             <select
                               aria-label={`Area ${index + 1} location`}
                               required
@@ -611,7 +615,9 @@ export function VendorOperationsAdmin({
                               }
                             >
                               <option value="">
-                                Select registered location
+                                {area.scope === "WITHIN_STATE"
+                                  ? "Select state"
+                                  : "Select city"}
                               </option>
                               {selected.locationOptions
                                 .filter(
@@ -633,7 +639,9 @@ export function VendorOperationsAdmin({
                           )}
                           <input
                             aria-label={`Area ${index + 1} PIN codes`}
-                            disabled={area.scope === "PAN_INDIA"}
+                            disabled={
+                              !area.scope || area.scope === "PAN_INDIA"
+                            }
                             placeholder="Optional PIN codes"
                             value={area.pins}
                             onChange={(event) =>

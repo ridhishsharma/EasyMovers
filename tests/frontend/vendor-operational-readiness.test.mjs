@@ -57,6 +57,14 @@ test("vendor-specific operational drafts cannot leak between selections", () => 
   assert.match(ui, /requestNumber !== openRequest\.current/);
 });
 
+test("new vendor areas require an explicit city state or pan-India scope", () => {
+  assert.match(ui, /scope: ""/);
+  assert.match(ui, /Select coverage type/);
+  assert.match(ui, /"Select state"/);
+  assert.match(ui, /"Select city"/);
+  assert.match(ui, /locationId: ""/);
+});
+
 test("vendor service configuration is validated transactional and audited", () => {
   assert.match(configurationRoute, /CRM_PERMISSIONS\.VENDOR_MANAGE/);
   assert.match(configurationRoute, /replaceVendorServiceConfiguration/);
