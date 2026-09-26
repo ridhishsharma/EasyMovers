@@ -1,7 +1,7 @@
 "use client";
 import { createClient } from "@supabase/supabase-js";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { BrandLogo } from "./brand-logo";
 import styles from "./brand-shell.module.css";
@@ -14,7 +14,6 @@ export function AppBrandShell({ children, supabaseUrl, publishableKey }: {
   publishableKey: string;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
   const isAdmin = pathname.startsWith("/admin");
   const isAdminLogin = pathname === "/admin/login";
   const isProtectedAdminPage = isAdmin && !isAdminLogin;
@@ -34,14 +33,14 @@ export function AppBrandShell({ children, supabaseUrl, publishableKey }: {
     setSessionState("checking");
     if (!client) {
       setSessionState("unauthenticated");
-      router.replace(`/admin/login?returnTo=${encodeURIComponent(pathname)}`);
+      window.location.replace(`/admin/login?returnTo=${encodeURIComponent(pathname)}`);
       return;
     }
     void client.auth.getSession().then(({ data, error }) => {
       if (!active) return;
       if (error || !data.session) {
         setSessionState("unauthenticated");
-        router.replace(`/admin/login?returnTo=${encodeURIComponent(pathname)}`);
+        window.location.replace(`/admin/login?returnTo=${encodeURIComponent(pathname)}`);
         return;
       }
       setSessionState("authenticated");
@@ -50,7 +49,7 @@ export function AppBrandShell({ children, supabaseUrl, publishableKey }: {
       if (!active || event === "INITIAL_SESSION") return;
       if (event === "SIGNED_OUT" || !session) {
         setSessionState("unauthenticated");
-        router.replace(`/admin/login?returnTo=${encodeURIComponent(pathname)}`);
+        window.location.replace(`/admin/login?returnTo=${encodeURIComponent(pathname)}`);
       } else {
         setSessionState("authenticated");
       }
@@ -59,7 +58,7 @@ export function AppBrandShell({ children, supabaseUrl, publishableKey }: {
       active = false;
       data.subscription.unsubscribe();
     };
-  }, [client, isProtectedAdminPage, pathname, router]);
+  }, [client, isProtectedAdminPage, pathname]);
 
   async function signOutOffice() {
     if (!client || signingOut) return;
@@ -67,9 +66,11 @@ export function AppBrandShell({ children, supabaseUrl, publishableKey }: {
     try {
       const { data } = await client.auth.getSession();
       if (data.session) {
-        await fetch("/api/admin/session-events", {
+        // Audit logging must never prevent the browser session from closing.
+        void fetch("/api/admin/session-events", {
           method: "POST",
           cache: "no-store",
+          keepalive: true,
           headers: {
             Authorization: `Bearer ${data.session.access_token}`,
             "Content-Type": "application/json",
@@ -77,11 +78,13 @@ export function AppBrandShell({ children, supabaseUrl, publishableKey }: {
           body: JSON.stringify({ event: "LOGOUT" }),
         }).catch(() => undefined);
       }
-    } finally {
-      await client.auth.signOut();
+      const { error } = await client.auth.signOut({ scope: "local" });
+      if (error) throw error;
       setSessionState("unauthenticated");
-      router.replace("/admin/login");
-      router.refresh();
+      window.location.replace("/admin/login");
+    } catch {
+      setSigningOut(false);
+      window.alert("Sign out could not be completed. Please try again.");
     }
   }
 

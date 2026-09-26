@@ -63,7 +63,7 @@ test("central admin shell protects every CRM page and provides sign out", () => 
   assert.match(shell, /client\.auth\.onAuthStateChange/);
   assert.match(shell, /sessionState === "authenticated"/);
   assert.match(shell, /\/admin\/login\?returnTo=/);
-  assert.match(shell, /client\.auth\.signOut\(\)/);
+  assert.match(shell, /client\.auth\.signOut\(\{ scope: "local" \}\)/);
   assert.match(shell, /\/api\/admin\/session-events/);
   assert.match(shell, /event: "LOGOUT"/);
   assert.match(shell, /"Sign out"/);
