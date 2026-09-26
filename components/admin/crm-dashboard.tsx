@@ -119,8 +119,8 @@ export function CrmDashboard({ supabaseUrl, publishableKey }: { supabaseUrl: str
         <Link className={styles.cardLink} href="/admin/vendors?status=ACTIVE"><article className={styles.active}><span>Active vendors</span><strong>{data.vendors.counts.ACTIVE ?? 0}</strong><small>Operational network · View →</small></article></Link>
         <Link className={styles.cardLink} href="/admin/vendors?status=INACTIVE"><article className={styles.inactive}><span>Inactive vendors</span><strong>{data.vendors.counts.INACTIVE ?? 0}</strong><small>Require activation review · View →</small></article></Link>
         <Link className={styles.cardLink} href="/admin/vendors?status=PENDING"><article className={styles.verification}><span>Pending verification</span><strong>{data.vendors.counts.PENDING ?? 0}</strong><small>Vendor profiles awaiting checks · View →</small></article></Link>
-        <article className={styles.cities}><span>Vendor-covered cities</span><strong>{data.vendors.activeCities}</strong><small>Cities represented by active service areas</small></article>
-        <article className={styles.information}><span>Vendors added</span><strong>{data.analytics.vendorsAdded}</strong><small>During the selected {data.analytics.periodDays}-day period</small></article>
+        <Link className={styles.cardLink} href="/admin/vendors?coverage=ACTIVE"><article className={styles.cities}><span>Vendor-covered cities</span><strong>{data.vendors.activeCities}</strong><small>Open vendors with active coverage · View →</small></article></Link>
+        <Link className={styles.cardLink} href={`/admin/vendors?createdWithin=${data.analytics.periodDays}`}><article className={styles.information}><span>Vendors added</span><strong>{data.analytics.vendorsAdded}</strong><small>Added during the selected period · View →</small></article></Link>
       </>}
       {data.officeUsers && <Link className={styles.cardLink} href="/admin/users"><article className={styles.invitations}><span>Pending staff invitations</span><strong>{data.officeUsers.pendingInvitations}</strong><small>Passwords not configured · View →</small></article></Link>}
       {data.serviceLocations && <>

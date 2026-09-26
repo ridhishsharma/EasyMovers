@@ -51,7 +51,8 @@ test("vendor CRM provides a responsive readiness workspace", () => {
 test("vendor service configuration is validated transactional and audited", () => {
   assert.match(configurationRoute, /CRM_PERMISSIONS\.VENDOR_MANAGE/);
   assert.match(configurationRoute, /replaceVendorServiceConfiguration/);
-  assert.match(service, /ACTIVE_VENDOR_CONFIGURATION_LOCKED/);
+  assert.match(service, /ACTIVE_VENDOR_MINIMUM_CONFIGURATION_REQUIRED/);
+  assert.doesNotMatch(service, /Suspend the vendor before changing service areas or offerings/);
   assert.match(service, /DUPLICATE_SERVICE_AREA/);
   assert.match(service, /vendorServiceArea\.deleteMany/);
   assert.match(service, /vendorServiceOffering\.upsert/);
@@ -76,4 +77,8 @@ test("vendor operational evidence and activation are permission guarded and audi
   assert.match(ui, /Activate vendor/);
   assert.match(ui, /Operational records/);
   assert.match(ui, /setActivePanel/);
+  assert.match(ui, /Resolve →/);
+  assert.match(ui, /createdWithin/);
+  assert.match(ui, /coverage/);
+  assert.doesNotMatch(ui, /selected\.vendor\.status !== "ACTIVE"/);
 });

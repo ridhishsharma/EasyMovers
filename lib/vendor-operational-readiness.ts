@@ -278,12 +278,6 @@ async function requireEditableVendor(
       "Vendor was not found.",
       404,
     );
-  if (vendor.status === "ACTIVE")
-    throw new VendorOperationsError(
-      "ACTIVE_VENDOR_CONFIGURATION_LOCKED",
-      "Suspend the vendor before changing operational records.",
-      409,
-    );
   return vendor;
 }
 
@@ -938,11 +932,11 @@ export async function replaceVendorServiceConfiguration(
         "Vendor was not found.",
         404,
       );
-    if (vendor.status === "ACTIVE")
+    if (vendor.status === "ACTIVE" && (!areas.length || !serviceTypes.length))
       throw new VendorOperationsError(
-        "ACTIVE_VENDOR_CONFIGURATION_LOCKED",
-        "Suspend the vendor before changing service areas or offerings.",
-        409,
+        "ACTIVE_VENDOR_MINIMUM_CONFIGURATION_REQUIRED",
+        "An active vendor must retain at least one service area and one service offering.",
+        400,
       );
     await transaction.vendorServiceArea.deleteMany({
       where: { vendorId: vendor.id },

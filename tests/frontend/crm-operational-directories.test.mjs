@@ -12,6 +12,10 @@ test("vendor directory requires permission and bounded selected fields", () => {
   assert.match(vendorsApi, /pageSize > 100/);
   assert.match(vendorsApi, /select: \{/);
   assert.doesNotMatch(vendorsApi, /findMany\(\{[\s\S]*?include:/);
+  assert.match(vendorsApi, /ownerEmail/);
+  assert.match(vendorsApi, /originCity/);
+  assert.match(vendorsApi, /createdWithin/);
+  assert.match(vendorsApi, /coverage/);
 });
 
 test("lead pipeline requires permission and supports open and today filters", () => {

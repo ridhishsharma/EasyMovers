@@ -50,6 +50,7 @@ test("dashboard explains each staff member's effective CRM rights", () => {
 test("office entry point and navigation use the central CRM dashboard", () => {
   assert.match(adminPage, /redirect\("\/admin\/dashboard"\)/);
   assert.match(shell, /href="\/admin\/dashboard">Dashboard/);
+  assert.match(shell, /href="\/admin\/vendors">Vendor operations/);
   assert.match(ui, /returnTo=\/admin\/dashboard/);
 });
 
@@ -61,4 +62,6 @@ test("dashboard uses compact responsive cards and semantic status colours", () =
   assert.match(styles, /@media\(max-width:560px\)/);
   assert.match(ui, /Dashboard filters/);
   assert.match(ui, /Most requested services/);
+  assert.match(ui, /vendors\?coverage=ACTIVE/);
+  assert.match(ui, /vendors\?createdWithin=/);
 });

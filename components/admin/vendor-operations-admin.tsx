@@ -145,6 +145,8 @@ export function VendorOperationsAdmin({
   const [messageSuccess, setMessageSuccess] = useState(false);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState(() => searchParams.get("status")?.toUpperCase() ?? "");
+  const [coverage, setCoverage] = useState(() => searchParams.get("coverage")?.toUpperCase() ?? "");
+  const [createdWithin, setCreatedWithin] = useState(() => searchParams.get("createdWithin") ?? "");
   const [areas, setAreas] = useState<AreaDraft[]>([]);
   const [offerings, setOfferings] = useState<string[]>([]);
   const [activePanel, setActivePanel] = useState<
@@ -205,6 +207,8 @@ export function VendorOperationsAdmin({
       const query = new URLSearchParams({ page: "1", pageSize: "100" });
       if (search.trim()) query.set("search", search.trim());
       if (status) query.set("status", status);
+      if (coverage) query.set("coverage", coverage);
+      if (createdWithin) query.set("createdWithin", createdWithin);
       const data = await request(`/api/admin/vendors?${query}`);
       setVendors(data.vendors);
     } catch (error) {
@@ -214,7 +218,7 @@ export function VendorOperationsAdmin({
     } finally {
       setLoading(false);
     }
-  }, [request, search, status]);
+  }, [coverage, createdWithin, request, search, status]);
   const open = useCallback(
     async (id: string) => {
       setLoading(true);
@@ -323,8 +327,7 @@ export function VendorOperationsAdmin({
       setLoading(false);
     }
   }
-  const editable =
-    selected?.capabilities.canManage && selected.vendor.status !== "ACTIVE";
+  const editable = selected?.capabilities.canManage === true;
   return (
     <main className={styles.page}>
       <header className={styles.heading}>
@@ -348,13 +351,24 @@ export function VendorOperationsAdmin({
           value={search}
           maxLength={100}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search vendor, code, owner or city…"
+          placeholder="Search name, code, owner, phone, email, city, state or service area…"
         />
         <select aria-label="Filter vendors by status" value={status} onChange={(event) => setStatus(event.target.value)}>
           <option value="">All statuses</option>
           <option value="ACTIVE">Active</option>
           <option value="INACTIVE">Inactive</option>
           <option value="PENDING">Pending verification</option>
+        </select>
+        <select aria-label="Filter vendors by service coverage" value={coverage} onChange={(event) => setCoverage(event.target.value)}>
+          <option value="">All coverage</option>
+          <option value="ACTIVE">Has active coverage</option>
+          <option value="MISSING">Missing active coverage</option>
+        </select>
+        <select aria-label="Filter vendors by creation date" value={createdWithin} onChange={(event) => setCreatedWithin(event.target.value)}>
+          <option value="">Any joining date</option>
+          <option value="7">Added in last 7 days</option>
+          <option value="30">Added in last 30 days</option>
+          <option value="90">Added in last 90 days</option>
         </select>
         <button>Search</button>
       </form>
@@ -455,7 +469,7 @@ export function VendorOperationsAdmin({
                 <div className={styles.blockers}>
                   <strong>Activation blockers</strong>
                   {selected.readiness.blockers.map((blocker) => (
-                    <span key={blocker.code}>{blocker.message}</span>
+                    <span key={blocker.code}>{blocker.message}{selected.capabilities.canManage && <button type="button" onClick={() => setActivePanel(blocker.code.includes("SERVICE_") ? "services" : blocker.code.includes("DOCUMENT") || blocker.code.includes("PAN") || blocker.code.includes("BANK") || blocker.code.includes("VEHICLE") || blocker.code.includes("TRANSPORT") ? "verification" : "records")}>Resolve →</button>}</span>
                   ))}
                 </div>
               )}
@@ -630,14 +644,6 @@ export function VendorOperationsAdmin({
                   </button>
                 </form>
               )}
-              {selected.vendor.status === "ACTIVE" &&
-                selected.capabilities.canManage &&
-                activePanel === "services" && (
-                  <p className={styles.next}>
-                    Suspend this active vendor before changing service areas or
-                    offerings.
-                  </p>
-                )}
               {editable && activePanel === "verification" && (
                 <section className={styles.operations}>
                   <h3>Operational verification</h3>
