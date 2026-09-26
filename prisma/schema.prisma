@@ -116,6 +116,7 @@ model Vendor {
   reviews                VendorReview[]
   vehicles               VendorVehicle[]
   sourceApplication      VendorApplication?      @relation("VendorApplicationCreatedVendor")
+  changeRequests         VendorChangeRequest[]
 
   @@index([deletedAt])
   @@index([engagementMode])
@@ -553,6 +554,8 @@ model User {
   reviewedVendorApplications VendorApplication[]     @relation("VendorApplicationReviewer")
   crmRoleAssignments         UserCrmRole[]           @relation("CrmRoleAssignedUser")
   crmAuditLogs               CrmAuditLog[]           @relation("CrmAuditActor")
+  submittedVendorChanges     VendorChangeRequest[]   @relation("VendorChangeSubmittedBy")
+  reviewedVendorChanges      VendorChangeRequest[]   @relation("VendorChangeReviewedBy")
 
   @@index([mobile])
   @@index([email])
@@ -892,6 +895,36 @@ model VendorDocument {
   @@index([vendorId])
   @@index([documentType])
   @@index([verificationStatus])
+}
+
+model VendorChangeRequest {
+  id                String                 @id @default(cuid())
+  vendorId          String
+  entityType        VendorChangeEntityType
+  action            VendorChangeAction
+  entityId          String?
+  source            VendorChangeSource
+  status            VendorChangeStatus     @default(PENDING)
+  proposedData      Json
+  previousData      Json?
+  submissionNote    String?
+  reviewNote        String?
+  submittedByUserId String?
+  reviewedByUserId  String?
+  submittedAt       DateTime               @default(now())
+  reviewedAt        DateTime?
+  appliedAt         DateTime?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  vendor            Vendor                 @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  submittedBy       User?                  @relation("VendorChangeSubmittedBy", fields: [submittedByUserId], references: [id], onDelete: SetNull)
+  reviewedBy        User?                  @relation("VendorChangeReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([vendorId, status])
+  @@index([entityType, entityId])
+  @@index([submittedByUserId])
+  @@index([reviewedByUserId])
+  @@index([submittedAt])
 }
 
 model VendorRating {
@@ -1746,6 +1779,34 @@ enum VerificationStatus {
   PENDING
   VERIFIED
   REJECTED
+}
+
+enum VendorChangeEntityType {
+  PROFILE
+  SERVICE_AREA
+  SERVICE_OFFERING
+  VEHICLE
+  DOCUMENT
+  BANK_ACCOUNT
+}
+
+enum VendorChangeAction {
+  CREATE
+  UPDATE
+  DEACTIVATE
+}
+
+enum VendorChangeSource {
+  VENDOR_PORTAL
+  EM_STAFF
+}
+
+enum VendorChangeStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  SUPERSEDED
 }
 
 enum ReviewStatus {

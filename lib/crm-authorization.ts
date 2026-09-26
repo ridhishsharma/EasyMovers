@@ -10,6 +10,7 @@ export const CRM_PERMISSIONS = {
   VENDOR_APPLICATION_APPROVE: "vendor_application.approve",
   VENDOR_READ: "vendor.read",
   VENDOR_MANAGE: "vendor.manage",
+  VENDOR_VERIFY: "vendor.verify",
   VENDOR_ACTIVATE: "vendor.activate",
   SERVICE_LOCATION_READ: "service_location.read",
   SERVICE_LOCATION_MANAGE: "service_location.manage",
