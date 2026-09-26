@@ -20,7 +20,10 @@ return (
 
   <body className="bg-slate-950 text-white antialiased overflow-x-hidden">
 
-    <AppBrandShell>{children}</AppBrandShell>
+    <AppBrandShell
+      supabaseUrl={process.env.SUPABASE_URL || ""}
+      publishableKey={process.env.SUPABASE_PUBLISHABLE_KEY || ""}
+    >{children}</AppBrandShell>
 
   </body>
 

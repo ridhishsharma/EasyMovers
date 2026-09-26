@@ -6,6 +6,7 @@ const api = readFileSync(new URL("../../app/api/admin/dashboard/route.ts", impor
 const ui = readFileSync(new URL("../../components/admin/crm-dashboard.tsx", import.meta.url), "utf8");
 const adminPage = readFileSync(new URL("../../app/admin/page.tsx", import.meta.url), "utf8");
 const shell = readFileSync(new URL("../../components/brand/app-brand-shell.tsx", import.meta.url), "utf8");
+const rootLayout = readFileSync(new URL("../../app/layout.tsx", import.meta.url), "utf8");
 const styles = readFileSync(new URL("../../components/admin/crm-dashboard.module.css", import.meta.url), "utf8");
 
 test("CRM dashboard requires dashboard permission and returns no-store data", () => {
@@ -55,6 +56,18 @@ test("office entry point and navigation use the central CRM dashboard", () => {
   assert.match(shell, /href="\/admin\/vendors">Vendor operations/);
   assert.match(shell, /href="\/admin\/vendor-changes">Change approvals/);
   assert.match(ui, /returnTo=\/admin\/dashboard/);
+});
+
+test("central admin shell protects every CRM page and provides sign out", () => {
+  assert.match(shell, /client\.auth\.getSession\(\)/);
+  assert.match(shell, /client\.auth\.onAuthStateChange/);
+  assert.match(shell, /sessionState === "authenticated"/);
+  assert.match(shell, /\/admin\/login\?returnTo=/);
+  assert.match(shell, /client\.auth\.signOut\(\)/);
+  assert.match(shell, /\/api\/admin\/session-events/);
+  assert.match(shell, /event: "LOGOUT"/);
+  assert.match(shell, /"Sign out"/);
+  assert.match(rootLayout, /SUPABASE_PUBLISHABLE_KEY/);
 });
 
 test("dashboard uses compact responsive cards and semantic status colours", () => {

@@ -19,7 +19,45 @@
   font-weight: 600;
   align-items: center;
 }
+.adminActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 18px;
+}
+.signOut {
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 7px 14px;
+  border: 1px solid #b8cce0;
+  border-radius: 8px;
+  background: #fff;
+  color: #165ca3;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.signOut:hover:not(:disabled) {
+  background: #eef6ff;
+  border-color: #165ca3;
+}
+.signOut:disabled {
+  cursor: wait;
+  opacity: .65;
+}
+.sessionGate {
+  min-height: calc(100vh - 74px);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  color: #536b82;
+  background: #f1f6fc;
+}
 @media (max-width: 920px) {
+  .adminActions {
+    gap: 10px;
+  }
   .adminNav {
     flex-wrap: wrap;
     justify-content: flex-end;
@@ -51,5 +89,13 @@
   .adminArea {
     font-size: 11px;
     text-align: right;
+  }
+  .adminActions {
+    align-items: flex-end;
+  }
+  .signOut {
+    min-height: 34px;
+    padding: 5px 9px;
+    font-size: 12px;
   }
 }
