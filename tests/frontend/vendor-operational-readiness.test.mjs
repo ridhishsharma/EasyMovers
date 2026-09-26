@@ -81,6 +81,8 @@ test("vendor operational evidence and activation are permission guarded and audi
   assert.match(ui, /Original checked manually/);
   assert.match(ui, /Save & verify document/);
   assert.match(ui, /Update vehicle/);
+  assert.match(ui, /registered · View records/);
+  assert.match(ui, /uploaded · View records/);
   assert.match(ui, /setActivePanel/);
   assert.match(ui, /Resolve →/);
   assert.match(ui, /createdWithin/);

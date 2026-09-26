@@ -448,21 +448,39 @@ export function VendorOperationsAdmin({
                   <span>Service offerings</span>
                   <strong>{selected.readiness.activeServiceOfferings}</strong>
                 </article>
-                <article>
+                <button
+                  type="button"
+                  className={styles.recordCard}
+                  onClick={() => setActivePanel("records")}
+                  aria-label={`View ${selected.vendor.vehicles.length} registered vehicles`}
+                >
                   <span>Active vehicles</span>
                   <strong>{selected.readiness.activeVehicles}</strong>
-                </article>
-                <article>
+                  <small>{selected.vendor.vehicles.length} registered · View records →</small>
+                </button>
+                <button
+                  type="button"
+                  className={styles.recordCard}
+                  onClick={() => setActivePanel("records")}
+                  aria-label={`View ${selected.vendor.documents.length} compliance documents`}
+                >
                   <span>Verified documents</span>
                   <strong>
                     {selected.readiness.verifiedMandatoryDocuments}/
                     {selected.readiness.mandatoryDocuments}
                   </strong>
-                </article>
-                <article>
+                  <small>{selected.vendor.documents.length} uploaded · View records →</small>
+                </button>
+                <button
+                  type="button"
+                  className={styles.recordCard}
+                  onClick={() => setActivePanel("records")}
+                  aria-label={`View ${selected.vendor.bankAccounts.length} bank accounts`}
+                >
                   <span>Verified banks</span>
                   <strong>{selected.readiness.verifiedBankAccounts}</strong>
-                </article>
+                  <small>{selected.vendor.bankAccounts.length} recorded · View records →</small>
+                </button>
               </div>
               <div className={styles.next}>
                 <strong>Work eligibility</strong>
@@ -499,7 +517,7 @@ export function VendorOperationsAdmin({
                   className={activePanel === "records" ? styles.activeTab : ""}
                   onClick={() => setActivePanel("records")}
                 >
-                  Operational records
+                  Operational records ({selected.vendor.vehicles.length + selected.vendor.documents.length + selected.vendor.bankAccounts.length})
                 </button>
               </nav>
               {editable && activePanel === "services" && (
