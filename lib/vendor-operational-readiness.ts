@@ -374,6 +374,37 @@ export async function performVendorOperationalAction(
         );
         return { action, vehicleId: vehicle.id };
       }
+      if (action === "UPDATE_VEHICLE") {
+        await requireEditableVendor(transaction, vendorId);
+        const vehicleId = textValue(body.vehicleId, "Vehicle ID", 100);
+        const registrationNumber = textValue(
+          body.registrationNumber,
+          "Registration number",
+          20,
+        ).toUpperCase().replace(/[^A-Z0-9]/g, "");
+        if (!/^[A-Z0-9]{6,15}$/.test(registrationNumber))
+          throw new VendorOperationsError("INVALID_VENDOR_OPERATION", "Enter a valid vehicle registration number.", 400);
+        const vehicleType = enumValue(body.vehicleType, Object.values(VehicleType), "Vehicle type");
+        const ownership = enumValue(body.ownership, Object.values(VehicleOwnership), "Vehicle ownership");
+        const insuranceExpiry = body.insuranceExpiry ? new Date(String(body.insuranceExpiry)) : null;
+        if (insuranceExpiry && !Number.isFinite(insuranceExpiry.getTime()))
+          throw new VendorOperationsError("INVALID_VENDOR_OPERATION", "Insurance expiry date is invalid.", 400);
+        const result = await transaction.vendorVehicle.updateMany({
+          where: { id: vehicleId, vendorId, isActive: true },
+          data: {
+            registrationNumber,
+            vehicleType,
+            ownership,
+            currentCity: typeof body.currentCity === "string" ? body.currentCity.trim().slice(0, 100) || null : null,
+            insuranceNumber: typeof body.insuranceNumber === "string" ? body.insuranceNumber.trim().toUpperCase().slice(0, 100) || null : null,
+            insuranceExpiry,
+          },
+        });
+        if (!result.count)
+          throw new VendorOperationsError("VENDOR_VEHICLE_NOT_FOUND", "Active vendor vehicle was not found.", 404);
+        await audit(transaction, actorUserId, "VENDOR_VEHICLE_UPDATED", vendorId, { vehicleId, registrationNumber, vehicleType }, ipAddress);
+        return { action, vehicleId };
+      }
       if (action === "ADD_DOCUMENT") {
         await requireEditableVendor(transaction, vendorId);
         const documentType = enumValue(
@@ -381,8 +412,15 @@ export async function performVendorOperationalAction(
           Object.values(VendorDocumentType),
           "Document type",
         );
-        const fileName = textValue(body.fileName, "File name", 200);
-        const fileUrl = textValue(body.fileUrl, "Document URL", 1000);
+        const fileName = typeof body.fileName === "string" ? body.fileName.trim().slice(0, 200) || null : null;
+        const fileUrl = typeof body.fileUrl === "string" ? body.fileUrl.trim().slice(0, 1000) || null : null;
+        const verifyManually = body.verifyManually === true;
+        if (!verifyManually && !fileUrl)
+          throw new VendorOperationsError(
+            "INVALID_VENDOR_OPERATION",
+            "Provide a secure document URL or confirm that the original was checked manually.",
+            400,
+          );
         const expiryDate = body.expiryDate
           ? new Date(String(body.expiryDate))
           : null;
@@ -392,15 +430,31 @@ export async function performVendorOperationalAction(
             "Document expiry date is invalid.",
             400,
           );
-        try {
-          const url = new URL(fileUrl);
-          if (url.protocol !== "https:") throw new Error();
-        } catch {
-          throw new VendorOperationsError(
-            "INVALID_VENDOR_OPERATION",
-            "Document URL must be a valid HTTPS URL.",
-            400,
-          );
+        if (fileUrl) {
+          try {
+            const url = new URL(fileUrl);
+            if (url.protocol !== "https:") throw new Error();
+          } catch {
+            throw new VendorOperationsError(
+              "INVALID_VENDOR_OPERATION",
+              "Document URL must be a valid HTTPS URL.",
+              400,
+            );
+          }
+        }
+        if (verifyManually) {
+          await transaction.vendorDocument.updateMany({
+            where: {
+              vendorId,
+              documentType,
+              isActive: true,
+              verificationStatus: { not: VerificationStatus.VERIFIED },
+            },
+            data: {
+              isActive: false,
+              remarks: "Superseded by a manually verified document record.",
+            },
+          });
         }
         const document = await transaction.vendorDocument.create({
           data: {
@@ -414,7 +468,10 @@ export async function performVendorOperationalAction(
             fileUrl,
             expiryDate,
             isMandatory: body.isMandatory !== false,
-            verificationStatus: VerificationStatus.PENDING,
+            verificationStatus: verifyManually ? VerificationStatus.VERIFIED : VerificationStatus.PENDING,
+            verifiedBy: verifyManually ? actorUserId : null,
+            verifiedAt: verifyManually ? new Date() : null,
+            remarks: verifyManually ? "Original document checked manually by an authorised EasyMovers officer." : null,
             isActive: true,
           },
         });
@@ -423,7 +480,7 @@ export async function performVendorOperationalAction(
           actorUserId,
           "VENDOR_DOCUMENT_ADDED",
           vendorId,
-          { documentId: document.id, documentType },
+          { documentId: document.id, documentType, verifyManually },
           ipAddress,
         );
         return { action, documentId: document.id };

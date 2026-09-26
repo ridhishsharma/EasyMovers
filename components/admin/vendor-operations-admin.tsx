@@ -66,14 +66,16 @@ type Detail = {
       ownership: string;
       status: string;
       currentCity: string | null;
+      insuranceNumber: string | null;
+      insuranceExpiry: string | null;
       isActive: boolean;
     }>;
     documents: Array<{
       id: string;
       documentType: string;
       documentNumber: string | null;
-      fileName: string;
-      fileUrl: string;
+      fileName: string | null;
+      fileUrl: string | null;
       verificationStatus: string;
       isMandatory: boolean;
       isActive: boolean;
@@ -160,6 +162,7 @@ export function VendorOperationsAdmin({
     insuranceNumber: "",
     insuranceExpiry: "",
   });
+  const [editingVehicleId, setEditingVehicleId] = useState<string | null>(null);
   const [document, setDocument] = useState({
     documentType: "PAN",
     documentNumber: "",
@@ -167,6 +170,7 @@ export function VendorOperationsAdmin({
     fileUrl: "",
     expiryDate: "",
     isMandatory: true,
+    verifyManually: true,
   });
   const [bank, setBank] = useState({
     accountHolderName: "",
@@ -656,12 +660,21 @@ export function VendorOperationsAdmin({
                       onSubmit={(event) => {
                         event.preventDefault();
                         void operate(
-                          { action: "ADD_VEHICLE", ...vehicle },
-                          "Operational vehicle added.",
+                          {
+                            action: editingVehicleId
+                              ? "UPDATE_VEHICLE"
+                              : "ADD_VEHICLE",
+                            vehicleId: editingVehicleId,
+                            ...vehicle,
+                          },
+                          editingVehicleId
+                            ? "Vehicle details updated."
+                            : "Operational vehicle added.",
                         );
+                        setEditingVehicleId(null);
                       }}
                     >
-                      <h4>Add vehicle</h4>
+                      <h4>{editingVehicleId ? "Update vehicle" : "Add vehicle"}</h4>
                       <input
                         required
                         placeholder="Registration number"
@@ -749,14 +762,23 @@ export function VendorOperationsAdmin({
                           }
                         />
                       </label>
-                      <button disabled={loading}>Add vehicle</button>
+                      <button disabled={loading}>
+                        {editingVehicleId ? "Update vehicle" : "Add vehicle"}
+                      </button>
+                      {editingVehicleId && (
+                        <button type="button" onClick={() => setEditingVehicleId(null)}>
+                          Cancel edit
+                        </button>
+                      )}
                     </form>
                     <form
                       onSubmit={(event) => {
                         event.preventDefault();
                         void operate(
                           { action: "ADD_DOCUMENT", ...document },
-                          "Compliance document added for review.",
+                          document.verifyManually
+                            ? "Document manually verified and readiness recalculated."
+                            : "Compliance document added for review.",
                         );
                       }}
                     >
@@ -799,7 +821,6 @@ export function VendorOperationsAdmin({
                         }
                       />
                       <input
-                        required
                         placeholder="File name"
                         value={document.fileName}
                         onChange={(event) =>
@@ -810,9 +831,8 @@ export function VendorOperationsAdmin({
                         }
                       />
                       <input
-                        required
                         type="url"
-                        placeholder="Secure document URL (https://…)"
+                        placeholder="Secure document URL (optional)"
                         value={document.fileUrl}
                         onChange={(event) =>
                           setDocument((current) => ({
@@ -821,6 +841,10 @@ export function VendorOperationsAdmin({
                           }))
                         }
                       />
+                      <small>
+                        Do not use a public Drive link. Leave file details blank
+                        when checking the original document manually.
+                      </small>
                       <label className={styles.dateField}>
                         Document expiry (when applicable)
                         <input
@@ -847,7 +871,24 @@ export function VendorOperationsAdmin({
                         />{" "}
                         Mandatory for activation
                       </label>
-                      <button disabled={loading}>Add document</button>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={document.verifyManually}
+                          onChange={(event) =>
+                            setDocument((current) => ({
+                              ...current,
+                              verifyManually: event.target.checked,
+                            }))
+                          }
+                        />{" "}
+                        Original checked manually — verify now
+                      </label>
+                      <button disabled={loading}>
+                        {document.verifyManually
+                          ? "Save & verify document"
+                          : "Save for review"}
+                      </button>
                     </form>
                     <form
                       onSubmit={(event) => {
@@ -947,6 +988,26 @@ export function VendorOperationsAdmin({
                           <em>{item.isActive ? "Operational" : "Inactive"}</em>
                           {editable && item.isActive && (
                             <button
+                              onClick={() => {
+                                setVehicle({
+                                  registrationNumber: item.registrationNumber,
+                                  vehicleType: item.vehicleType,
+                                  ownership: item.ownership,
+                                  currentCity: item.currentCity || "",
+                                  insuranceNumber: item.insuranceNumber || "",
+                                  insuranceExpiry: item.insuranceExpiry
+                                    ? item.insuranceExpiry.slice(0, 10)
+                                    : "",
+                                });
+                                setEditingVehicleId(item.id);
+                                setActivePanel("verification");
+                              }}
+                            >
+                              Edit
+                            </button>
+                          )}
+                          {editable && item.isActive && (
+                            <button
                               className={styles.danger}
                               onClick={() => {
                                 if (
@@ -978,13 +1039,13 @@ export function VendorOperationsAdmin({
                       <p key={item.id}>
                         <span>
                           <b>{label(item.documentType)}</b> ·{" "}
-                          <a
-                            href={item.fileUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            {item.fileName}
-                          </a>{" "}
+                          {item.fileUrl ? (
+                            <a href={item.fileUrl} target="_blank" rel="noreferrer">
+                              {item.fileName || "Secure evidence"}
+                            </a>
+                          ) : (
+                            <span>{item.fileName || "Manual original check"}</span>
+                          )}{" "}
                           · {item.isMandatory ? "Mandatory" : "Optional"}
                         </span>
                         <span>

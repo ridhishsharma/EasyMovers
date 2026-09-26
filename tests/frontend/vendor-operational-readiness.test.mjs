@@ -63,6 +63,8 @@ test("vendor operational evidence and activation are permission guarded and audi
   assert.match(operationsRoute, /CRM_PERMISSIONS\.VENDOR_MANAGE/);
   assert.match(operationsRoute, /CRM_PERMISSIONS\.VENDOR_ACTIVATE/);
   assert.match(service, /ADD_VEHICLE/);
+  assert.match(service, /UPDATE_VEHICLE/);
+  assert.match(service, /Superseded by a manually verified document record/);
   assert.match(service, /ADD_DOCUMENT/);
   assert.match(service, /REVIEW_DOCUMENT/);
   assert.match(service, /ADD_BANK_ACCOUNT/);
@@ -76,6 +78,9 @@ test("vendor operational evidence and activation are permission guarded and audi
   assert.match(ui, /Operational verification/);
   assert.match(ui, /Activate vendor/);
   assert.match(ui, /Operational records/);
+  assert.match(ui, /Original checked manually/);
+  assert.match(ui, /Save & verify document/);
+  assert.match(ui, /Update vehicle/);
   assert.match(ui, /setActivePanel/);
   assert.match(ui, /Resolve →/);
   assert.match(ui, /createdWithin/);

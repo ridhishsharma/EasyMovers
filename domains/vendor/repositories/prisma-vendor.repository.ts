@@ -6491,10 +6491,10 @@ export function mapPrismaVendorDocumentToDomain(
       undefined,
 
     documentUrl:
-      document.fileUrl,
+      document.fileUrl ?? "",
 
     fileName:
-      document.fileName,
+      document.fileName ?? "Manual verification",
 
     mimeType:
       document.mimeType ??

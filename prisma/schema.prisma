@@ -871,8 +871,8 @@ model VendorDocument {
   vendorId           String
   documentType       VendorDocumentType
   documentNumber     String?
-  fileName           String
-  fileUrl            String
+  fileName           String?
+  fileUrl            String?
   fileSize           Int?
   mimeType           String?
   issuedBy           String?
