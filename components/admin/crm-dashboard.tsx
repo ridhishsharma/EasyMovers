@@ -12,7 +12,7 @@ type DashboardData = {
   roles: Array<{ code: string; name: string }>;
   permissions: string[];
   vendorApplications: { counts: Counts; staleCount: number; oldestOpenAgeDays: number } | null;
-  vendors: { counts: Counts; activeCities: number } | null;
+  vendors: { counts: Counts; activeCities: number; exceptions: { activeReadinessGaps: number; pendingDocuments: number; expiredInstantInsurance: number } } | null;
   officeUsers: { pendingInvitations: number } | null;
   leads: { counts: Counts; newToday: number } | null;
   serviceLocations: { counts: Counts } | null;
@@ -21,6 +21,14 @@ type DashboardData = {
 };
 
 const total = (counts: Counts, statuses: string[]) => statuses.reduce((sum, status) => sum + (counts[status] ?? 0), 0);
+
+const accessModules = [
+  { name: "Vendor applications", href: "/admin/vendor-applications", permissions: [["vendor_application.read", "View"], ["vendor_application.review", "Review"], ["vendor_application.approve", "Approve"]] },
+  { name: "Vendor operations", href: "/admin/vendors", permissions: [["vendor.read", "View"], ["vendor.manage", "Modify"], ["vendor.activate", "Activate / suspend"]] },
+  { name: "Service locations", href: "/admin/service-locations", permissions: [["service_location.read", "View"], ["service_location.manage", "Modify"], ["service_location.activate", "Activate / suspend"]] },
+  { name: "Office users", href: "/admin/users", permissions: [["crm_user.read", "View"], ["crm_user.manage", "Invite / assign roles"]] },
+  { name: "Sales leads", href: "/admin/leads", permissions: [["lead.read", "View"], ["lead.manage", "Modify"], ["lead.assign", "Assign"]] },
+] as const;
 
 export function CrmDashboard({ supabaseUrl, publishableKey }: { supabaseUrl: string; publishableKey: string }) {
   const router = useRouter();
@@ -58,8 +66,10 @@ export function CrmDashboard({ supabaseUrl, publishableKey }: { supabaseUrl: str
   if (!data) return <main className={styles.page}><section className={styles.error}><h1>Dashboard unavailable</h1><p>{message}</p><button onClick={() => void load()}>Try again</button></section></main>;
 
   const firstName = data.user.fullName.trim().split(/\s+/)[0] || "there";
+  const can = (permission: string) => data.permissions.includes(permission);
   const openApplications = data.vendorApplications ? total(data.vendorApplications.counts, ["PENDING", "UNDER_REVIEW", "NEEDS_INFORMATION"]) : 0;
   const pipelineLeads = data.leads ? total(data.leads.counts, ["NEW", "CONTACTED", "QUALIFIED"]) : 0;
+  const vendorExceptionTotal = data.vendors ? data.vendors.exceptions.activeReadinessGaps + data.vendors.exceptions.pendingDocuments + data.vendors.exceptions.expiredInstantInsurance : 0;
 
   return <main className={styles.page}>
     <header className={styles.heading}>
@@ -70,6 +80,26 @@ export function CrmDashboard({ supabaseUrl, publishableKey }: { supabaseUrl: str
       <span>Signed in as <strong>{data.user.email || data.user.fullName}</strong></span>
       <div>{data.roles.map(role => <span className={role.code.includes("ADMIN") ? styles.adminRole : styles.role} key={role.code}>{role.name}</span>)}</div>
     </section>
+
+    <section className={styles.access} aria-labelledby="access-heading">
+      <div className={styles.accessIntro}><p className={styles.eyebrow}>YOUR AUTHORISED ACCESS</p><h2 id="access-heading">What you can do</h2><p>Only the actions listed below are enabled for your assigned CRM roles.</p></div>
+      <div className={styles.accessGrid}>{accessModules.map(module => {
+        const granted = module.permissions.filter(([permission]) => can(permission));
+        return <article key={module.name} className={granted.length ? styles.accessGranted : styles.accessDenied}>
+          <div><strong>{module.name}</strong><span>{granted.length ? granted.map(([, label]) => label).join(" · ") : "No access assigned"}</span></div>
+          {granted.length > 0 && <Link href={module.href}>Open →</Link>}
+        </article>;
+      })}</div>
+    </section>
+
+    {data.vendors && vendorExceptionTotal > 0 && <section className={styles.exceptions} aria-labelledby="exceptions-heading">
+      <div><p className={styles.eyebrow}>CONTROL EXCEPTIONS</p><h2 id="exceptions-heading">Problems requiring attention</h2><p>Active status and work eligibility are checked separately. Resolve these gaps before assigning affected vendors.</p></div>
+      <div className={styles.exceptionGrid}>
+        {data.vendors.exceptions.activeReadinessGaps > 0 && <Link href="/admin/vendors?status=ACTIVE"><strong>{data.vendors.exceptions.activeReadinessGaps}</strong><span>active vendors have readiness gaps</span><small>{can("vendor.manage") ? "Open and resolve →" : "Open for review →"}</small></Link>}
+        {data.vendors.exceptions.pendingDocuments > 0 && <Link href="/admin/vendors"><strong>{data.vendors.exceptions.pendingDocuments}</strong><span>documents await verification</span><small>{can("vendor.manage") ? "Open verification queue →" : "Open for review →"}</small></Link>}
+        {data.vendors.exceptions.expiredInstantInsurance > 0 && <Link href="/admin/vendors?status=ACTIVE"><strong>{data.vendors.exceptions.expiredInstantInsurance}</strong><span>instant-rate vendors have missing or expired insurance</span><small>{can("vendor.activate") ? "Review eligibility →" : "Open for review →"}</small></Link>}
+      </div>
+    </section>}
 
     <form className={styles.filters} aria-label="Dashboard filters" onSubmit={(event) => { event.preventDefault(); setAppliedFilters({ period, city: city.trim(), state: state.trim(), serviceType }); }}>
       <label>Period<select value={period} onChange={(event) => setPeriod(event.target.value)}><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option></select></label>
@@ -109,11 +139,11 @@ export function CrmDashboard({ supabaseUrl, publishableKey }: { supabaseUrl: str
     <section className={styles.work}>
       <div><p className={styles.eyebrow}>TODAY&apos;S WORK</p><h2>Action centre</h2><p>Only modules permitted for your assigned roles are shown.</p></div>
       <div className={styles.actions}>
-        {data.vendorApplications && <Link href="/admin/vendor-applications"><strong>Review vendor applications</strong><span>{openApplications} currently require attention →</span></Link>}
-        {data.officeUsers && <Link href="/admin/users"><strong>Manage office access</strong><span>{data.officeUsers.pendingInvitations} invitations awaiting password setup →</span></Link>}
-        {data.vendors && <Link href="/admin/vendors"><strong>Open vendor directory</strong><span>Review verification and operational capacity →</span></Link>}
-        {data.leads && <Link href="/admin/leads?status=OPEN"><strong>Manage sales pipeline</strong><span>{pipelineLeads} open leads require follow-up →</span></Link>}
-        {data.serviceLocations && <Link href="/admin/service-locations"><strong>Manage service locations</strong><span>Review service readiness and launch capacity →</span></Link>}
+        {data.vendorApplications && <Link href="/admin/vendor-applications"><strong>{can("vendor_application.approve") ? "Review and approve vendor applications" : can("vendor_application.review") ? "Review vendor applications" : "View vendor applications"}</strong><span>{openApplications} currently require attention →</span></Link>}
+        {data.officeUsers && <Link href="/admin/users"><strong>{can("crm_user.manage") ? "Manage office access" : "View office users"}</strong><span>{data.officeUsers.pendingInvitations} invitations awaiting password setup →</span></Link>}
+        {data.vendors && <Link href="/admin/vendors"><strong>{can("vendor.activate") ? "Verify and activate vendors" : can("vendor.manage") ? "Maintain vendor records" : "View vendor directory"}</strong><span>{vendorExceptionTotal} operational exceptions require attention →</span></Link>}
+        {data.leads && <Link href="/admin/leads?status=OPEN"><strong>{can("lead.manage") ? "Manage sales pipeline" : "View sales pipeline"}</strong><span>{pipelineLeads} open leads require follow-up →</span></Link>}
+        {data.serviceLocations && <Link href="/admin/service-locations"><strong>{can("service_location.activate") ? "Control service location launches" : can("service_location.manage") ? "Maintain service locations" : "View service locations"}</strong><span>Review service readiness and launch capacity →</span></Link>}
       </div>
     </section>
   </main>;

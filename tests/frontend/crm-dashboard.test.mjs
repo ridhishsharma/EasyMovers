@@ -26,6 +26,25 @@ test("dashboard reports operational counts and pending-work ageing", () => {
   assert.match(ui, /Only modules permitted for your assigned roles are shown/);
   assert.match(ui, /Active service locations/);
   assert.match(ui, /Locations ready to launch/);
+  assert.match(api, /activeVendorReadinessGaps/);
+  assert.match(api, /pendingVendorDocuments/);
+  assert.match(api, /instantVendorsWithExpiredInsurance/);
+  assert.match(ui, /Problems requiring attention/);
+  assert.match(ui, /Active status and work eligibility are checked separately/);
+});
+
+test("dashboard explains each staff member's effective CRM rights", () => {
+  assert.match(ui, /YOUR AUTHORISED ACCESS/);
+  assert.match(ui, /What you can do/);
+  assert.match(ui, /No access assigned/);
+  assert.match(ui, /vendor_application\.approve/);
+  assert.match(ui, /vendor\.activate/);
+  assert.match(ui, /service_location\.activate/);
+  assert.match(ui, /Invite \/ assign roles/);
+  assert.match(ui, /can\("vendor\.manage"\)/);
+  assert.match(styles, /accessGranted/);
+  assert.match(styles, /accessDenied/);
+  assert.match(styles, /exceptionGrid/);
 });
 
 test("office entry point and navigation use the central CRM dashboard", () => {

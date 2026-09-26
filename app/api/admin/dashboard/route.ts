@@ -86,7 +86,7 @@ export async function GET(request: Request) {
       ...(serviceType ? { shiftingType: { equals: serviceType, mode: "insensitive" as const } } : {}),
     };
 
-    const [applicationGroups, oldestApplication, staleApplications, vendorGroups, cities, pendingInvitations, leadGroups, newLeadsToday, serviceLocationGroups, vendorsAdded, leadsInPeriod, topServices] = await Promise.all([
+    const [applicationGroups, oldestApplication, staleApplications, vendorGroups, cities, pendingInvitations, leadGroups, newLeadsToday, serviceLocationGroups, vendorsAdded, leadsInPeriod, topServices, activeVendorReadinessGaps, pendingVendorDocuments, instantVendorsWithExpiredInsurance] = await Promise.all([
       canSeeApplications ? prisma.vendorApplication.groupBy({ by: ["status"], _count: { _all: true } }) : Promise.resolve([]),
       canSeeApplications ? prisma.vendorApplication.findFirst({
         where: { status: { in: ["PENDING", "UNDER_REVIEW", "NEEDS_INFORMATION"] } },
@@ -107,6 +107,29 @@ export async function GET(request: Request) {
       canSeeVendors ? prisma.vendor.count({ where: { ...vendorFilter, createdAt: { gte: periodStart } } }) : Promise.resolve(0),
       canSeeLeads ? prisma.lead.count({ where: leadPeriodFilter }) : Promise.resolve(0),
       canSeeLeads ? prisma.lead.groupBy({ by: ["shiftingType"], where: { ...leadPeriodFilter, shiftingType: { not: null } }, _count: { _all: true }, orderBy: { _count: { shiftingType: "desc" } }, take: 5 }) : Promise.resolve([]),
+      canSeeVendors ? prisma.vendor.count({
+        where: {
+          deletedAt: null,
+          status: "ACTIVE",
+          OR: [
+            { serviceAreas: { none: { active: true } } },
+            { serviceOfferings: { none: { active: true } } },
+            { documents: { none: { isActive: true, documentType: "PAN", verificationStatus: "VERIFIED" } } },
+            { bankAccounts: { none: { isActive: true, verified: true } } },
+          ],
+        },
+      }) : Promise.resolve(0),
+      canSeeVendors ? prisma.vendorDocument.count({
+        where: { isActive: true, verificationStatus: "PENDING", vendor: { deletedAt: null } },
+      }) : Promise.resolve(0),
+      canSeeVendors ? prisma.vendor.count({
+        where: {
+          deletedAt: null,
+          status: "ACTIVE",
+          engagementMode: { in: ["INSTANT_RATE", "HYBRID"] },
+          vehicles: { some: { isActive: true, OR: [{ insuranceExpiry: null }, { insuranceExpiry: { lte: new Date() } }] } },
+        },
+      }) : Promise.resolve(0),
     ]);
 
     return reply({ success: true, data: {
@@ -116,7 +139,9 @@ export async function GET(request: Request) {
         staleCount: staleApplications, oldestOpenAgeDays: ageInDays(oldestApplication?.createdAt ?? null),
       } : null,
       vendors: canSeeVendors ? {
-        counts: Object.fromEntries(vendorGroups.map(item => [item.status, item._count._all])), activeCities: cities.length,
+        counts: Object.fromEntries(vendorGroups.map(item => [item.status, item._count._all])),
+        activeCities: cities.length,
+        exceptions: { activeReadinessGaps: activeVendorReadinessGaps, pendingDocuments: pendingVendorDocuments, expiredInstantInsurance: instantVendorsWithExpiredInsurance },
       } : null,
       officeUsers: canSeeUsers ? { pendingInvitations } : null,
       leads: canSeeLeads ? {
