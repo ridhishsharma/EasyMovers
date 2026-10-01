@@ -120,7 +120,6 @@ export async function GET(request: Request) {
           ],
         },
       }) : Promise.resolve(0),
-      canVerifyVendorChanges ? prisma.vendorChangeRequest.count({ where: { status: "PENDING" } }) : Promise.resolve(0),
       canSeeVendors ? prisma.vendorDocument.count({
         where: { isActive: true, verificationStatus: "PENDING", vendor: { deletedAt: null } },
       }) : Promise.resolve(0),
@@ -132,6 +131,7 @@ export async function GET(request: Request) {
           vehicles: { some: { isActive: true, OR: [{ insuranceExpiry: null }, { insuranceExpiry: { lte: new Date() } }] } },
         },
       }) : Promise.resolve(0),
+      canVerifyVendorChanges ? prisma.vendorChangeRequest.count({ where: { status: "PENDING" } }) : Promise.resolve(0),
     ]);
 
     return reply({ success: true, data: {

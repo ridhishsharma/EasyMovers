@@ -26,7 +26,9 @@ test("lead pipeline requires permission and supports open and today filters", ()
 });
 
 test("dashboard cards drill into filtered operational directories", () => {
-  assert.match(dashboard, /href="\/admin\/vendors\?status=PENDING"/);
+  assert.match(dashboard, /href="\/admin\/vendors\?status=ACTIVE"/);
+  assert.match(dashboard, /href="\/admin\/vendors\?status=INACTIVE"/);
+  assert.doesNotMatch(dashboard, /<span>Pending verification<\/span>/);
   assert.match(dashboard, /href="\/admin\/leads\?status=OPEN"/);
   assert.match(dashboard, /href="\/admin\/leads\?period=today"/);
   assert.match(dashboard, /className=\{styles\.cardLink\}/);

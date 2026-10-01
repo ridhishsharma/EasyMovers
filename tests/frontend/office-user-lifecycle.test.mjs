@@ -9,6 +9,7 @@ const login = readFileSync("components/admin/office-login.tsx", "utf8");
 const usersRoute = readFileSync("app/api/admin/crm-users/route.ts", "utf8");
 const usersUi = readFileSync("components/admin/crm-users-admin.tsx", "utf8");
 const vendorUi = readFileSync("components/admin/vendor-applications-admin.tsx", "utf8");
+const shell = readFileSync("components/brand/app-brand-shell.tsx", "utf8");
 
 test("office account lifecycle is persisted by the schema migration", () => {
   for (const field of ["officeInvitedAt", "officeInvitationAcceptedAt", "officePasswordSetAt", "officeFirstLoginAt", "officeLastLogoutAt"]) {
@@ -33,10 +34,10 @@ test("office authentication records acceptance, password setup, login and logout
   assert.match(login, /"PASSWORD_SET"/);
   assert.match(login, /"LOGIN"/);
   assert.match(login, /"LOGOUT"/);
-  assert.match(vendorUi, /signOutOffice/);
-  assert.match(vendorUi, /event: "LOGOUT"/);
-  assert.match(usersUi, /signOutOffice/);
-  assert.match(usersUi, /event: "LOGOUT"/);
+  assert.match(shell, /signOutOffice/);
+  assert.match(shell, /event: "LOGOUT"/);
+  assert.doesNotMatch(vendorUi, />Sign out<\/button>/);
+  assert.doesNotMatch(usersUi, />Sign out<\/button>/);
 });
 
 test("office user administration exposes lifecycle status and timestamps", () => {

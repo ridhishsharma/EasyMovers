@@ -31,9 +31,12 @@ test("dashboard reports operational counts and pending-work ageing", () => {
   assert.match(api, /activeVendorReadinessGaps/);
   assert.match(api, /pendingVendorDocuments/);
   assert.match(api, /instantVendorsWithExpiredInsurance/);
+  assert.match(api, /vendorDocument\.count[\s\S]+insuranceExpiry[\s\S]+vendorChangeRequest\.count/);
   assert.match(ui, /Problems requiring attention/);
-  assert.match(ui, /Vendor changes awaiting approval/);
+  assert.match(ui, /Changes awaiting checker/);
   assert.match(ui, /Active status and work eligibility are checked separately/);
+  assert.match(ui, /vendor-applications\?status=ACTION/);
+  assert.doesNotMatch(ui, /<span>Pending verification<\/span>/);
 });
 
 test("dashboard explains each staff member's effective CRM rights", () => {

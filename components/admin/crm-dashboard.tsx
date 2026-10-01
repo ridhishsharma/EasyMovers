@@ -114,17 +114,16 @@ export function CrmDashboard({ supabaseUrl, publishableKey }: { supabaseUrl: str
 
     <section className={styles.cards} aria-label="CRM summary">
       {data.vendorApplications && <>
-        <Link className={styles.cardLink} href="/admin/vendor-applications?status=PENDING"><article className={styles.attention}><span>Applications awaiting action</span><strong>{openApplications}</strong><small>{data.vendorApplications.staleCount} over SLA · oldest {data.vendorApplications.oldestOpenAgeDays} days · View →</small></article></Link>
+        <Link className={styles.cardLink} href="/admin/vendor-applications?status=ACTION"><article className={styles.attention}><span>Applications awaiting action</span><strong>{openApplications}</strong><small>Pending, under review or awaiting information · {data.vendorApplications.staleCount} over SLA · oldest {data.vendorApplications.oldestOpenAgeDays} days · View →</small></article></Link>
         <Link className={styles.cardLink} href="/admin/vendor-applications?status=APPROVED"><article className={styles.success}><span>Approved applications</span><strong>{data.vendorApplications.counts.APPROVED ?? 0}</strong><small>Converted to vendor profiles · View →</small></article></Link>
       </>}
       {data.vendors && <>
         <Link className={styles.cardLink} href="/admin/vendors?status=ACTIVE"><article className={styles.active}><span>Active vendors</span><strong>{data.vendors.counts.ACTIVE ?? 0}</strong><small>Operational network · View →</small></article></Link>
         <Link className={styles.cardLink} href="/admin/vendors?status=INACTIVE"><article className={styles.inactive}><span>Inactive vendors</span><strong>{data.vendors.counts.INACTIVE ?? 0}</strong><small>Require activation review · View →</small></article></Link>
-        <Link className={styles.cardLink} href="/admin/vendors?status=PENDING"><article className={styles.verification}><span>Pending verification</span><strong>{data.vendors.counts.PENDING ?? 0}</strong><small>Vendor profiles awaiting checks · View →</small></article></Link>
         <Link className={styles.cardLink} href="/admin/vendors?coverage=ACTIVE"><article className={styles.cities}><span>Vendor-covered cities</span><strong>{data.vendors.activeCities}</strong><small>Open vendors with active coverage · View →</small></article></Link>
         <Link className={styles.cardLink} href={`/admin/vendors?createdWithin=${data.analytics.periodDays}`}><article className={styles.information}><span>Vendors added</span><strong>{data.analytics.vendorsAdded}</strong><small>Added during the selected period · View →</small></article></Link>
       </>}
-      {data.vendorChanges && <Link className={styles.cardLink} href="/admin/vendor-changes?status=PENDING"><article className={styles.verification}><span>Vendor changes awaiting approval</span><strong>{data.vendorChanges.pending}</strong><small>Independent checker action required · View →</small></article></Link>}
+      {data.vendorChanges && <Link className={styles.cardLink} href="/admin/vendor-changes?status=PENDING"><article className={styles.verification}><span>Changes awaiting checker</span><strong>{data.vendorChanges.pending}</strong><small>Maker submissions requiring independent approval · View →</small></article></Link>}
       {data.officeUsers && <Link className={styles.cardLink} href="/admin/users"><article className={styles.invitations}><span>Pending staff invitations</span><strong>{data.officeUsers.pendingInvitations}</strong><small>Passwords not configured · View →</small></article></Link>}
       {data.serviceLocations && <>
         <Link className={styles.cardLink} href="/admin/service-locations?status=ACTIVE"><article className={styles.cities}><span>Active service locations</span><strong>{data.serviceLocations.counts.ACTIVE ?? 0}</strong><small>Controlled launch cities · View →</small></article></Link>
@@ -142,10 +141,10 @@ export function CrmDashboard({ supabaseUrl, publishableKey }: { supabaseUrl: str
     <section className={styles.work}>
       <div><p className={styles.eyebrow}>TODAY&apos;S WORK</p><h2>Action centre</h2><p>Only modules permitted for your assigned roles are shown.</p></div>
       <div className={styles.actions}>
-        {data.vendorApplications && <Link href="/admin/vendor-applications"><strong>{can("vendor_application.approve") ? "Review and approve vendor applications" : can("vendor_application.review") ? "Review vendor applications" : "View vendor applications"}</strong><span>{openApplications} currently require attention →</span></Link>}
+        {data.vendorApplications && <Link href="/admin/vendor-applications?status=ACTION"><strong>{can("vendor_application.approve") ? "Review and approve vendor applications" : can("vendor_application.review") ? "Review vendor applications" : "View vendor applications"}</strong><span>{openApplications} currently require attention →</span></Link>}
         {data.officeUsers && <Link href="/admin/users"><strong>{can("crm_user.manage") ? "Manage office access" : "View office users"}</strong><span>{data.officeUsers.pendingInvitations} invitations awaiting password setup →</span></Link>}
         {data.vendors && <Link href="/admin/vendors"><strong>{can("vendor.activate") ? "Verify and activate vendors" : can("vendor.manage") ? "Maintain vendor records" : "View vendor directory"}</strong><span>{vendorExceptionTotal} operational exceptions require attention →</span></Link>}
-        {data.vendorChanges && <Link href="/admin/vendor-changes"><strong>Review vendor record changes</strong><span>{data.vendorChanges.pending} changes await an independent checker →</span></Link>}
+        {data.vendorChanges && <Link href="/admin/vendor-changes?status=PENDING"><strong>Review vendor record changes</strong><span>{data.vendorChanges.pending} changes await an independent checker →</span></Link>}
         {data.leads && <Link href="/admin/leads?status=OPEN"><strong>{can("lead.manage") ? "Manage sales pipeline" : "View sales pipeline"}</strong><span>{pipelineLeads} open leads require follow-up →</span></Link>}
         {data.serviceLocations && <Link href="/admin/service-locations"><strong>{can("service_location.activate") ? "Control service location launches" : can("service_location.manage") ? "Maintain service locations" : "View service locations"}</strong><span>Review service readiness and launch capacity →</span></Link>}
       </div>

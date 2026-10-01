@@ -56,6 +56,7 @@ export async function GET(request: Request) {
   const page = positiveInteger(url.searchParams.get("page"), 1, 100_000);
   const pageSize = positiveInteger(url.searchParams.get("pageSize"), 20, 100);
   const status = applicationStatus(url.searchParams.get("status"));
+  const queue = url.searchParams.get("queue")?.trim().toUpperCase() ?? "";
   const search = url.searchParams.get("search")?.trim() ?? "";
 
   if (page === null || pageSize === null) {
@@ -78,6 +79,16 @@ export async function GET(request: Request) {
     }, 400);
   }
 
+  if (queue && queue !== "ACTION") {
+    return reply({
+      success: false,
+      error: {
+        code: "INVALID_VENDOR_APPLICATION_QUEUE",
+        message: "The Vendor application queue filter is invalid.",
+      },
+    }, 400);
+  }
+
   if (search.length > 100) {
     return reply({
       success: false,
@@ -89,7 +100,9 @@ export async function GET(request: Request) {
   }
 
   const where = {
-    ...(status ? { status } : {}),
+    ...(queue === "ACTION"
+      ? { status: { in: ["PENDING", "UNDER_REVIEW", "NEEDS_INFORMATION"] as VendorApplicationStatus[] } }
+      : status ? { status } : {}),
     ...(search
       ? {
           OR: [

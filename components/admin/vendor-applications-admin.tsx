@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import styles from "./vendor-applications-admin.module.css";
 
 type Status = "PENDING" | "UNDER_REVIEW" | "NEEDS_INFORMATION" | "APPROVED" | "REJECTED" | "WITHDRAWN";
+type StatusFilter = "" | "ACTION" | Status;
 type ApplicationSummary = {
   id: string; referenceId: string; companyName: string; businessType: string; engagementMode: string; operatingCategory: string;
   contactName: string; mobile: string; email: string; city: string; state: string; postalCode: string;
@@ -21,8 +22,8 @@ type ApplicationDetail = ApplicationSummary & {
 };
 type Pagination = { page: number; pageSize: number; total: number; totalPages: number };
 
-const statuses: Array<{ value: "" | Status; label: string }> = [
-  { value: "", label: "All statuses" }, { value: "PENDING", label: "Pending" },
+const statuses: Array<{ value: StatusFilter; label: string }> = [
+  { value: "", label: "All statuses" }, { value: "ACTION", label: "Requires action" }, { value: "PENDING", label: "Pending" },
   { value: "UNDER_REVIEW", label: "Under review" }, { value: "NEEDS_INFORMATION", label: "Needs information" },
   { value: "APPROVED", label: "Approved" }, { value: "REJECTED", label: "Rejected" },
   { value: "WITHDRAWN", label: "Withdrawn" },
@@ -47,9 +48,9 @@ export function VendorApplicationsAdmin({ supabaseUrl, publishableKey }: { supab
   const [applications, setApplications] = useState<ApplicationSummary[]>([]);
   const [selected, setSelected] = useState<ApplicationDetail | null>(null);
   const [pagination, setPagination] = useState<Pagination>({ page: 1, pageSize: 20, total: 0, totalPages: 0 });
-  const [status, setStatus] = useState<"" | Status>(() => {
+  const [status, setStatus] = useState<StatusFilter>(() => {
     const requested = searchParams.get("status")?.toUpperCase() ?? "";
-    return statuses.some((item) => item.value === requested) ? requested as "" | Status : "";
+    return statuses.some((item) => item.value === requested) ? requested as StatusFilter : "";
   }); const [search, setSearch] = useState("");
   const [appliedSearch, setAppliedSearch] = useState(""); const [reason, setReason] = useState("");
   const [message, setMessage] = useState(""); const [busy, setBusy] = useState(false);
@@ -91,7 +92,9 @@ export function VendorApplicationsAdmin({ supabaseUrl, publishableKey }: { supab
     const currentRequest = ++requestNumber.current; setBusy(true); setMessage("");
     try {
       const query = new URLSearchParams({ page: String(page), pageSize: "20" });
-      if (status) query.set("status", status); if (appliedSearch) query.set("search", appliedSearch);
+      if (status === "ACTION") query.set("queue", "ACTION");
+      else if (status) query.set("status", status);
+      if (appliedSearch) query.set("search", appliedSearch);
       const data = await api(`/api/admin/vendor-applications?${query}`);
       if (currentRequest === requestNumber.current) { setApplications(data.applications); setPagination(data.pagination); }
     } catch (error) { if (currentRequest === requestNumber.current) setMessage(error instanceof Error ? error.message : "Unable to load applications."); }
@@ -174,7 +177,7 @@ export function VendorApplicationsAdmin({ supabaseUrl, publishableKey }: { supab
     {changingPassword && <form className={styles.passwordPanel} onSubmit={changePassword}><div><h2>Change administrator password</h2><p>Use at least 12 characters. You will be signed out after the password changes.</p></div><label>New password<input type="password" autoComplete="new-password" minLength={12} required value={newPassword} onChange={event => setNewPassword(event.target.value)} /></label><label>Confirm password<input type="password" autoComplete="new-password" minLength={12} required value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} /></label><div className={styles.actionButtons}><button className={styles.primary} disabled={busy}>{busy ? "Updating…" : "Update password"}</button><button type="button" className={styles.secondary} disabled={busy} onClick={() => { setChangingPassword(false); setNewPassword(""); setConfirmPassword(""); }}>Cancel</button></div></form>}
     <section className={styles.toolbar} aria-label="Application filters">
       <form onSubmit={event => { event.preventDefault(); setAppliedSearch(search.trim()); }}><label><span className={styles.srOnly}>Search applications</span><input maxLength={100} placeholder="Search reference, company, contact…" value={search} onChange={event => setSearch(event.target.value)} /></label><button className={styles.secondary}>Search</button></form>
-      <label><span className={styles.srOnly}>Filter by status</span><select value={status} onChange={event => { setStatus(event.target.value as "" | Status); setSelected(null); }}>{statuses.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+      <label><span className={styles.srOnly}>Filter by status</span><select value={status} onChange={event => { setStatus(event.target.value as StatusFilter); setSelected(null); }}>{statuses.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
       <button className={styles.linkButton} disabled={busy} onClick={() => void loadApplications(pagination.page)}>Refresh</button>
     </section>
     {message && <p className={message.includes("failed") || message.includes("Unable") || message.includes("required") ? styles.errorBanner : styles.successBanner} role="status">{message}</p>}

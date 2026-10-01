@@ -23,6 +23,8 @@ test("admin vendor application UI covers list, detail and review APIs", () => {
   assert.match(ui, /START_REVIEW/);
   assert.match(ui, /REQUEST_INFORMATION/);
   assert.match(ui, /REJECT/);
+  assert.match(ui, /Requires action/);
+  assert.match(ui, /query\.set\("queue", "ACTION"\)/);
 });
 
 test("admin vendor application UI preserves approval safety", () => {

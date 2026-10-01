@@ -39,6 +39,9 @@ test("admin list uses bounded pagination, validated status and selected fields",
   assert.match(listRoute, /Object\.values\(VendorApplicationStatus\)/);
   assert.match(listRoute, /INVALID_PAGINATION/);
   assert.match(listRoute, /INVALID_VENDOR_APPLICATION_STATUS/);
+  assert.match(listRoute, /queue === "ACTION"/);
+  assert.match(listRoute, /"PENDING", "UNDER_REVIEW", "NEEDS_INFORMATION"/);
+  assert.match(listRoute, /INVALID_VENDOR_APPLICATION_QUEUE/);
   assert.match(listRoute, /select:\s*\{/);
   assert.doesNotMatch(listRoute, /include:\s*\{/);
 });
