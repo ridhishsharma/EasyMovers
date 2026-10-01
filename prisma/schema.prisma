@@ -65,33 +65,33 @@ model Lead {
 }
 
 model Vendor {
-  id                     String                  @id @default(cuid())
+  id                     String                       @id @default(cuid())
   companyName            String
   ownerName              String
-  businessType           VendorBusinessType      @default(UNSPECIFIED)
-  engagementMode         VendorEngagementMode    @default(QUOTATION)
+  businessType           VendorBusinessType           @default(UNSPECIFIED)
+  engagementMode         VendorEngagementMode         @default(QUOTATION)
   gstNumber              String?
   serviceCities          String
-  householdService       Boolean                 @default(false)
-  officeService          Boolean                 @default(false)
-  vehicleService         Boolean                 @default(false)
+  householdService       Boolean                      @default(false)
+  officeService          Boolean                      @default(false)
+  vehicleService         Boolean                      @default(false)
   experienceYears        Int?
-  rating                 Float                   @default(0)
-  reviewCount            Int                     @default(0)
-  status                 String                  @default("PENDING")
-  createdAt              DateTime                @default(now())
-  updatedAt              DateTime                @updatedAt
+  rating                 Float                        @default(0)
+  reviewCount            Int                          @default(0)
+  status                 String                       @default("PENDING")
+  createdAt              DateTime                     @default(now())
+  updatedAt              DateTime                     @updatedAt
   deletedAt              DateTime?
   address                String?
   city                   String?
   companyLogo            String?
-  completedMoves         Int                     @default(0)
+  completedMoves         Int                          @default(0)
   coordinatorEmail       String?
   coordinatorMobile      String?
   coordinatorName        String?
-  insuranceAvailable     Boolean                 @default(false)
+  insuranceAvailable     Boolean                      @default(false)
   ownerEmail             String?
-  ownerMobile            String                  @unique
+  ownerMobile            String                       @unique
   panNumber              String?
   pincode                String?
   quotationContactEmail  String?
@@ -101,9 +101,9 @@ model Vendor {
   state                  String?
   totalLabours           Int?
   totalVehicles          Int?
-  vendorCode             String                  @unique
+  vendorCode             String                       @unique
   website                String?
-  assignedBookings       Booking[]               @relation("AssignedVendorBookings")
+  assignedBookings       Booking[]                    @relation("AssignedVendorBookings")
   payments               Payment[]
   quotations             Quotation[]
   User                   User[]
@@ -115,8 +115,11 @@ model Vendor {
   ratingSummary          VendorRating?
   reviews                VendorReview[]
   vehicles               VendorVehicle[]
-  sourceApplication      VendorApplication?      @relation("VendorApplicationCreatedVendor")
+  sourceApplication      VendorApplication?           @relation("VendorApplicationCreatedVendor")
   changeRequests         VendorChangeRequest[]
+  operatorAvailability   VendorOperatorAvailability[]
+  availabilityEvents     VendorAvailabilityEvent[]
+  enquiryPreference      VendorEnquiryPreference?
 
   @@index([deletedAt])
   @@index([engagementMode])
@@ -519,43 +522,46 @@ enum VendorApplicationStatus {
 }
 
 model User {
-  id                         String                  @id @default(cuid())
-  supabaseAuthId             String?                 @unique @db.Uuid
-  email                      String?                 @unique
-  mobile                     String                  @unique
-  passwordHash               String
-  fullName                   String
-  role                       UserRole                @default(CUSTOMER)
-  avatar                     String?
-  isActive                   Boolean                 @default(true)
-  emailVerified              Boolean                 @default(false)
-  mobileVerified             Boolean                 @default(false)
-  lastLogin                  DateTime?
-  officeInvitedAt            DateTime?
-  officeInvitationAcceptedAt DateTime?
-  officePasswordSetAt        DateTime?
-  officeFirstLoginAt         DateTime?
-  officeLastLogoutAt         DateTime?
-  createdAt                  DateTime                @default(now())
-  updatedAt                  DateTime                @updatedAt
-  vendorId                   String?
-  bookings                   Booking[]
-  callbackRequests           CallbackRequest[]
-  Corporate                  Corporate?
-  Customer                   Customer?
-  customerDocuments          CustomerDocument[]
-  Franchise                  Franchise?
-  leads                      Lead[]
-  Notification               Notification[]
-  notificationPreference     NotificationPreference?
-  payments                   Payment[]
-  quotations                 Quotation[]
-  vendor                     Vendor?                 @relation(fields: [vendorId], references: [id])
-  reviewedVendorApplications VendorApplication[]     @relation("VendorApplicationReviewer")
-  crmRoleAssignments         UserCrmRole[]           @relation("CrmRoleAssignedUser")
-  crmAuditLogs               CrmAuditLog[]           @relation("CrmAuditActor")
-  submittedVendorChanges     VendorChangeRequest[]   @relation("VendorChangeSubmittedBy")
-  reviewedVendorChanges      VendorChangeRequest[]   @relation("VendorChangeReviewedBy")
+  id                              String                      @id @default(cuid())
+  supabaseAuthId                  String?                     @unique @db.Uuid
+  email                           String?                     @unique
+  mobile                          String                      @unique
+  passwordHash                    String
+  fullName                        String
+  role                            UserRole                    @default(CUSTOMER)
+  avatar                          String?
+  isActive                        Boolean                     @default(true)
+  emailVerified                   Boolean                     @default(false)
+  mobileVerified                  Boolean                     @default(false)
+  lastLogin                       DateTime?
+  officeInvitedAt                 DateTime?
+  officeInvitationAcceptedAt      DateTime?
+  officePasswordSetAt             DateTime?
+  officeFirstLoginAt              DateTime?
+  officeLastLogoutAt              DateTime?
+  createdAt                       DateTime                    @default(now())
+  updatedAt                       DateTime                    @updatedAt
+  vendorId                        String?
+  bookings                        Booking[]
+  callbackRequests                CallbackRequest[]
+  Corporate                       Corporate?
+  Customer                        Customer?
+  customerDocuments               CustomerDocument[]
+  Franchise                       Franchise?
+  leads                           Lead[]
+  Notification                    Notification[]
+  notificationPreference          NotificationPreference?
+  payments                        Payment[]
+  quotations                      Quotation[]
+  vendor                          Vendor?                     @relation(fields: [vendorId], references: [id])
+  reviewedVendorApplications      VendorApplication[]         @relation("VendorApplicationReviewer")
+  crmRoleAssignments              UserCrmRole[]               @relation("CrmRoleAssignedUser")
+  crmAuditLogs                    CrmAuditLog[]               @relation("CrmAuditActor")
+  submittedVendorChanges          VendorChangeRequest[]       @relation("VendorChangeSubmittedBy")
+  reviewedVendorChanges           VendorChangeRequest[]       @relation("VendorChangeReviewedBy")
+  vendorOperatorAvailability      VendorOperatorAvailability?
+  vendorAvailabilityEvents        VendorAvailabilityEvent[]
+  updatedVendorEnquiryPreferences VendorEnquiryPreference[]   @relation("VendorEnquiryPreferenceUpdatedBy")
 
   @@index([mobile])
   @@index([email])
@@ -925,6 +931,59 @@ model VendorChangeRequest {
   @@index([submittedByUserId])
   @@index([reviewedByUserId])
   @@index([submittedAt])
+}
+
+/// Real-time dispatch presence belongs to a linked vendor operator, not to the
+/// vendor company as a whole. A stale heartbeat is treated as unavailable by
+/// matching/dispatch code even when the stored state is ONLINE.
+model VendorOperatorAvailability {
+  id               String                      @id @default(cuid())
+  vendorId         String
+  userId           String                      @unique
+  state            VendorOperatorPresenceState @default(OFFLINE)
+  currentLatitude  Decimal?                    @db.Decimal(10, 7)
+  currentLongitude Decimal?                    @db.Decimal(10, 7)
+  lastHeartbeatAt  DateTime?
+  stateChangedAt   DateTime                    @default(now())
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+  vendor           Vendor                      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  user             User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([vendorId, state])
+  @@index([state, lastHeartbeatAt])
+}
+
+/// Quotation availability is a company-level preference and intentionally
+/// separate from real-time driver/operator presence.
+model VendorEnquiryPreference {
+  id                          String    @id @default(cuid())
+  vendorId                    String    @unique
+  acceptingQuotationEnquiries Boolean   @default(true)
+  pausedUntil                 DateTime?
+  updatedByUserId             String?
+  createdAt                   DateTime  @default(now())
+  updatedAt                   DateTime  @updatedAt
+  vendor                      Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  updatedBy                   User?     @relation("VendorEnquiryPreferenceUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([acceptingQuotationEnquiries])
+  @@index([pausedUntil])
+}
+
+model VendorAvailabilityEvent {
+  id         String                      @id @default(cuid())
+  vendorId   String
+  userId     String
+  state      VendorOperatorPresenceState
+  latitude   Decimal?                    @db.Decimal(10, 7)
+  longitude  Decimal?                    @db.Decimal(10, 7)
+  occurredAt DateTime                    @default(now())
+  vendor     Vendor                      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  user       User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([vendorId, occurredAt])
+  @@index([userId, occurredAt])
 }
 
 model VendorRating {
@@ -1807,6 +1866,13 @@ enum VendorChangeStatus {
   REJECTED
   CANCELLED
   SUPERSEDED
+}
+
+enum VendorOperatorPresenceState {
+  OFFLINE
+  ONLINE
+  PAUSED
+  BUSY
 }
 
 enum ReviewStatus {

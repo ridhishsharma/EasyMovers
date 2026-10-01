@@ -16,16 +16,23 @@ export function AppBrandShell({ children, supabaseUrl, publishableKey }: {
   const pathname = usePathname();
   const isAdmin = pathname.startsWith("/admin");
   const isAdminLogin = pathname === "/admin/login";
-  const isProtectedAdminPage = isAdmin && !isAdminLogin;
+  const isVendor = pathname.startsWith("/vendor");
+  const isVendorLogin = pathname === "/vendor/login";
+  const isProtectedPortalPage = (isAdmin && !isAdminLogin) || (isVendor && !isVendorLogin);
+  const protectedLoginDestination = isVendor
+    ? `/vendor/login?returnTo=${encodeURIComponent(pathname)}`
+    : `/admin/login?returnTo=${encodeURIComponent(pathname)}`;
   const client = useMemo(
     () => supabaseUrl && publishableKey ? createClient(supabaseUrl, publishableKey) : null,
     [supabaseUrl, publishableKey],
   );
-  const [sessionState, setSessionState] = useState<SessionState>(isProtectedAdminPage ? "checking" : "authenticated");
+  const [sessionState, setSessionState] = useState<SessionState>(isProtectedPortalPage ? "checking" : "authenticated");
   const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
-    if (!isProtectedAdminPage) {
+    if (!isProtectedPortalPage) {
+      // Route scope changed; reset the shared shell gate for public/login pages.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSessionState("authenticated");
       return;
     }
@@ -33,14 +40,14 @@ export function AppBrandShell({ children, supabaseUrl, publishableKey }: {
     setSessionState("checking");
     if (!client) {
       setSessionState("unauthenticated");
-      window.location.replace(`/admin/login?returnTo=${encodeURIComponent(pathname)}`);
+      window.location.replace(protectedLoginDestination);
       return;
     }
     void client.auth.getSession().then(({ data, error }) => {
       if (!active) return;
       if (error || !data.session) {
         setSessionState("unauthenticated");
-        window.location.replace(`/admin/login?returnTo=${encodeURIComponent(pathname)}`);
+        window.location.replace(protectedLoginDestination);
         return;
       }
       setSessionState("authenticated");
@@ -49,7 +56,7 @@ export function AppBrandShell({ children, supabaseUrl, publishableKey }: {
       if (!active || event === "INITIAL_SESSION") return;
       if (event === "SIGNED_OUT" || !session) {
         setSessionState("unauthenticated");
-        window.location.replace(`/admin/login?returnTo=${encodeURIComponent(pathname)}`);
+        window.location.replace(protectedLoginDestination);
       } else {
         setSessionState("authenticated");
       }
@@ -58,14 +65,14 @@ export function AppBrandShell({ children, supabaseUrl, publishableKey }: {
       active = false;
       data.subscription.unsubscribe();
     };
-  }, [client, isProtectedAdminPage, pathname]);
+  }, [client, isProtectedPortalPage, protectedLoginDestination]);
 
   async function signOutOffice() {
     if (!client || signingOut) return;
     setSigningOut(true);
     try {
       const { data } = await client.auth.getSession();
-      if (data.session) {
+      if (data.session && isAdmin) {
         // Audit logging must never prevent the browser session from closing.
         void fetch("/api/admin/session-events", {
           method: "POST",
@@ -81,23 +88,24 @@ export function AppBrandShell({ children, supabaseUrl, publishableKey }: {
       const { error } = await client.auth.signOut({ scope: "local" });
       if (error) throw error;
       setSessionState("unauthenticated");
-      window.location.replace("/admin/login");
+      if (isVendor) window.location.replace("/vendor/login");
+      else window.location.replace("/admin/login");
     } catch {
       setSigningOut(false);
       window.alert("Sign out could not be completed. Please try again.");
     }
   }
 
-  const mayRenderAdminPage = !isProtectedAdminPage || sessionState === "authenticated";
+  const mayRenderPortalPage = !isProtectedPortalPage || sessionState === "authenticated";
   return (
     <>
       {pathname !== "/" && (
         <header className={styles.header}>
           <div className={styles.inner}>
-            <Link href={isAdmin ? "/admin/dashboard" : "/"} aria-label={isAdmin ? "EasyMovers administration" : "EasyMovers home"}>
+            <Link href={isAdmin ? "/admin/dashboard" : isVendor ? "/vendor/dashboard" : "/"} aria-label={isAdmin ? "EasyMovers administration" : isVendor ? "EasyMovers vendor portal" : "EasyMovers home"}>
               <BrandLogo />
             </Link>
-            {isAdmin ? isAdminLogin ? <span className={styles.adminArea}>Office administration</span> : sessionState === "authenticated" ? <div className={styles.adminActions}><nav className={styles.adminNav} aria-label="Office navigation"><Link href="/admin/dashboard">Dashboard</Link><Link href="/admin/vendor-applications">Vendor applications</Link><Link href="/admin/vendors">Vendor operations</Link><Link href="/admin/vendor-changes">Change approvals</Link><Link href="/admin/service-locations">Service locations</Link><Link href="/admin/users">Office users</Link></nav><button type="button" className={styles.signOut} disabled={signingOut} onClick={() => void signOutOffice()}>{signingOut ? "Signing out…" : "Sign out"}</button></div> : <span className={styles.adminArea}>Checking office session…</span> : <nav aria-label="Page navigation">
+            {isAdmin ? isAdminLogin ? <span className={styles.adminArea}>Office administration</span> : sessionState === "authenticated" ? <div className={styles.adminActions}><nav className={styles.adminNav} aria-label="Office navigation"><Link href="/admin/dashboard">Dashboard</Link><Link href="/admin/vendor-applications">Vendor applications</Link><Link href="/admin/vendors">Vendor operations</Link><Link href="/admin/vendor-changes">Change approvals</Link><Link href="/admin/service-locations">Service locations</Link><Link href="/admin/users">Office users</Link></nav><button type="button" className={styles.signOut} disabled={signingOut} onClick={() => void signOutOffice()}>{signingOut ? "Signing out…" : "Sign out"}</button></div> : <span className={styles.adminArea}>Checking office session…</span> : isVendor ? isVendorLogin ? <span className={styles.adminArea}>Partner portal</span> : sessionState === "authenticated" ? <div className={styles.adminActions}><nav aria-label="Vendor navigation"><Link href="/vendor/dashboard">Dashboard</Link></nav><button type="button" className={styles.signOut} disabled={signingOut} onClick={() => void signOutOffice()}>{signingOut ? "Signing out…" : "Sign out"}</button></div> : <span className={styles.adminArea}>Checking vendor session…</span> : <nav aria-label="Page navigation">
               <Link href="/">Home</Link>
               <Link href="/track">Track / resume move</Link>
               <Link href="/partner">Become a partner</Link>
@@ -105,7 +113,7 @@ export function AppBrandShell({ children, supabaseUrl, publishableKey }: {
           </div>
         </header>
       )}
-      {mayRenderAdminPage ? children : <main className={styles.sessionGate}><p>{sessionState === "checking" ? "Checking office session…" : "Redirecting to office sign in…"}</p></main>}
+      {mayRenderPortalPage ? children : <main className={styles.sessionGate}><p>{sessionState === "checking" ? "Checking secure session…" : "Redirecting to sign in…"}</p></main>}
     </>
   );
 }

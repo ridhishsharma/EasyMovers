@@ -12,6 +12,7 @@ export interface ApplicationAuthentication {
 export interface VerifiedAuthIdentity {
   id: string;
   emailConfirmed: boolean;
+  phoneConfirmed?: boolean;
 }
 
 export interface ApplicationAuthUser {
@@ -59,7 +60,7 @@ export function createApplicationAuthenticationResolver(
       const identity =
         await dependencies.verifyAccessToken(match[1]);
 
-      if (!identity?.id || !identity.emailConfirmed) {
+      if (!identity?.id || (!identity.emailConfirmed && !identity.phoneConfirmed)) {
         return { authenticated: false };
       }
 
@@ -134,6 +135,7 @@ export const resolveApplicationAuthentication =
       return {
         id: user.id,
         emailConfirmed: Boolean(user.email_confirmed_at),
+        phoneConfirmed: Boolean(user.phone_confirmed_at),
       };
     },
 
