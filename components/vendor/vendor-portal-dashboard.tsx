@@ -12,12 +12,20 @@ type PortalData = {
   enquiryPreference: { acceptingQuotationEnquiries: boolean; pausedUntil: string | null };
   summary: { pendingChanges: number; activeVehicles: number };
 };
+type Opportunity = {
+  id: string; bookingNumber: string; serviceType: string; moveType: string; moveDate: string;
+  pickupCity: string; pickupState: string; dropCity: string; dropState: string;
+  inventorySummaryJson: unknown;
+};
 
 export function VendorPortalDashboard({ supabaseUrl, publishableKey }: { supabaseUrl: string; publishableKey: string }) {
   const client = useMemo(() => createClient(supabaseUrl, publishableKey), [supabaseUrl, publishableKey]);
   const [data, setData] = useState<PortalData | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const [quoting, setQuoting] = useState<Opportunity | null>(null);
+  const [quote, setQuote] = useState({ transportationCost: "", packingCost: "0", labourCost: "0", taxAmount: "0", validUntil: "", remarks: "" });
 
   const request = useCallback(async (url: string, options?: RequestInit) => {
     const { data: session } = await client.auth.getSession();
@@ -31,6 +39,11 @@ export function VendorPortalDashboard({ supabaseUrl, publishableKey }: { supabas
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error?.message || "Unable to load vendor portal.");
       setData(payload.data);
+      if (payload.data.capabilities.quotationEnquiries && payload.data.enquiryPreference.acceptingQuotationEnquiries) {
+        const queueResponse = await request("/api/vendor/opportunities");
+        const queuePayload = await queueResponse.json();
+        if (queueResponse.ok) setOpportunities(queuePayload.data.opportunities);
+      } else setOpportunities([]);
     } catch (error) { if ((error as Error).message !== "NO_SESSION") setMessage((error as Error).message); }
   }, [request]);
 
@@ -83,6 +96,30 @@ export function VendorPortalDashboard({ supabaseUrl, publishableKey }: { supabas
     finally { setBusy(false); }
   }
 
+  async function submitQuotation(event: React.FormEvent) {
+    event.preventDefault();
+    if (!quoting) return;
+    setBusy(true); setMessage("");
+    try {
+      const monetary = ["transportationCost", "packingCost", "labourCost", "taxAmount"] as const;
+      const amounts = Object.fromEntries(monetary.map(key => [key, Number(quote[key])]));
+      if (Object.values(amounts).some(value => !Number.isFinite(value) || value < 0)) throw new Error("Enter valid non-negative quotation amounts.");
+      const totalAmount = Object.values(amounts).reduce((sum, value) => sum + value, 0);
+      if (totalAmount <= 0) throw new Error("Quotation total must be greater than zero.");
+      const response = await request(`/api/vendor/opportunities/${quoting.id}/quotation`, {
+        method: "POST",
+        body: JSON.stringify({ ...amounts, totalAmount, validUntil: quote.validUntil ? new Date(`${quote.validUntil}T23:59:59+05:30`).toISOString() : undefined, remarks: quote.remarks }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.success) throw new Error(payload.error?.message || "Quotation could not be submitted.");
+      setMessage(`Quotation submitted for ${quoting.bookingNumber}.`);
+      setQuoting(null);
+      setQuote({ transportationCost: "", packingCost: "0", labourCost: "0", taxAmount: "0", validUntil: "", remarks: "" });
+      await load();
+    } catch (error) { setMessage((error as Error).message); }
+    finally { setBusy(false); }
+  }
+
   if (!data) return <main className={styles.page}><section className={styles.loading}>{message || "Loading your vendor workspace…"}</section></main>;
   return <main className={styles.page}>
     <section className={styles.hero}>
@@ -108,5 +145,26 @@ export function VendorPortalDashboard({ supabaseUrl, publishableKey }: { supabas
       </article>}
     </section>
     <section className={styles.notice}><strong>Operational controls are immediate.</strong><p>Profile, service area, vehicle, document and bank-detail amendments remain protected by EasyMovers maker-checker approval.</p></section>
+    {data.capabilities.quotationEnquiries && <section className={styles.opportunities}>
+      <div className={styles.sectionTitle}><div><p className={styles.eyebrow}>MATCHED TO YOUR SERVICES & COVERAGE</p><h2>Quotation enquiries</h2></div><strong>{opportunities.length} open</strong></div>
+      {opportunities.length ? <div className={styles.opportunityGrid}>{opportunities.map(item => <article key={item.id}>
+        <span>{item.bookingNumber}</span><h3>{item.serviceType.replaceAll("_", " ")}</h3>
+        <p>{item.pickupCity}, {item.pickupState} → {item.dropCity}, {item.dropState}</p>
+        <small>Move date: {new Date(item.moveDate).toLocaleDateString("en-IN")}</small>
+        <button onClick={() => setQuoting(item)}>Prepare quotation</button>
+      </article>)}</div> : <p className={styles.empty}>No eligible quotation enquiries are currently available for this vendor&apos;s active services and coverage.</p>}
+    </section>}
+    {quoting && <form className={styles.quoteForm} onSubmit={submitQuotation}>
+      <div className={styles.sectionTitle}><div><p className={styles.eyebrow}>SECURE VENDOR QUOTATION</p><h2>{quoting.bookingNumber}</h2></div><button type="button" className={styles.close} onClick={() => setQuoting(null)}>Close</button></div>
+      <div className={styles.quoteFields}>
+        <label>Transportation ₹<input type="number" min="0" step="0.01" required value={quote.transportationCost} onChange={event => setQuote(current => ({ ...current, transportationCost: event.target.value }))} /></label>
+        <label>Packing ₹<input type="number" min="0" step="0.01" value={quote.packingCost} onChange={event => setQuote(current => ({ ...current, packingCost: event.target.value }))} /></label>
+        <label>Labour ₹<input type="number" min="0" step="0.01" value={quote.labourCost} onChange={event => setQuote(current => ({ ...current, labourCost: event.target.value }))} /></label>
+        <label>Tax ₹<input type="number" min="0" step="0.01" value={quote.taxAmount} onChange={event => setQuote(current => ({ ...current, taxAmount: event.target.value }))} /></label>
+        <label>Valid until<input type="date" required value={quote.validUntil} onChange={event => setQuote(current => ({ ...current, validUntil: event.target.value }))} /></label>
+      </div>
+      <label>Remarks<textarea maxLength={1000} value={quote.remarks} onChange={event => setQuote(current => ({ ...current, remarks: event.target.value }))} /></label>
+      <button disabled={busy}>{busy ? "Submitting…" : "Submit quotation"}</button>
+    </form>}
   </main>;
 }

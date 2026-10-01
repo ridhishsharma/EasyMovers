@@ -39,6 +39,7 @@ type AreaDraft = {
   locationId: string;
   pins: string;
 };
+type VendorPortalUser = { id: string; fullName: string; email: string | null; mobile: string; isActive: boolean; lastLogin: string | null; createdAt: string };
 type Detail = {
   vendor: VendorSummary & {
     ownerMobile: string;
@@ -180,8 +181,10 @@ export function VendorOperationsAdmin({
   const [areas, setAreas] = useState<AreaDraft[]>([]);
   const [offerings, setOfferings] = useState<string[]>([]);
   const [activePanel, setActivePanel] = useState<
-    "services" | "verification" | "records"
+    "services" | "verification" | "records" | "access"
   >("services");
+  const [portalUsers, setPortalUsers] = useState<VendorPortalUser[]>([]);
+  const [portalInvite, setPortalInvite] = useState({ fullName: "", email: "", mobile: "" });
   const [vehicle, setVehicle] = useState(emptyVehicle);
   const [editingVehicleId, setEditingVehicleId] = useState<string | null>(null);
   const [document, setDocument] = useState(emptyDocument);
@@ -247,8 +250,10 @@ export function VendorOperationsAdmin({
         const detail: Detail = await request(
           `/api/admin/vendors/${encodeURIComponent(id)}`,
         );
+        const accessData = await request(`/api/admin/vendors/${encodeURIComponent(id)}/portal-users`);
         if (requestNumber !== openRequest.current) return;
         setSelected(detail);
+        setPortalUsers(accessData.users);
         setOfferings(
           detail.vendor.serviceOfferings
             .filter((item) => item.active)
@@ -356,6 +361,21 @@ export function VendorOperationsAdmin({
       );
       setLoading(false);
     }
+  }
+  async function invitePortalUser(event: FormEvent) {
+    event.preventDefault();
+    if (!selected || loading) return;
+    setLoading(true); setMessage(""); setMessageSuccess(false);
+    try {
+      await request(`/api/admin/vendors/${selected.vendor.id}/portal-users`, { method: "POST", body: JSON.stringify(portalInvite) });
+      const accessData = await request(`/api/admin/vendors/${selected.vendor.id}/portal-users`);
+      setPortalUsers(accessData.users);
+      setPortalInvite({ fullName: "", email: "", mobile: "" });
+      setMessageSuccess(true);
+      setMessage("Secure vendor portal invitation sent.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to invite vendor user.");
+    } finally { setLoading(false); }
   }
   const editable = selected?.capabilities.canManage === true;
   return (
@@ -545,7 +565,22 @@ export function VendorOperationsAdmin({
                 >
                   Operational records ({selected.vendor.vehicles.length + selected.vendor.documents.length + selected.vendor.bankAccounts.length})
                 </button>
+                <button className={activePanel === "access" ? styles.activeTab : ""} onClick={() => setActivePanel("access")}>
+                  Portal access ({portalUsers.length})
+                </button>
               </nav>
+              {activePanel === "access" && <section className={styles.configuration}>
+                <div className={styles.configTitle}><div><h3>Vendor portal accounts</h3><span>Each person receives a private invitation and sets their own password. Never share one password across vendors.</span></div></div>
+                {portalUsers.length ? <div className={styles.matrix}>{portalUsers.map(user => <p key={user.id}><b>{user.fullName}</b> — {user.email || user.mobile}<em>{user.isActive ? "Active" : "Inactive"}{user.lastLogin ? ` · Last login ${new Date(user.lastLogin).toLocaleString("en-IN")}` : " · Never signed in"}</em></p>)}</div> : <p>No portal accounts linked to this vendor.</p>}
+                {editable && <form onSubmit={invitePortalUser}>
+                  <div className={styles.areaRow}>
+                    <label>Full name<input required value={portalInvite.fullName} onChange={event => setPortalInvite(current => ({ ...current, fullName: event.target.value }))} /></label>
+                    <label>Email<input type="email" required value={portalInvite.email} onChange={event => setPortalInvite(current => ({ ...current, email: event.target.value }))} /></label>
+                    <label>Mobile<input inputMode="numeric" pattern="[6-9][0-9]{9}" required value={portalInvite.mobile} onChange={event => setPortalInvite(current => ({ ...current, mobile: event.target.value.replace(/\D/g, "").slice(0, 10) }))} /></label>
+                  </div>
+                  <button disabled={loading}>Invite vendor user</button>
+                </form>}
+              </section>}
               {editable && activePanel === "services" && (
                 <form
                   className={styles.configuration}
