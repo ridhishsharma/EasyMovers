@@ -878,6 +878,7 @@ model Notification {
 model VendorDocument {
   id                 String             @id @default(cuid())
   vendorId           String
+  vehicleId          String?
   documentType       VendorDocumentType
   documentNumber     String?
   fileName           String?
@@ -897,8 +898,10 @@ model VendorDocument {
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
   vendor             Vendor             @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  vehicle            VendorVehicle?     @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 
   @@index([vendorId])
+  @@index([vehicleId])
   @@index([documentType])
   @@index([verificationStatus])
 }
@@ -1666,6 +1669,7 @@ model VendorVehicle {
   createdAt           DateTime         @default(now())
   updatedAt           DateTime         @updatedAt
   vendor              Vendor           @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  documents           VendorDocument[]
 
   @@index([vendorId])
   @@index([vehicleType])

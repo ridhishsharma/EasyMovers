@@ -67,6 +67,7 @@ export async function getVendorOperationalReadiness(vendorId: string) {
           orderBy: [{ isMandatory: "desc" }, { documentType: "asc" }],
           select: {
             id: true,
+            vehicleId: true,
             documentType: true,
             documentNumber: true,
             fileName: true,
@@ -154,7 +155,8 @@ export async function getVendorOperationalReadiness(vendorId: string) {
           document.isActive &&
           document.documentType === "VEHICLE_RC" &&
           document.verificationStatus === "VERIFIED" &&
-          normalizeEvidence(document.documentNumber) === registration,
+          (document.vehicleId === vehicle.id ||
+            (!document.vehicleId && normalizeEvidence(document.documentNumber) === registration)),
       ) &&
       Boolean(
         insurance &&
@@ -166,7 +168,8 @@ export async function getVendorOperationalReadiness(vendorId: string) {
           document.isActive &&
           document.documentType === "VEHICLE_INSURANCE" &&
           document.verificationStatus === "VERIFIED" &&
-          normalizeEvidence(document.documentNumber) === insurance &&
+          (document.vehicleId === vehicle.id ||
+            (!document.vehicleId && normalizeEvidence(document.documentNumber) === insurance)) &&
           document.expiryDate instanceof Date &&
           document.expiryDate.getTime() > Date.now(),
       )
@@ -750,6 +753,7 @@ export async function changeVendorOperationalStatus(
         documents: {
           where: { isActive: true },
           select: {
+            vehicleId: true,
             documentType: true,
             documentNumber: true,
             verificationStatus: true,
@@ -821,13 +825,15 @@ export async function changeVendorOperationalStatus(
             (document) =>
               document.documentType === VendorDocumentType.VEHICLE_RC &&
               document.verificationStatus === VerificationStatus.VERIFIED &&
-              normalize(document.documentNumber) === registration,
+              (document.vehicleId === vehicle.id ||
+                (!document.vehicleId && normalize(document.documentNumber) === registration)),
           ) &&
           vendor.documents.some(
             (document) =>
               document.documentType === VendorDocumentType.VEHICLE_INSURANCE &&
               document.verificationStatus === VerificationStatus.VERIFIED &&
-              normalize(document.documentNumber) === insurance &&
+              (document.vehicleId === vehicle.id ||
+                (!document.vehicleId && normalize(document.documentNumber) === insurance)) &&
               document.expiryDate &&
               document.expiryDate.getTime() > Date.now(),
           ),

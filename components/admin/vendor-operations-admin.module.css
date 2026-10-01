@@ -191,12 +191,18 @@
   font-weight: 750;
 }
 .success {
-  margin-top: 12px;
-  padding: 10px;
+  position: fixed;
+  z-index: 1000;
+  top: 86px;
+  right: 24px;
+  width: min(440px, calc(100vw - 32px));
+  margin: 0;
+  padding: 14px 16px;
   border: 1px solid #a9d8ba;
   border-radius: 8px;
   background: #e7f7ed;
   color: #17663c;
+  box-shadow: 0 12px 32px rgba(12, 53, 92, .2);
 }
 .cards span {
   display: block;
@@ -259,11 +265,18 @@
   border-radius: 8px;
 }
 .error {
-  margin-top: 12px;
-  padding: 10px;
+  position: fixed;
+  z-index: 1000;
+  top: 86px;
+  right: 24px;
+  width: min(440px, calc(100vw - 32px));
+  margin: 0;
+  padding: 14px 16px;
   background: #fde9e9;
   color: #a82929;
+  border: 1px solid #f2bcbc;
   border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(12, 53, 92, .2);
 }
 .configuration {
   margin-top: 18px;

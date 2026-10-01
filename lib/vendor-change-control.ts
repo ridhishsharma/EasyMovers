@@ -141,12 +141,32 @@ async function applyApprovedChange(
       if (!result.count) throw new VendorChangeError("DOCUMENT_NOT_FOUND", "Active document was not found.", 404);
       return change.entityId;
     }
+    const documentType = enumField(data, "documentType", Object.values(VendorDocumentType));
+    const vehicleDocumentTypes: VendorDocumentType[] = [VendorDocumentType.VEHICLE_RC, VendorDocumentType.VEHICLE_INSURANCE, VendorDocumentType.GOODS_CARRIER_PERMIT];
+    const vehicleDocument = vehicleDocumentTypes.includes(documentType);
+    const vehicleId = optionalText(data, "vehicleId", 100);
+    const vehicle = vehicleDocument
+      ? await transaction.vendorVehicle.findFirst({ where: { id: vehicleId || "", vendorId: change.vendorId, isActive: true }, select: { id: true, registrationNumber: true, insuranceNumber: true } })
+      : null;
+    if (vehicleDocument && !vehicle)
+      throw new VendorChangeError("VEHICLE_REQUIRED", "Select an active vehicle for this compliance document.", 400);
+    let documentNumber = optionalText(data, "documentNumber", 100);
+    const expiryDate = optionalDate(data, "expiryDate");
+    if (documentType === VendorDocumentType.VEHICLE_RC) documentNumber = vehicle!.registrationNumber;
+    if (documentType === VendorDocumentType.VEHICLE_INSURANCE) {
+      const normalize = (value: string | null | undefined) => value?.toUpperCase().replace(/[^A-Z0-9]/g, "") || "";
+      if (!normalize(vehicle!.insuranceNumber) || normalize(documentNumber) !== normalize(vehicle!.insuranceNumber))
+        throw new VendorChangeError("INSURANCE_MISMATCH", "The insurance document policy number must match the selected vehicle.", 400);
+      if (!expiryDate || expiryDate.getTime() <= Date.now())
+        throw new VendorChangeError("INSURANCE_EXPIRED", "The selected vehicle requires an unexpired insurance document.", 400);
+    }
     const documentData = {
-      documentType: enumField(data, "documentType", Object.values(VendorDocumentType)),
-      documentNumber: optionalText(data, "documentNumber", 100),
+      vehicleId: vehicle?.id ?? null,
+      documentType,
+      documentNumber,
       fileName: optionalText(data, "fileName", 200),
       fileUrl: optionalText(data, "fileUrl", 1000),
-      expiryDate: optionalDate(data, "expiryDate"),
+      expiryDate,
       isMandatory: data.isMandatory !== false,
       verificationStatus: VerificationStatus.VERIFIED,
       verifiedBy: reviewerUserId,

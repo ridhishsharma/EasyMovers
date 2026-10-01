@@ -74,6 +74,7 @@ type Detail = {
     }>;
     documents: Array<{
       id: string;
+      vehicleId: string | null;
       documentType: string;
       documentNumber: string | null;
       fileName: string | null;
@@ -137,6 +138,7 @@ const emptyVehicle = () => ({
 
 const emptyDocument = () => ({
   documentType: "PAN",
+  vehicleId: "",
   documentNumber: "",
   fileName: "",
   fileUrl: "",
@@ -360,7 +362,7 @@ export function VendorOperationsAdmin({
           entityId = typeof body.documentId === "string" ? body.documentId : null;
           const existing = selected.vendor.documents.find(item => item.id === entityId);
           previousData = existing ? { documentType: existing.documentType, documentNumber: existing.documentNumber, fileName: existing.fileName, fileUrl: existing.fileUrl, isMandatory: existing.isMandatory, verificationStatus: existing.verificationStatus } : undefined;
-          proposedData = action === "DEACTIVATE_DOCUMENT" ? { isActive: false } : { documentType: body.documentType, documentNumber: body.documentNumber, fileName: body.fileName, fileUrl: body.fileUrl, expiryDate: body.expiryDate, isMandatory: body.isMandatory };
+          proposedData = action === "DEACTIVATE_DOCUMENT" ? { isActive: false } : { vehicleId: body.vehicleId, documentType: body.documentType, documentNumber: body.documentNumber, fileName: body.fileName, fileUrl: body.fileUrl, expiryDate: body.expiryDate, isMandatory: body.isMandatory };
         } else {
           entityType = "BANK_ACCOUNT";
           entityId = typeof body.bankAccountId === "string" ? body.bankAccountId : null;
@@ -374,7 +376,17 @@ export function VendorOperationsAdmin({
           method: "POST",
           body: JSON.stringify({ vendorId: selected.vendor.id, entityType, action: changeAction, entityId, proposedData, previousData, submissionNote: "Submitted from vendor readiness by EasyMovers staff." }),
         });
-        success = "Change submitted for independent checker approval.";
+        success = action.includes("VEHICLE")
+          ? "Vehicle submitted for independent checker approval."
+          : action === "ADD_DOCUMENT" && body.documentType === "VEHICLE_RC"
+            ? "RC book details submitted for independent checker approval."
+            : action === "ADD_DOCUMENT" && body.documentType === "VEHICLE_INSURANCE"
+              ? "Insurance details submitted for independent checker approval."
+              : action.includes("DOCUMENT")
+                ? "Document submitted for independent checker approval."
+                : action.includes("BANK_ACCOUNT")
+                  ? "Bank account submitted for independent checker approval."
+                  : "Change submitted for independent checker approval.";
       } else {
         await request(`/api/admin/vendors/${selected.vendor.id}/operations`, {
           method: "POST",
@@ -463,7 +475,7 @@ export function VendorOperationsAdmin({
         <button>Search</button>
       </form>
       {message && (
-        <p className={messageSuccess ? styles.success : styles.error}>
+        <p role="status" aria-live="polite" className={messageSuccess ? styles.success : styles.error}>
           {message}
         </p>
       )}
@@ -911,12 +923,13 @@ export function VendorOperationsAdmin({
                       <h4>Add document</h4>
                       <select
                         value={document.documentType}
-                        onChange={(event) =>
-                          setDocument((current) => ({
-                            ...current,
-                            documentType: event.target.value,
-                          }))
-                        }
+                        onChange={(event) => setDocument((current) => ({
+                          ...current,
+                          documentType: event.target.value,
+                          vehicleId: "",
+                          documentNumber: "",
+                          expiryDate: "",
+                        }))}
                       >
                         {[
                           "PAN",
@@ -936,8 +949,38 @@ export function VendorOperationsAdmin({
                           </option>
                         ))}
                       </select>
+                      {["VEHICLE_RC", "VEHICLE_INSURANCE", "GOODS_CARRIER_PERMIT"].includes(document.documentType) && (
+                        <label>
+                          Corresponding vehicle
+                          <select
+                            required
+                            value={document.vehicleId}
+                            onChange={(event) => {
+                              const linkedVehicle = selected.vendor.vehicles.find(item => item.id === event.target.value);
+                              setDocument((current) => ({
+                                ...current,
+                                vehicleId: event.target.value,
+                                documentNumber: current.documentType === "VEHICLE_RC"
+                                  ? linkedVehicle?.registrationNumber || ""
+                                  : current.documentType === "VEHICLE_INSURANCE"
+                                    ? linkedVehicle?.insuranceNumber || ""
+                                    : "",
+                                expiryDate: current.documentType === "VEHICLE_INSURANCE"
+                                  ? linkedVehicle?.insuranceExpiry?.slice(0, 10) || ""
+                                  : current.expiryDate,
+                              }));
+                            }}
+                          >
+                            <option value="">Select registered vehicle</option>
+                            {selected.vendor.vehicles.filter(item => item.isActive).map(item => (
+                              <option key={item.id} value={item.id}>{item.registrationNumber} · {label(item.vehicleType)}</option>
+                            ))}
+                          </select>
+                        </label>
+                      )}
                       <input
                         placeholder="Document number"
+                        readOnly={document.documentType === "VEHICLE_RC"}
                         value={document.documentNumber}
                         onChange={(event) =>
                           setDocument((current) => ({
@@ -1172,7 +1215,10 @@ export function VendorOperationsAdmin({
                           ) : (
                             <span>{item.fileName || "Manual original check"}</span>
                           )}{" "}
-                          · {item.isMandatory ? "Mandatory" : "Optional"}
+                          · {item.vehicleId
+                            ? `Vehicle ${selected.vendor.vehicles.find(vehicle => vehicle.id === item.vehicleId)?.registrationNumber || "not found"} · `
+                            : ""}
+                          {item.isMandatory ? "Mandatory" : "Optional"}
                         </span>
                         <span>
                           <em className={styles[item.verificationStatus]}>
