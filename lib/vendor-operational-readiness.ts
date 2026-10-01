@@ -118,7 +118,7 @@ export async function getVendorOperationalReadiness(vendorId: string) {
     (vehicle) => vehicle.isActive && vehicle.status === VehicleStatus.AVAILABLE,
   );
   const mandatoryDocuments = vendor.documents.filter(
-    (document) => document.isActive && document.isMandatory,
+    (document) => document.isActive && document.isMandatory && !document.vehicleId,
   );
   const verifiedMandatoryDocuments = mandatoryDocuments.filter(
     (document) => document.verificationStatus === "VERIFIED",
@@ -146,35 +146,50 @@ export async function getVendorOperationalReadiness(vendorId: string) {
     vendor.engagementMode !== "QUOTATION";
   const normalizeEvidence = (value: string | null | undefined) =>
     value?.toUpperCase().replace(/[^A-Z0-9]/g, "") || "";
-  const eligibleTransportVehicle = activeVehicles.some((vehicle) => {
+  const vehicleCompliance = activeVehicles.map((vehicle) => {
     const registration = normalizeEvidence(vehicle.registrationNumber);
     const insurance = normalizeEvidence(vehicle.insuranceNumber);
-    return (
-      vendor.documents.some(
+    const rcDocument = vendor.documents.find(
         (document) =>
           document.isActive &&
           document.documentType === "VEHICLE_RC" &&
-          document.verificationStatus === "VERIFIED" &&
           (document.vehicleId === vehicle.id ||
             (!document.vehicleId && normalizeEvidence(document.documentNumber) === registration)),
-      ) &&
-      Boolean(
-        insurance &&
-        vehicle.insuranceExpiry &&
-        vehicle.insuranceExpiry.getTime() > Date.now(),
-      ) &&
-      vendor.documents.some(
+      );
+    const insuranceDetailsValid = Boolean(insurance && vehicle.insuranceExpiry && vehicle.insuranceExpiry.getTime() > Date.now());
+    const insuranceDocument = vendor.documents.find(
         (document) =>
           document.isActive &&
           document.documentType === "VEHICLE_INSURANCE" &&
-          document.verificationStatus === "VERIFIED" &&
           (document.vehicleId === vehicle.id ||
-            (!document.vehicleId && normalizeEvidence(document.documentNumber) === insurance)) &&
-          document.expiryDate instanceof Date &&
-          document.expiryDate.getTime() > Date.now(),
-      )
-    );
+            (!document.vehicleId && normalizeEvidence(document.documentNumber) === insurance)),
+      );
+    const rcVerified = rcDocument?.verificationStatus === "VERIFIED";
+    const insuranceDocumentStatus = insuranceDocument && insuranceDocument.expiryDate && insuranceDocument.expiryDate.getTime() <= Date.now()
+      ? "EXPIRED"
+      : insuranceDocument?.verificationStatus || "MISSING";
+    const insuranceVerified = insuranceDocumentStatus === "VERIFIED";
+    return {
+      vehicleId: vehicle.id,
+      registrationNumber: vehicle.registrationNumber,
+      rcDocumentId: rcDocument?.id || null,
+      rcStatus: rcDocument?.verificationStatus || "MISSING",
+      insuranceDetailsStatus: !vehicle.insuranceNumber || !vehicle.insuranceExpiry
+        ? "MISSING"
+        : vehicle.insuranceExpiry.getTime() <= Date.now() ? "EXPIRED" : "VALID",
+      insuranceDocumentId: insuranceDocument?.id || null,
+      insuranceDocumentStatus,
+      eligible: rcVerified && insuranceDetailsValid && insuranceVerified,
+    };
   });
+  const eligibleTransportVehicle = vehicleCompliance.some((vehicle) => vehicle.eligible);
+  const transportEvidenceBlockers = registeredFleetRequired && transportRequired && !eligibleTransportVehicle
+    ? vehicleCompliance.flatMap((vehicle) => [
+        ...(vehicle.rcStatus !== "VERIFIED" ? [{ code: `VEHICLE_RC_${vehicle.vehicleId}`, message: `RC verification ${vehicle.rcStatus === "MISSING" ? "is required" : "is pending"} for ${vehicle.registrationNumber}.` }] : []),
+        ...(vehicle.insuranceDetailsStatus !== "VALID" ? [{ code: `VEHICLE_INSURANCE_DETAILS_${vehicle.vehicleId}`, message: `${vehicle.insuranceDetailsStatus === "EXPIRED" ? "Insurance has expired" : "Add insurance policy details"} for ${vehicle.registrationNumber}.` }] : []),
+        ...(vehicle.insuranceDetailsStatus === "VALID" && vehicle.insuranceDocumentStatus !== "VERIFIED" ? [{ code: `VEHICLE_INSURANCE_DOCUMENT_${vehicle.vehicleId}`, message: `Insurance document verification ${vehicle.insuranceDocumentStatus === "MISSING" ? "is required" : "is pending"} for ${vehicle.registrationNumber}.` }] : []),
+      ])
+    : [];
   const blockers = [
     ...(!activeAreas.length
       ? [
@@ -200,15 +215,7 @@ export async function getVendorOperationalReadiness(vendorId: string) {
           },
         ]
       : []),
-    ...(registeredFleetRequired && transportRequired && !eligibleTransportVehicle
-      ? [
-          {
-            code: "TRANSPORT_EVIDENCE_REQUIRED",
-            message:
-              "Verify matching vehicle RC and unexpired insurance evidence.",
-          },
-        ]
-      : []),
+    ...transportEvidenceBlockers,
     ...(!verifiedPan
       ? [
           {
@@ -245,6 +252,7 @@ export async function getVendorOperationalReadiness(vendorId: string) {
       verifiedMandatoryDocuments: verifiedMandatoryDocuments.length,
       mandatoryDocuments: mandatoryDocuments.length,
       verifiedBankAccounts: verifiedBankAccounts.length,
+      vehicleCompliance,
       quotationEligible: blockers.every((blocker) => !["SERVICE_AREA_REQUIRED", "SERVICE_OFFERING_REQUIRED", "PAN_VERIFICATION_REQUIRED", "MANDATORY_DOCUMENTS_PENDING", "BANK_VERIFICATION_REQUIRED"].includes(blocker.code)),
       instantRateEligible: registeredFleetRequired && blockers.length === 0,
       blockers,
@@ -798,6 +806,7 @@ export async function changeVendorOperationalStatus(
         vendor.documents.some(
           (document) =>
             document.isMandatory &&
+            !document.vehicleId &&
             document.verificationStatus !== VerificationStatus.VERIFIED,
         )
       )
@@ -813,22 +822,18 @@ export async function changeVendorOperationalStatus(
       );
       const normalize = (value: string | null) =>
         value?.toUpperCase().replace(/[^A-Z0-9]/g, "") || "";
-      const eligibleVehicle = vendor.vehicles.some((vehicle) => {
+      const vehicleChecks = vendor.vehicles.map((vehicle) => {
         const registration = normalize(vehicle.registrationNumber);
         const insurance = normalize(vehicle.insuranceNumber);
-        return Boolean(
-          registration &&
-          insurance &&
-          vehicle.insuranceExpiry &&
-          vehicle.insuranceExpiry.getTime() > Date.now() &&
-          vendor.documents.some(
+        const rcVerified = vendor.documents.some(
             (document) =>
               document.documentType === VendorDocumentType.VEHICLE_RC &&
               document.verificationStatus === VerificationStatus.VERIFIED &&
               (document.vehicleId === vehicle.id ||
                 (!document.vehicleId && normalize(document.documentNumber) === registration)),
-          ) &&
-          vendor.documents.some(
+          );
+        const insuranceDetailsValid = Boolean(insurance && vehicle.insuranceExpiry && vehicle.insuranceExpiry.getTime() > Date.now());
+        const insuranceDocumentVerified = vendor.documents.some(
             (document) =>
               document.documentType === VendorDocumentType.VEHICLE_INSURANCE &&
               document.verificationStatus === VerificationStatus.VERIFIED &&
@@ -836,13 +841,16 @@ export async function changeVendorOperationalStatus(
                 (!document.vehicleId && normalize(document.documentNumber) === insurance)) &&
               document.expiryDate &&
               document.expiryDate.getTime() > Date.now(),
-          ),
-        );
+          );
+        return { vehicle, rcVerified, insuranceDetailsValid, insuranceDocumentVerified, eligible: rcVerified && insuranceDetailsValid && insuranceDocumentVerified };
       });
-      if (registeredFleetRequired && transportRequired && !eligibleVehicle)
-        blockers.push(
-          "Verify matching vehicle RC and unexpired insurance evidence.",
-        );
+      if (registeredFleetRequired && transportRequired && !vehicleChecks.some(check => check.eligible)) {
+        for (const check of vehicleChecks) {
+          if (!check.rcVerified) blockers.push(`Verify the RC for ${check.vehicle.registrationNumber}.`);
+          if (!check.insuranceDetailsValid) blockers.push(`Add unexpired insurance policy details for ${check.vehicle.registrationNumber}.`);
+          else if (!check.insuranceDocumentVerified) blockers.push(`Verify the insurance document for ${check.vehicle.registrationNumber}.`);
+        }
+      }
       if (!vendor.bankAccounts.length)
         blockers.push("Verify an active bank account.");
       if (blockers.length)

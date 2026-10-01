@@ -482,6 +482,83 @@
   color: #173f63;
   font: inherit;
 }
+.compliancePanel {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0;
+  padding: 14px;
+  border: 1px solid #b9d5eb;
+  border-radius: 10px;
+  background: #f7fbff;
+}
+.compliancePanel h4 {
+  margin: 0;
+  color: #0c355c;
+  font-size: 17px;
+}
+.compliancePanel article {
+  overflow: hidden;
+  border: 1px solid #d6e1ec;
+  border-radius: 9px;
+  background: #fff;
+}
+.compliancePanel article header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e3eaf0;
+  background: #eef6fd;
+}
+.compliancePanel article header em {
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+}
+.compliancePanel article > div {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) minmax(90px, 0.7fr) 140px;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 12px;
+  border-top: 1px solid #edf1f5;
+}
+.compliancePanel article > div:first-of-type {
+  border-top: 0;
+}
+.compliancePanel article > div span {
+  color: #60758a;
+}
+.compliancePanel article > div b {
+  font-size: 12px;
+}
+.compliancePanel button {
+  border: 1px solid #1762a7;
+  border-radius: 7px;
+  background: #fff;
+  color: #145796;
+  padding: 7px 9px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+}
+.compliancePanel button:disabled {
+  border-color: #ccd6df;
+  color: #8294a5;
+  cursor: not-allowed;
+}
+.ready {
+  background: #ddf4e7;
+  color: #17663c;
+}
+.pending {
+  background: #fff2c9;
+  color: #785700;
+}
 .operationGrid label {
   display: flex;
   align-items: center;
@@ -591,5 +668,9 @@
   }
   .vendorTabs {
     grid-template-columns: 1fr;
+  }
+  .compliancePanel article > div {
+    grid-template-columns: 1fr;
+    gap: 5px;
   }
 }

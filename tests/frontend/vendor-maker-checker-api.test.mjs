@@ -46,7 +46,7 @@ test("CRM checker queue compares and independently reviews vendor changes", () =
 test("vendor readiness submits controlled records to maker checker", () => {
   assert.match(operationsUi, /const controlled = \[/);
   assert.match(operationsUi, /"ADD_VEHICLE", "UPDATE_VEHICLE", "DEACTIVATE_VEHICLE"/);
-  assert.match(operationsUi, /"ADD_DOCUMENT", "DEACTIVATE_DOCUMENT"/);
+  assert.match(operationsUi, /"ADD_DOCUMENT", "UPDATE_DOCUMENT", "DEACTIVATE_DOCUMENT"/);
   assert.match(operationsUi, /"ADD_BANK_ACCOUNT", "DEACTIVATE_BANK_ACCOUNT"/);
   assert.match(operationsUi, /request\("\/api\/admin\/vendor-changes"/);
   assert.match(operationsUi, /Change submitted for independent checker approval/);

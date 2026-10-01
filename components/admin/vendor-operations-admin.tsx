@@ -79,6 +79,7 @@ type Detail = {
       documentNumber: string | null;
       fileName: string | null;
       fileUrl: string | null;
+      expiryDate: string | null;
       verificationStatus: string;
       isMandatory: boolean;
       isActive: boolean;
@@ -103,6 +104,16 @@ type Detail = {
     verifiedMandatoryDocuments: number;
     mandatoryDocuments: number;
     verifiedBankAccounts: number;
+    vehicleCompliance: Array<{
+      vehicleId: string;
+      registrationNumber: string;
+      rcDocumentId: string | null;
+      rcStatus: string;
+      insuranceDetailsStatus: string;
+      insuranceDocumentId: string | null;
+      insuranceDocumentStatus: string;
+      eligible: boolean;
+    }>;
     blockers: Array<{ code: string; message: string }>;
     operationallyReady: boolean;
     quotationEligible: boolean;
@@ -137,6 +148,7 @@ const emptyVehicle = () => ({
 });
 
 const emptyDocument = () => ({
+  documentId: "",
   documentType: "PAN",
   vehicleId: "",
   documentNumber: "",
@@ -144,7 +156,6 @@ const emptyDocument = () => ({
   fileUrl: "",
   expiryDate: "",
   isMandatory: true,
-  verifyManually: true,
 });
 
 const emptyBank = () => ({
@@ -342,7 +353,7 @@ export function VendorOperationsAdmin({
       const action = String(body.action || "");
       const controlled = [
         "ADD_VEHICLE", "UPDATE_VEHICLE", "DEACTIVATE_VEHICLE",
-        "ADD_DOCUMENT", "DEACTIVATE_DOCUMENT",
+        "ADD_DOCUMENT", "UPDATE_DOCUMENT", "DEACTIVATE_DOCUMENT",
         "ADD_BANK_ACCOUNT", "DEACTIVATE_BANK_ACCOUNT",
       ].includes(action);
       if (controlled) {
@@ -361,7 +372,7 @@ export function VendorOperationsAdmin({
           entityType = "DOCUMENT";
           entityId = typeof body.documentId === "string" ? body.documentId : null;
           const existing = selected.vendor.documents.find(item => item.id === entityId);
-          previousData = existing ? { documentType: existing.documentType, documentNumber: existing.documentNumber, fileName: existing.fileName, fileUrl: existing.fileUrl, isMandatory: existing.isMandatory, verificationStatus: existing.verificationStatus } : undefined;
+          previousData = existing ? { vehicleId: existing.vehicleId, documentType: existing.documentType, documentNumber: existing.documentNumber, fileName: existing.fileName, fileUrl: existing.fileUrl, expiryDate: existing.expiryDate, isMandatory: existing.isMandatory, verificationStatus: existing.verificationStatus } : undefined;
           proposedData = action === "DEACTIVATE_DOCUMENT" ? { isActive: false } : { vehicleId: body.vehicleId, documentType: body.documentType, documentNumber: body.documentNumber, fileName: body.fileName, fileUrl: body.fileUrl, expiryDate: body.expiryDate, isMandatory: body.isMandatory };
         } else {
           entityType = "BANK_ACCOUNT";
@@ -378,9 +389,9 @@ export function VendorOperationsAdmin({
         });
         success = action.includes("VEHICLE")
           ? "Vehicle submitted for independent checker approval."
-          : action === "ADD_DOCUMENT" && body.documentType === "VEHICLE_RC"
+          : action.includes("DOCUMENT") && body.documentType === "VEHICLE_RC"
             ? "RC book details submitted for independent checker approval."
-            : action === "ADD_DOCUMENT" && body.documentType === "VEHICLE_INSURANCE"
+            : action.includes("DOCUMENT") && body.documentType === "VEHICLE_INSURANCE"
               ? "Insurance details submitted for independent checker approval."
               : action.includes("DOCUMENT")
                 ? "Document submitted for independent checker approval."
@@ -396,7 +407,7 @@ export function VendorOperationsAdmin({
       if (body.action === "ADD_VEHICLE" || body.action === "UPDATE_VEHICLE") {
         setVehicle(emptyVehicle());
         setEditingVehicleId(null);
-      } else if (body.action === "ADD_DOCUMENT") {
+      } else if (body.action === "ADD_DOCUMENT" || body.action === "UPDATE_DOCUMENT") {
         setDocument(emptyDocument());
       } else if (body.action === "ADD_BANK_ACCOUNT") {
         setBank(emptyBank());
@@ -791,9 +802,24 @@ export function VendorOperationsAdmin({
                 <section className={styles.operations}>
                   <h3>Operational verification</h3>
                   <p>
-                    Add operational evidence, then verify compliance and banking
-                    before activation.
+                    Complete each vehicle checklist. Every change is applied only
+                    after independent checker approval.
                   </p>
+                  {selected.readiness.vehicleCompliance.length > 0 && (
+                    <div className={styles.compliancePanel}>
+                      <h4>Vehicle compliance</h4>
+                      {selected.readiness.vehicleCompliance.map((compliance) => {
+                        const linkedVehicle = selected.vendor.vehicles.find(item => item.id === compliance.vehicleId)!;
+                        return <article key={compliance.vehicleId}>
+                          <header><strong>{compliance.registrationNumber}</strong><em className={compliance.eligible ? styles.ready : styles.pending}>{compliance.eligible ? "Eligible" : "Action required"}</em></header>
+                          <div><span>Vehicle record</span><b>Approved</b><button type="button" onClick={() => { setVehicle({ registrationNumber: linkedVehicle.registrationNumber, vehicleType: linkedVehicle.vehicleType, ownership: linkedVehicle.ownership, currentCity: linkedVehicle.currentCity || "", insuranceNumber: linkedVehicle.insuranceNumber || "", insuranceExpiry: linkedVehicle.insuranceExpiry?.slice(0, 10) || "" }); setEditingVehicleId(linkedVehicle.id); }}>Edit vehicle</button></div>
+                          <div><span>RC Book</span><b>{label(compliance.rcStatus)}</b><button type="button" disabled={compliance.rcStatus === "PENDING"} onClick={() => { const evidence = selected.vendor.documents.find(item => item.id === compliance.rcDocumentId); setDocument({ ...emptyDocument(), documentId: evidence?.id || "", documentType: "VEHICLE_RC", vehicleId: linkedVehicle.id, documentNumber: linkedVehicle.registrationNumber, fileName: evidence?.fileName || "", fileUrl: evidence?.fileUrl || "", expiryDate: evidence?.expiryDate?.slice(0, 10) || "", isMandatory: evidence?.isMandatory ?? true }); }}>{compliance.rcStatus === "PENDING" ? "Awaiting checker" : compliance.rcDocumentId ? "Update RC" : "Submit RC"}</button></div>
+                          <div><span>Insurance details</span><b>{label(compliance.insuranceDetailsStatus)}</b><button type="button" onClick={() => { setVehicle({ registrationNumber: linkedVehicle.registrationNumber, vehicleType: linkedVehicle.vehicleType, ownership: linkedVehicle.ownership, currentCity: linkedVehicle.currentCity || "", insuranceNumber: linkedVehicle.insuranceNumber || "", insuranceExpiry: linkedVehicle.insuranceExpiry?.slice(0, 10) || "" }); setEditingVehicleId(linkedVehicle.id); }}>Update insurance</button></div>
+                          <div><span>Insurance document</span><b>{label(compliance.insuranceDocumentStatus)}</b><button type="button" disabled={compliance.insuranceDetailsStatus !== "VALID" || compliance.insuranceDocumentStatus === "PENDING"} onClick={() => { const evidence = selected.vendor.documents.find(item => item.id === compliance.insuranceDocumentId); setDocument({ ...emptyDocument(), documentId: evidence?.id || "", documentType: "VEHICLE_INSURANCE", vehicleId: linkedVehicle.id, documentNumber: linkedVehicle.insuranceNumber || "", fileName: evidence?.fileName || "", fileUrl: evidence?.fileUrl || "", expiryDate: linkedVehicle.insuranceExpiry?.slice(0, 10) || evidence?.expiryDate?.slice(0, 10) || "", isMandatory: evidence?.isMandatory ?? true }); }}>{compliance.insuranceDocumentStatus === "PENDING" ? "Awaiting checker" : compliance.insuranceDocumentId ? "Update policy" : "Submit policy"}</button></div>
+                        </article>;
+                      })}
+                    </div>
+                  )}
                   <div className={styles.operationGrid}>
                     <form
                       onSubmit={(event) => {
@@ -901,7 +927,7 @@ export function VendorOperationsAdmin({
                         />
                       </label>
                       <button disabled={loading}>
-                        {editingVehicleId ? "Update vehicle" : "Add vehicle"}
+                        {editingVehicleId ? "Submit vehicle update" : "Submit vehicle for approval"}
                       </button>
                       {editingVehicleId && (
                         <button type="button" onClick={() => setEditingVehicleId(null)}>
@@ -913,18 +939,17 @@ export function VendorOperationsAdmin({
                       onSubmit={(event) => {
                         event.preventDefault();
                         void operate(
-                          { action: "ADD_DOCUMENT", ...document },
-                          document.verifyManually
-                            ? "Document manually verified and readiness recalculated."
-                            : "Compliance document added for review.",
+                          { action: document.documentId ? "UPDATE_DOCUMENT" : "ADD_DOCUMENT", ...document },
+                          "Document submitted for checker approval.",
                         );
                       }}
                     >
-                      <h4>Add document</h4>
+                      <h4>{document.documentId ? "Update document" : "Add document"}</h4>
                       <select
                         value={document.documentType}
                         onChange={(event) => setDocument((current) => ({
                           ...current,
+                          documentId: "",
                           documentType: event.target.value,
                           vehicleId: "",
                           documentNumber: "",
@@ -1040,24 +1065,7 @@ export function VendorOperationsAdmin({
                         />{" "}
                         Mandatory for activation
                       </label>
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={document.verifyManually}
-                          onChange={(event) =>
-                            setDocument((current) => ({
-                              ...current,
-                              verifyManually: event.target.checked,
-                            }))
-                          }
-                        />{" "}
-                        Original checked manually — verify now
-                      </label>
-                      <button disabled={loading}>
-                        {document.verifyManually
-                          ? "Save & verify document"
-                          : "Save for review"}
-                      </button>
+                      <button disabled={loading}>Submit for checker approval</button>
                     </form>
                     <form
                       onSubmit={(event) => {

@@ -21,6 +21,10 @@ test("approved RC and insurance evidence is validated against its vehicle", () =
   assert.match(service, /INSURANCE_MISMATCH/);
   assert.match(service, /INSURANCE_EXPIRED/);
   assert.match(readiness, /document\.vehicleId === vehicle\.id/);
+  assert.match(readiness, /vehicleCompliance/);
+  assert.match(readiness, /RC verification/);
+  assert.match(readiness, /Add insurance policy details/);
+  assert.match(readiness, /Insurance document verification/);
 });
 
 test("CRM selects a corresponding vehicle and displays visible action feedback", () => {
@@ -28,6 +32,11 @@ test("CRM selects a corresponding vehicle and displays visible action feedback",
   assert.match(ui, /Select registered vehicle/);
   assert.match(ui, /RC book details submitted for independent checker approval/);
   assert.match(ui, /Insurance details submitted for independent checker approval/);
+  assert.match(ui, /Vehicle compliance/);
+  assert.match(ui, /UPDATE_DOCUMENT/);
+  assert.match(ui, /Submit for checker approval/);
+  assert.doesNotMatch(ui, /Original checked manually/);
+  assert.match(css, /\.compliancePanel/);
   assert.match(ui, /role="status" aria-live="polite"/);
   assert.match(css, /position:\s*fixed/);
   assert.match(css, /z-index:\s*1000/);
