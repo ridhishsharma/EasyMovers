@@ -7,6 +7,7 @@ const listRoute = await readFile("app/api/admin/vendor-changes/route.ts", "utf8"
 const reviewRoute = await readFile("app/api/admin/vendor-changes/[changeRequestId]/review/route.ts", "utf8");
 const reviewUi = await readFile("components/admin/vendor-change-review-admin.tsx", "utf8");
 const reviewPage = await readFile("app/admin/vendor-changes/page.tsx", "utf8");
+const operationsUi = await readFile("components/admin/vendor-operations-admin.tsx", "utf8");
 
 test("staff submissions and checker queue use separate permissions", () => {
   assert.match(listRoute, /VENDOR_MANAGE/);
@@ -40,4 +41,13 @@ test("CRM checker queue compares and independently reviews vendor changes", () =
   assert.match(reviewUi, /Another authorised checker must review it/);
   assert.match(reviewUi, /sensitive/);
   assert.match(listRoute, /currentUserId: access\.userId/);
+});
+
+test("vendor readiness submits controlled records to maker checker", () => {
+  assert.match(operationsUi, /const controlled = \[/);
+  assert.match(operationsUi, /"ADD_VEHICLE", "UPDATE_VEHICLE", "DEACTIVATE_VEHICLE"/);
+  assert.match(operationsUi, /"ADD_DOCUMENT", "DEACTIVATE_DOCUMENT"/);
+  assert.match(operationsUi, /"ADD_BANK_ACCOUNT", "DEACTIVATE_BANK_ACCOUNT"/);
+  assert.match(operationsUi, /request\("\/api\/admin\/vendor-changes"/);
+  assert.match(operationsUi, /Change submitted for independent checker approval/);
 });

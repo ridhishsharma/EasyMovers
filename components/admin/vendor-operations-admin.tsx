@@ -337,10 +337,50 @@ export function VendorOperationsAdmin({
     setMessage("");
     setMessageSuccess(false);
     try {
-      await request(`/api/admin/vendors/${selected.vendor.id}/operations`, {
-        method: "POST",
-        body: JSON.stringify(body),
-      });
+      const action = String(body.action || "");
+      const controlled = [
+        "ADD_VEHICLE", "UPDATE_VEHICLE", "DEACTIVATE_VEHICLE",
+        "ADD_DOCUMENT", "DEACTIVATE_DOCUMENT",
+        "ADD_BANK_ACCOUNT", "DEACTIVATE_BANK_ACCOUNT",
+      ].includes(action);
+      if (controlled) {
+        let entityType = "";
+        let changeAction = "CREATE";
+        let entityId: string | null = null;
+        let proposedData: Record<string, unknown> = {};
+        let previousData: Record<string, unknown> | undefined;
+        if (action.includes("VEHICLE")) {
+          entityType = "VEHICLE";
+          entityId = typeof body.vehicleId === "string" ? body.vehicleId : null;
+          const existing = selected.vendor.vehicles.find(item => item.id === entityId);
+          previousData = existing ? { registrationNumber: existing.registrationNumber, vehicleType: existing.vehicleType, ownership: existing.ownership, currentCity: existing.currentCity, insuranceNumber: existing.insuranceNumber, insuranceExpiry: existing.insuranceExpiry } : undefined;
+          proposedData = action === "DEACTIVATE_VEHICLE" ? { isActive: false } : { registrationNumber: body.registrationNumber, vehicleType: body.vehicleType, ownership: body.ownership, currentCity: body.currentCity, insuranceNumber: body.insuranceNumber, insuranceExpiry: body.insuranceExpiry };
+        } else if (action.includes("DOCUMENT")) {
+          entityType = "DOCUMENT";
+          entityId = typeof body.documentId === "string" ? body.documentId : null;
+          const existing = selected.vendor.documents.find(item => item.id === entityId);
+          previousData = existing ? { documentType: existing.documentType, documentNumber: existing.documentNumber, fileName: existing.fileName, fileUrl: existing.fileUrl, isMandatory: existing.isMandatory, verificationStatus: existing.verificationStatus } : undefined;
+          proposedData = action === "DEACTIVATE_DOCUMENT" ? { isActive: false } : { documentType: body.documentType, documentNumber: body.documentNumber, fileName: body.fileName, fileUrl: body.fileUrl, expiryDate: body.expiryDate, isMandatory: body.isMandatory };
+        } else {
+          entityType = "BANK_ACCOUNT";
+          entityId = typeof body.bankAccountId === "string" ? body.bankAccountId : null;
+          const existing = selected.vendor.bankAccounts.find(item => item.id === entityId);
+          previousData = existing ? { accountHolderName: existing.accountHolderName, bankName: existing.bankName, ifscCode: existing.ifscCode, accountType: existing.accountType, verified: existing.verified } : undefined;
+          proposedData = action === "DEACTIVATE_BANK_ACCOUNT" ? { isActive: false } : { accountHolderName: body.accountHolderName, bankName: body.bankName, accountNumber: body.accountNumber, ifscCode: body.ifscCode, accountType: body.accountType };
+        }
+        if (action.startsWith("UPDATE_")) changeAction = "UPDATE";
+        if (action.startsWith("DEACTIVATE_")) changeAction = "DEACTIVATE";
+        await request("/api/admin/vendor-changes", {
+          method: "POST",
+          body: JSON.stringify({ vendorId: selected.vendor.id, entityType, action: changeAction, entityId, proposedData, previousData, submissionNote: "Submitted from vendor readiness by EasyMovers staff." }),
+        });
+        success = "Change submitted for independent checker approval.";
+      } else {
+        await request(`/api/admin/vendors/${selected.vendor.id}/operations`, {
+          method: "POST",
+          body: JSON.stringify(body),
+        });
+      }
       if (body.action === "ADD_VEHICLE" || body.action === "UPDATE_VEHICLE") {
         setVehicle(emptyVehicle());
         setEditingVehicleId(null);
