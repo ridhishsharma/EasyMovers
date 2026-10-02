@@ -175,9 +175,53 @@ async function applyApprovedChange(
       isActive: true,
     };
     if (change.action === VendorChangeAction.CREATE) {
-      const created = await transaction.vendorDocument.create({ data: { vendorId: change.vendorId, ...documentData }, select: { id: true } });
-      return created.id;
+  /*
+   * Vehicle compliance documents are unique by
+   * (vehicleId, documentType).
+   *
+   * A legacy/existing compliance record may therefore already exist
+   * when a maker submits a new document for checker approval.
+   * In that case, apply the approved change to the existing record
+   * instead of attempting to create a duplicate.
+   */
+  if (vehicle?.id) {
+    const existingDocument =
+      await transaction.vendorDocument.findFirst({
+        where: {
+          vendorId: change.vendorId,
+          vehicleId: vehicle.id,
+          documentType,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+    if (existingDocument) {
+      await transaction.vendorDocument.update({
+        where: {
+          id: existingDocument.id,
+        },
+        data: documentData,
+      });
+
+      return existingDocument.id;
     }
+  }
+
+  const created =
+    await transaction.vendorDocument.create({
+      data: {
+        vendorId: change.vendorId,
+        ...documentData,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+  return created.id;
+}
     if (!change.entityId) throw new VendorChangeError("ENTITY_ID_REQUIRED", "Document ID is required.", 400);
     const result = await transaction.vendorDocument.updateMany({ where: { id: change.entityId, vendorId: change.vendorId, isActive: true }, data: documentData });
     if (!result.count) throw new VendorChangeError("DOCUMENT_NOT_FOUND", "Active document was not found.", 404);

@@ -9,6 +9,8 @@ const quoteRoute = await readFile("app/api/vendor/opportunities/[bookingId]/quot
 const dashboard = await readFile("components/vendor/vendor-portal-dashboard.tsx", "utf8");
 const admin = await readFile("components/admin/vendor-operations-admin.tsx", "utf8");
 const login = await readFile("components/vendor/vendor-login.tsx", "utf8");
+const portalRoute = await readFile("app/api/vendor/portal/route.ts", "utf8");
+const adminCss = await readFile("components/admin/vendor-operations-admin.module.css", "utf8");
 
 test("CRM creates vendor-specific Supabase invitations without shared passwords", () => {
   assert.match(accountRoute, /CRM_PERMISSIONS\.VENDOR_MANAGE/);
@@ -18,6 +20,12 @@ test("CRM creates vendor-specific Supabase invitations without shared passwords"
   assert.match(accounts, /SUPABASE_AUTH_MANAGED/);
   assert.doesNotMatch(accounts, /password:\s*["']/);
   assert.match(admin, /Portal access/);
+  assert.match(admin, /Create access & send activation link/);
+  assert.match(admin, /Resend activation link/);
+  assert.match(accountRoute, /RESEND_ACTIVATION/);
+  assert.match(accounts, /resetPasswordForEmail/);
+  assert.match(accounts, /VENDOR_PORTAL_ACTIVATION_RESENT/);
+  assert.match(adminCss, /grid-template-columns:\s*repeat\(4, 1fr\)/);
 });
 
 test("vendor invitation accepts a private password and returns to vendor sign in", () => {
@@ -25,6 +33,7 @@ test("vendor invitation accepts a private password and returns to vendor sign in
   assert.match(login, /Create vendor password/);
   assert.match(login, /updateUser\(\{ password: newPassword \}\)/);
   assert.match(login, /minLength=\{12\}/);
+  assert.match(portalRoute, /emailVerified: true, lastLogin: new Date\(\)/);
 });
 
 test("enquiry queue is scoped by active services coverage and linked vendor", () => {

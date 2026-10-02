@@ -39,7 +39,7 @@ type AreaDraft = {
   locationId: string;
   pins: string;
 };
-type VendorPortalUser = { id: string; fullName: string; email: string | null; mobile: string; isActive: boolean; lastLogin: string | null; createdAt: string };
+type VendorPortalUser = { id: string; fullName: string; email: string | null; mobile: string; isActive: boolean; emailVerified: boolean; lastLogin: string | null; createdAt: string };
 type Detail = {
   vendor: VendorSummary & {
     ownerMobile: string;
@@ -440,6 +440,20 @@ export function VendorOperationsAdmin({
       setMessage(error instanceof Error ? error.message : "Unable to invite vendor user.");
     } finally { setLoading(false); }
   }
+  async function resendPortalActivation(userId: string) {
+    if (!selected || loading) return;
+    setLoading(true); setMessage(""); setMessageSuccess(false);
+    try {
+      await request(`/api/admin/vendors/${selected.vendor.id}/portal-users`, {
+        method: "PATCH",
+        body: JSON.stringify({ action: "RESEND_ACTIVATION", userId }),
+      });
+      setMessageSuccess(true);
+      setMessage("A fresh vendor activation link has been emailed.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to resend the activation link.");
+    } finally { setLoading(false); }
+  }
   const editable = selected?.capabilities.canManage === true;
   return (
     <main className={styles.page}>
@@ -632,16 +646,30 @@ export function VendorOperationsAdmin({
                   Portal access ({portalUsers.length})
                 </button>
               </nav>
-              {activePanel === "access" && <section className={styles.configuration}>
-                <div className={styles.configTitle}><div><h3>Vendor portal accounts</h3><span>Each person receives a private invitation and sets their own password. Never share one password across vendors.</span></div></div>
-                {portalUsers.length ? <div className={styles.matrix}>{portalUsers.map(user => <p key={user.id}><b>{user.fullName}</b> — {user.email || user.mobile}<em>{user.isActive ? "Active" : "Inactive"}{user.lastLogin ? ` · Last login ${new Date(user.lastLogin).toLocaleString("en-IN")}` : " · Never signed in"}</em></p>)}</div> : <p>No portal accounts linked to this vendor.</p>}
-                {editable && <form onSubmit={invitePortalUser}>
+              {activePanel === "access" && <section className={`${styles.configuration} ${styles.portalAccess}`}>
+                <div className={styles.configTitle}><div><h3>Vendor portal access</h3><span>Create an individual account for each authorised vendor representative. The activation email lets the user set a private password.</span></div></div>
+                {portalUsers.length ? <div className={styles.portalAccounts}>{portalUsers.map(user => {
+                  const activated = Boolean(user.lastLogin || user.emailVerified);
+                  return <article key={user.id}>
+                    <div>
+                      <strong>{user.fullName}</strong>
+                      <span>{user.email || "No email"} · {user.mobile}</span>
+                      <small>Created {new Date(user.createdAt).toLocaleString("en-IN")}{user.lastLogin ? ` · Last login ${new Date(user.lastLogin).toLocaleString("en-IN")}` : " · Never signed in"}</small>
+                    </div>
+                    <div className={styles.portalAccountAction}>
+                      <em className={activated ? styles.portalActive : styles.portalPending}>{user.isActive ? activated ? "Activated" : "Activation pending" : "Access disabled"}</em>
+                      {editable && user.isActive && !activated && <button type="button" disabled={loading} onClick={() => void resendPortalActivation(user.id)}>Resend activation link</button>}
+                    </div>
+                  </article>;
+                })}</div> : <div className={styles.portalEmpty}><strong>No portal access created</strong><span>Add the vendor owner or an authorised representative below.</span></div>}
+                {editable && <form className={styles.portalInvite} onSubmit={invitePortalUser}>
+                  <h4>Create portal access</h4>
                   <div className={styles.areaRow}>
                     <label>Full name<input required value={portalInvite.fullName} onChange={event => setPortalInvite(current => ({ ...current, fullName: event.target.value }))} /></label>
                     <label>Email<input type="email" required value={portalInvite.email} onChange={event => setPortalInvite(current => ({ ...current, email: event.target.value }))} /></label>
                     <label>Mobile<input inputMode="numeric" pattern="[6-9][0-9]{9}" required value={portalInvite.mobile} onChange={event => setPortalInvite(current => ({ ...current, mobile: event.target.value.replace(/\D/g, "").slice(0, 10) }))} /></label>
                   </div>
-                  <button disabled={loading}>Invite vendor user</button>
+                  <button disabled={loading}>{loading ? "Sending…" : "Create access & send activation link"}</button>
                 </form>}
               </section>}
               {editable && activePanel === "services" && (

@@ -363,6 +363,101 @@
 .matrix {
   margin-top: 18px;
 }
+.portalAccess {
+  display: grid;
+  gap: 16px;
+}
+.portalAccounts {
+  display: grid;
+  gap: 9px;
+}
+.portalAccounts article {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 13px 14px;
+  border: 1px solid #d7e3ed;
+  border-radius: 9px;
+  background: #fff;
+}
+.portalAccounts article > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+.portalAccounts article span,
+.portalAccounts article small,
+.portalEmpty span {
+  color: #60758a;
+}
+.portalAccountAction {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.portalAccountAction em {
+  white-space: nowrap;
+  border-radius: 999px;
+  padding: 5px 9px;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+}
+.portalActive {
+  background: #ddf4e7;
+  color: #17663c;
+}
+.portalPending {
+  background: #fff2c9;
+  color: #785700;
+}
+.portalAccountAction button,
+.portalInvite button {
+  border: 1px solid #1762a7;
+  border-radius: 7px;
+  background: #1967ad;
+  color: #fff;
+  padding: 9px 12px;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+.portalAccountAction button:disabled,
+.portalInvite button:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+.portalEmpty {
+  display: grid;
+  gap: 4px;
+  padding: 18px;
+  border: 1px dashed #b9cad9;
+  border-radius: 9px;
+  background: #fff;
+  text-align: center;
+}
+.portalInvite {
+  display: grid;
+  gap: 11px;
+  padding-top: 15px;
+  border-top: 1px solid #d7e3ed;
+}
+.portalInvite h4 {
+  margin: 0;
+}
+.portalInvite .areaRow {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.portalInvite label {
+  display: grid;
+  gap: 5px;
+  color: #496984;
+  font-size: 12px;
+  font-weight: 700;
+}
+.portalInvite > button {
+  justify-self: start;
+}
 @media (max-width: 1100px) {
   .cards {
     grid-template-columns: repeat(3, 1fr);
@@ -424,7 +519,7 @@
 }
 .vendorTabs {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 6px;
   margin-top: 16px;
   padding: 5px;
@@ -667,6 +762,14 @@
     flex-wrap: wrap;
   }
   .vendorTabs {
+    grid-template-columns: 1fr;
+  }
+  .portalAccounts article,
+  .portalAccountAction {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .portalInvite .areaRow {
     grid-template-columns: 1fr;
   }
   .compliancePanel article > div {

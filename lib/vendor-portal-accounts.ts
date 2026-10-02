@@ -84,3 +84,58 @@ export async function inviteVendorPortalAccount(input: {
     throw persistError;
   }
 }
+
+export async function resendVendorPortalActivation(input: {
+  vendorId: string;
+  userId: string;
+  actorUserId: string;
+  origin: string;
+  ipAddress?: string;
+}) {
+  const supabaseUrl = process.env.SUPABASE_URL?.trim();
+  const secretKey = (process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY)?.trim();
+  if (!supabaseUrl || !secretKey)
+    throw new VendorPortalAccountError("VENDOR_INVITATION_NOT_CONFIGURED", "Secure vendor invitations are not configured.", 503);
+
+  const user = await prisma.user.findFirst({
+    where: {
+      id: input.userId,
+      vendorId: input.vendorId,
+      role: "VENDOR",
+      isActive: true,
+    },
+    select: {
+      id: true,
+      email: true,
+      fullName: true,
+      lastLogin: true,
+      supabaseAuthId: true,
+    },
+  });
+  if (!user)
+    throw new VendorPortalAccountError("VENDOR_PORTAL_USER_NOT_FOUND", "The vendor portal user was not found.", 404);
+  if (!user.email || !user.supabaseAuthId)
+    throw new VendorPortalAccountError("VENDOR_PORTAL_EMAIL_REQUIRED", "This portal account does not have a verified authentication email.", 409);
+  if (user.lastLogin)
+    throw new VendorPortalAccountError("VENDOR_PORTAL_ALREADY_ACTIVATED", "This portal account is already activated. Use password recovery if the user cannot sign in.", 409);
+
+  const admin = createClient(supabaseUrl, secretKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const redirectTo = `${input.origin}/vendor/login?mode=recovery&returnTo=%2Fvendor%2Fdashboard`;
+  const { error } = await admin.auth.resetPasswordForEmail(user.email, { redirectTo });
+  if (error)
+    throw new VendorPortalAccountError("VENDOR_ACTIVATION_RESEND_FAILED", "The activation link could not be sent. Check the email provider and try again.", 502);
+
+  await prisma.crmAuditLog.create({
+    data: {
+      actorUserId: input.actorUserId,
+      action: "VENDOR_PORTAL_ACTIVATION_RESENT",
+      entityType: "User",
+      entityId: user.id,
+      ipAddress: input.ipAddress,
+      metadata: { vendorId: input.vendorId, email: user.email },
+    },
+  });
+  return { userId: user.id, email: user.email, activationSent: true };
+}
