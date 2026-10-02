@@ -11,6 +11,9 @@ export class VendorSettlementError extends Error {
 type CommercialReference = {
   vendorQuotedAmount?: unknown;
   platformCommissionAmount?: unknown;
+  platformInvoiceAmount?: unknown;
+  tcsAmount?: unknown;
+  totalSettlementDeduction?: unknown;
 };
 
 const money = (value: unknown) => {
@@ -36,9 +39,12 @@ const paymentFinancials = (payment: {
   const commission = money(snapshot.platformCommissionAmount);
   if (vendorQuoted === null || commission === null)
     throw new VendorSettlementError("COMMISSION_NOT_LOCKED", "Lock the vendor quotation and EasyMovers commission before creating a settlement.", 409);
-  const vendorNet = Math.max(0, vendorQuoted - commission);
-  const fundedPayable = Math.max(0, Math.min(vendorNet, Number(payment.paidAmount) - commission));
-  return { vendorQuoted, commission, vendorNet, fundedPayable };
+  const invoiceAmount = money(snapshot.platformInvoiceAmount) ?? commission;
+  const tcsAmount = money(snapshot.tcsAmount) ?? 0;
+  const totalDeduction = money(snapshot.totalSettlementDeduction) ?? invoiceAmount + tcsAmount;
+  const vendorNet = Math.max(0, vendorQuoted - totalDeduction);
+  const fundedPayable = Math.max(0, Math.min(vendorNet, Number(payment.paidAmount) - totalDeduction));
+  return { vendorQuoted, commission, invoiceAmount, tcsAmount, totalDeduction, vendorNet, fundedPayable };
 };
 
 async function audit(transaction: Prisma.TransactionClient, actorUserId: string, action: string, entityId: string, metadata?: Prisma.InputJsonValue) {

@@ -5,6 +5,9 @@ type CommercialReference = {
   customerPayableAmount?: unknown;
   vendorQuotedAmount?: unknown;
   platformCommissionAmount?: unknown;
+  platformInvoiceAmount?: unknown;
+  tcsAmount?: unknown;
+  totalSettlementDeduction?: unknown;
   currency?: unknown;
 };
 
@@ -70,8 +73,11 @@ export async function getVendorFinancialLedger(vendorId: string) {
       const customerOutstanding = Math.max(0, Number(payment.balanceAmount));
       const vendorQuotedAmount = amount(snapshot.vendorQuotedAmount) ?? (payment.quotation ? Number(payment.quotation.totalAmount) : null);
       const commissionAmount = amount(snapshot.platformCommissionAmount);
+      const platformInvoiceAmount = amount(snapshot.platformInvoiceAmount) ?? commissionAmount;
+      const tcsAmount = amount(snapshot.tcsAmount) ?? 0;
+      const totalSettlementDeduction = amount(snapshot.totalSettlementDeduction) ?? (platformInvoiceAmount === null ? null : platformInvoiceAmount + tcsAmount);
       const commissionConfigured = vendorQuotedAmount !== null && commissionAmount !== null;
-      const vendorNetPayable = commissionConfigured ? Math.max(0, vendorQuotedAmount - commissionAmount) : null;
+      const vendorNetPayable = commissionConfigured && totalSettlementDeduction !== null ? Math.max(0, vendorQuotedAmount - totalSettlementDeduction) : null;
       const settledAmount = payment.vendorSettlements
         .filter((entry) => entry.status === VendorSettlementStatus.SETTLED)
         .reduce((total, entry) => total + Number(entry.amount), 0);
@@ -94,6 +100,9 @@ export async function getVendorFinancialLedger(vendorId: string) {
         customerOutstanding,
         vendorQuotedAmount,
         commissionAmount,
+        platformInvoiceAmount,
+        tcsAmount,
+        totalSettlementDeduction,
         commissionStatus: commissionConfigured ? "LOCKED" as const : "PENDING_CONFIGURATION" as const,
         vendorNetPayable,
         settledAmount,

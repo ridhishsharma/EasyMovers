@@ -22,7 +22,19 @@ export async function POST(request: Request) {
     const access = await authorizeCrmPermission(request, CRM_PERMISSIONS.PAYMENT_MANAGE);
     if (!access.authorized) return reply({ success: false, error: { code: access.code, message: access.message } }, access.status);
     const body = await request.json();
-    const data = await submitCommercialTermRequest({ paymentId: String(body.paymentId || ""), platformCommissionAmount: body.platformCommissionAmount, submissionNote: body.submissionNote, actorUserId: access.userId });
+    const data = await submitCommercialTermRequest({
+      paymentId: String(body.paymentId || ""),
+      commissionRate: body.commissionRate,
+      gstTreatment: body.gstTreatment,
+      gstRate: body.gstRate,
+      tcsApplicable: body.tcsApplicable,
+      tcsRate: body.tcsRate,
+      placeOfSupplyState: body.placeOfSupplyState,
+      taxOverrideReason: body.taxOverrideReason,
+      revisedFromId: body.revisedFromId,
+      submissionNote: body.submissionNote,
+      actorUserId: access.userId,
+    });
     return reply({ success: true, data }, 201);
   } catch (error) {
     if (error instanceof CommercialTermError) return reply({ success: false, error: { code: error.code, message: error.message } }, error.status);

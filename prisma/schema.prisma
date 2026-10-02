@@ -1204,33 +1204,53 @@ model Payment {
 }
 
 model PaymentCommercialTermRequest {
-  id                       String                      @id @default(cuid())
+  id                       String                         @id @default(cuid())
   paymentId                String
   vendorId                 String
   quotationId              String
-  customerPayableAmount    Decimal                     @db.Decimal(12, 2)
-  vendorQuotedAmount       Decimal                     @db.Decimal(12, 2)
-  platformCommissionAmount Decimal                     @db.Decimal(12, 2)
-  currency                 String                      @default("INR")
-  status                   CommercialTermRequestStatus @default(PENDING)
+  customerPayableAmount    Decimal                        @db.Decimal(12, 2)
+  vendorQuotedAmount       Decimal                        @db.Decimal(12, 2)
+  platformCommissionAmount Decimal                        @db.Decimal(12, 2)
+  commissionRate           Decimal                        @db.Decimal(7, 4)
+  commissionBase           Decimal                        @db.Decimal(12, 2)
+  gstTreatment             CommercialTaxTreatment
+  gstRate                  Decimal                        @db.Decimal(7, 4)
+  cgstAmount               Decimal                        @default(0) @db.Decimal(12, 2)
+  sgstAmount               Decimal                        @default(0) @db.Decimal(12, 2)
+  igstAmount               Decimal                        @default(0) @db.Decimal(12, 2)
+  tcsApplicable            Boolean                        @default(false)
+  tcsRate                  Decimal                        @default(0) @db.Decimal(7, 4)
+  tcsBase                  Decimal                        @default(0) @db.Decimal(12, 2)
+  tcsAmount                Decimal                        @default(0) @db.Decimal(12, 2)
+  placeOfSupplyState       String?
+  vendorGstinSnapshot      String?
+  easymoversGstinSnapshot  String?
+  taxOverrideReason        String?
+  revisedFromId            String?
+  revisionNumber           Int                            @default(1)
+  currency                 String                         @default("INR")
+  status                   CommercialTermRequestStatus    @default(PENDING)
   submissionNote           String?
   reviewNote               String?
   submittedBy              String
   reviewedBy               String?
-  submittedAt              DateTime                    @default(now())
+  submittedAt              DateTime                       @default(now())
   reviewedAt               DateTime?
   appliedAt                DateTime?
-  createdAt                DateTime                    @default(now())
-  updatedAt                DateTime                    @updatedAt
-  payment                  Payment                     @relation(fields: [paymentId], references: [id], onDelete: Cascade)
-  vendor                   Vendor                      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  quotation                Quotation                   @relation(fields: [quotationId], references: [id], onDelete: Restrict)
+  createdAt                DateTime                       @default(now())
+  updatedAt                DateTime                       @updatedAt
+  payment                  Payment                        @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  vendor                   Vendor                         @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  quotation                Quotation                      @relation(fields: [quotationId], references: [id], onDelete: Restrict)
+  revisedFrom              PaymentCommercialTermRequest?  @relation("CommercialTermRevisions", fields: [revisedFromId], references: [id], onDelete: Restrict)
+  revisions                PaymentCommercialTermRequest[] @relation("CommercialTermRevisions")
 
   @@index([paymentId, status])
   @@index([vendorId, status])
   @@index([submittedBy])
   @@index([reviewedBy])
   @@index([submittedAt])
+  @@index([revisedFromId])
 }
 
 model PaymentTransaction {
@@ -2074,6 +2094,13 @@ enum CommercialTermRequestStatus {
   APPROVED
   REJECTED
   CANCELLED
+}
+
+enum CommercialTaxTreatment {
+  CGST_SGST
+  IGST
+  NOT_APPLICABLE
+  PENDING_REVIEW
 }
 
 /// *

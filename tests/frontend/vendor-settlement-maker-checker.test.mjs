@@ -27,7 +27,8 @@ test("maker cannot approve and settlement cannot exceed funded vendor payable", 
   assert.match(service, /MAKER_CANNOT_APPROVE/);
   assert.match(service, /TransactionIsolationLevel\.Serializable/);
   assert.match(service, /SETTLEMENT_EXCEEDS_AVAILABLE/);
-  assert.match(service, /Math\.min\(vendorNet, Number\(payment\.paidAmount\) - commission\)/);
+  assert.match(service, /Math\.min\(vendorNet, Number\(payment\.paidAmount\) - totalDeduction\)/);
+  assert.match(service, /snapshot\.totalSettlementDeduction/);
   assert.match(service, /status: \{ in: \[VendorSettlementStatus\.PENDING, VendorSettlementStatus\.PROCESSING, VendorSettlementStatus\.SETTLED\] \}/);
 });
 
@@ -57,5 +58,6 @@ test("vendor ledger surfaces failed payouts without reducing the outstanding bal
   const ledger = await readFile("lib/vendor-financial-ledger.ts", "utf8");
   assert.match(ledger, /VendorSettlementStatus\.FAILED/);
   assert.match(ledger, /failedAmount/);
+  assert.match(ledger, /totalSettlementDeduction/);
   assert.match(ui, /Vendor payout marked failed/);
 });
