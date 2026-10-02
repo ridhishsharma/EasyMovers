@@ -37,11 +37,50 @@ async function vendorContext(vendorId: string) {
   if (vendor.status !== "ACTIVE") throw new VendorOpportunityError("VENDOR_NOT_ACTIVE", "The vendor must be active before receiving enquiries.", 409);
   if (vendor.engagementMode === VendorEngagementMode.INSTANT_RATE)
     throw new VendorOpportunityError("QUOTATION_MODE_NOT_ENABLED", "This vendor is configured only for instant-rate work.", 409);
-  const accepting = vendor.enquiryPreference?.acceptingQuotationEnquiries ?? true;
-  const pausedUntil = vendor.enquiryPreference?.pausedUntil;
-  if (!accepting || (pausedUntil && pausedUntil > new Date()))
-    throw new VendorOpportunityError("ENQUIRIES_PAUSED", "Quotation enquiries are currently paused.", 409);
   return vendor;
+}
+
+const hiddenRequirementKey = /(customer|contact|mobile|phone|email|full.?name|user.?name|address|latitude|longitude|digipin|photo|image|url)/i;
+function anonymousRequirement(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(anonymousRequirement);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(([key]) => !hiddenRequirementKey.test(key))
+      .map(([key, item]) => [key, anonymousRequirement(item)]),
+  );
+}
+
+function quotationView(quotation: {
+  id: string; quotationNumber: string; status: QuotationStatus;
+  transportationCost: unknown; packingCost: unknown; unpackingCost: unknown;
+  labourCost: unknown; insuranceCost: unknown; otherCost: unknown;
+  discountAmount: unknown; taxAmount: unknown; totalAmount: unknown;
+  validUntil: Date | null; remarks: string | null; createdAt: Date; updatedAt: Date;
+}) {
+  const money = (value: unknown) => Number(value);
+  return {
+    id: quotation.id,
+    quotationNumber: quotation.quotationNumber,
+    status: quotation.status,
+    transportationCost: money(quotation.transportationCost),
+    packingCost: money(quotation.packingCost),
+    unpackingCost: money(quotation.unpackingCost),
+    labourCost: money(quotation.labourCost),
+    insuranceCost: money(quotation.insuranceCost),
+    otherCost: money(quotation.otherCost),
+    discountAmount: money(quotation.discountAmount),
+    taxAmount: money(quotation.taxAmount),
+    totalAmount: money(quotation.totalAmount),
+    validUntil: quotation.validUntil,
+    remarks: quotation.remarks,
+    createdAt: quotation.createdAt,
+    updatedAt: quotation.updatedAt,
+    editable:
+      quotation.status === QuotationStatus.DRAFT ||
+      quotation.status === QuotationStatus.SUBMITTED ||
+      quotation.status === QuotationStatus.REVISED,
+  };
 }
 
 function matchesService(serviceType: string, offerings: Array<{ serviceType: VendorServiceType }>) {
@@ -65,7 +104,6 @@ export async function listVendorOpportunities(vendorId: string) {
     where: {
       bookingStatus: { in: ["QUOTATION_PENDING", "QUOTATION_RECEIVED"] },
       selectedQuotationId: null,
-      quotations: { none: { vendorId, status: { in: [QuotationStatus.DRAFT, QuotationStatus.SUBMITTED, QuotationStatus.REVISED, QuotationStatus.SHORTLISTED, QuotationStatus.ACCEPTED] } } },
     },
     orderBy: [{ moveDate: "asc" }, { createdAt: "asc" }],
     take: 100,
@@ -73,17 +111,45 @@ export async function listVendorOpportunities(vendorId: string) {
       id: true, bookingNumber: true, leadId: true, serviceType: true, moveType: true, moveDate: true,
       pickupCity: true, pickupState: true, pickupPincode: true,
       dropCity: true, dropState: true, dropPincode: true,
-      inventorySummaryJson: true, servicesJson: true, requirementsJson: true, createdAt: true,
+      inventoryJson: true, inventorySummaryJson: true, servicesJson: true, requirementsJson: true,
+      scheduleJson: true, pickupAddressJson: true, dropAddressJson: true, deliveryDate: true, createdAt: true,
+      quotations: {
+        where: { vendorId },
+        orderBy: { updatedAt: "desc" },
+        take: 1,
+        select: {
+          id: true, quotationNumber: true, status: true,
+          transportationCost: true, packingCost: true, unpackingCost: true,
+          labourCost: true, insuranceCost: true, otherCost: true,
+          discountAmount: true, taxAmount: true, totalAmount: true,
+          validUntil: true, remarks: true, createdAt: true, updatedAt: true,
+        },
+      },
     },
   });
-  return bookings.filter(booking => matchesService(booking.serviceType, vendor.serviceOfferings) && matchesArea(booking, vendor.serviceAreas));
+  const accepting = vendor.enquiryPreference?.acceptingQuotationEnquiries ?? true;
+  const pausedUntil = vendor.enquiryPreference?.pausedUntil;
+  const receivesNew = accepting && (!pausedUntil || pausedUntil <= new Date());
+  return bookings
+    .filter(booking => booking.quotations.length > 0 || (receivesNew && matchesService(booking.serviceType, vendor.serviceOfferings) && matchesArea(booking, vendor.serviceAreas)))
+    .map(({ quotations, pickupAddressJson, dropAddressJson, inventoryJson, inventorySummaryJson, servicesJson, requirementsJson, scheduleJson, ...booking }) => ({
+      ...booking,
+      pickupDetails: anonymousRequirement(pickupAddressJson),
+      dropDetails: anonymousRequirement(dropAddressJson),
+      inventory: anonymousRequirement(inventoryJson),
+      inventorySummary: anonymousRequirement(inventorySummaryJson),
+      requestedServices: anonymousRequirement(servicesJson),
+      requirements: anonymousRequirement(requirementsJson),
+      schedule: anonymousRequirement(scheduleJson),
+      myQuotation: quotations[0] ? quotationView(quotations[0]) : null,
+    }));
 }
 
 export async function submitVendorOpportunityQuotation(input: {
   vendorId: string; userId: string; bookingId: string; body: Record<string, unknown>; requestId: string; ipAddress?: string; userAgent?: string;
 }) {
   const opportunities = await listVendorOpportunities(input.vendorId);
-  const booking = opportunities.find(item => item.id === input.bookingId);
+  const booking = opportunities.find(item => item.id === input.bookingId && !item.myQuotation);
   if (!booking) throw new VendorOpportunityError("OPPORTUNITY_NOT_AVAILABLE", "This enquiry is not available to the linked vendor.", 404);
   const quotationModule = getOrCreateQuotationModule({ prisma });
   return quotationModule.controller.create({
@@ -117,4 +183,47 @@ export async function submitVendorOpportunityQuotation(input: {
     ipAddress: input.ipAddress,
     userAgent: input.userAgent,
   });
+}
+
+export async function reviseVendorOpportunityQuotation(input: {
+  vendorId: string; userId: string; bookingId: string; body: Record<string, unknown>;
+  requestId: string; ipAddress?: string; userAgent?: string;
+}) {
+  await vendorContext(input.vendorId);
+  const quotation = await prisma.quotation.findFirst({
+    where: {
+      bookingId: input.bookingId,
+      vendorId: input.vendorId,
+      status: { in: [QuotationStatus.DRAFT, QuotationStatus.SUBMITTED, QuotationStatus.REVISED] },
+      booking: { selectedQuotationId: null, bookingStatus: { in: ["QUOTATION_PENDING", "QUOTATION_RECEIVED"] } },
+    },
+    select: { id: true, status: true },
+  });
+  if (!quotation) throw new VendorOpportunityError("QUOTATION_NOT_EDITABLE", "This quotation can no longer be modified.", 409);
+  const module = getOrCreateQuotationModule({ prisma });
+  const result = await module.service.update({
+    quotationId: quotation.id as never,
+    changes: {
+      transportationCost: input.body.transportationCost,
+      packingCost: input.body.packingCost,
+      unpackingCost: input.body.unpackingCost,
+      labourCost: input.body.labourCost,
+      insuranceCost: input.body.insuranceCost,
+      otherCost: input.body.otherCost,
+      discountAmount: input.body.discountAmount,
+      taxAmount: input.body.taxAmount,
+      totalAmount: input.body.totalAmount,
+      validUntil: input.body.validUntil,
+      remarks: input.body.remarks,
+      updatedBy: input.userId,
+    } as never,
+    context: { audit: { performedBy: input.userId, requestId: input.requestId, source: "API", ipAddress: input.ipAddress, userAgent: input.userAgent } },
+  });
+  if (!result.success) throw new VendorOpportunityError(result.error.code, result.error.message, 400);
+  if (quotation.status === QuotationStatus.SUBMITTED) {
+    const revised = await module.service.markRevised({ quotationId: quotation.id as never, revisedBy: input.userId, reason: "Vendor revised commercial quotation." });
+    if (!revised.success) throw new VendorOpportunityError(revised.error.code, revised.error.message, 409);
+    return quotationView(revised.data as never);
+  }
+  return quotationView(result.data as never);
 }

@@ -54,9 +54,17 @@ test("enquiry queue is scoped by active services coverage and linked vendor", ()
   assert.match(opportunities, /bookingStatus: \{ in: \["QUOTATION_PENDING", "QUOTATION_RECEIVED"\] \}/);
   assert.match(opportunities, /matchesService/);
   assert.match(opportunities, /matchesArea/);
-  assert.match(opportunities, /quotations: \{ none: \{ vendorId/);
-  assert.match(opportunities, /ENQUIRIES_PAUSED/);
+  assert.match(opportunities, /quotations:\s*\{/);
+  assert.match(opportunities, /where: \{ vendorId \}/);
+  assert.match(opportunities, /myQuotation/);
+  assert.match(opportunities, /anonymousRequirement/);
+  assert.match(opportunities, /inventoryJson: true/);
+  assert.match(opportunities, /requirementsJson: true/);
+  assert.match(opportunities, /const receivesNew =/);
+  assert.match(opportunities, /booking\.quotations\.length > 0 \|\| \(receivesNew/);
   assert.doesNotMatch(opportunities, /customerMobile: true/);
+  assert.doesNotMatch(opportunities, /customerName: true/);
+  assert.doesNotMatch(opportunities, /customerEmail: true/);
 });
 
 test("quotation identity fields are forced from authenticated vendor opportunity", () => {
@@ -67,4 +75,12 @@ test("quotation identity fields are forced from authenticated vendor opportunity
   assert.match(opportunities, /getOrCreateQuotationModule/);
   assert.match(dashboard, /Prepare quotation/);
   assert.match(dashboard, /Submit quotation/);
+  assert.match(dashboard, /Submitted quotations/);
+  assert.match(dashboard, /Modify quotation/);
+  assert.match(dashboard, /Inventory and declared items/);
+  assert.match(dashboard, /Customer identity, phone number, email and precise private address are hidden/);
+  assert.match(quoteRoute, /export async function PUT/);
+  assert.match(opportunities, /reviseVendorOpportunityQuotation/);
+  assert.match(opportunities, /status: \{ in: \[QuotationStatus\.DRAFT, QuotationStatus\.SUBMITTED, QuotationStatus\.REVISED\] \}/);
+  assert.match(opportunities, /markRevised/);
 });
