@@ -72,6 +72,7 @@ export async function GET(request: Request) {
     const canSeeUsers = permissionSet.has(CRM_PERMISSIONS.CRM_USER_READ);
     const canSeeLeads = permissionSet.has(CRM_PERMISSIONS.LEAD_READ);
     const canSeeServiceLocations = permissionSet.has(CRM_PERMISSIONS.SERVICE_LOCATION_READ);
+    const canSeeSettlements = permissionSet.has(CRM_PERMISSIONS.PAYMENT_READ);
     const staleBefore = new Date(Date.now() - 3 * 86_400_000);
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const vendorFilter = {
@@ -87,7 +88,7 @@ export async function GET(request: Request) {
       ...(serviceType ? { shiftingType: { equals: serviceType, mode: "insensitive" as const } } : {}),
     };
 
-    const [applicationGroups, oldestApplication, staleApplications, vendorGroups, cities, pendingInvitations, leadGroups, newLeadsToday, serviceLocationGroups, vendorsAdded, leadsInPeriod, topServices, activeVendorReadinessGaps, pendingVendorDocuments, instantVendorsWithExpiredInsurance, pendingVendorChanges] = await Promise.all([
+    const [applicationGroups, oldestApplication, staleApplications, vendorGroups, cities, pendingInvitations, leadGroups, newLeadsToday, serviceLocationGroups, vendorsAdded, leadsInPeriod, topServices, activeVendorReadinessGaps, pendingVendorDocuments, instantVendorsWithExpiredInsurance, pendingVendorChanges, settlementGroups] = await Promise.all([
       canSeeApplications ? prisma.vendorApplication.groupBy({ by: ["status"], _count: { _all: true } }) : Promise.resolve([]),
       canSeeApplications ? prisma.vendorApplication.findFirst({
         where: { status: { in: ["PENDING", "UNDER_REVIEW", "NEEDS_INFORMATION"] } },
@@ -132,6 +133,7 @@ export async function GET(request: Request) {
         },
       }) : Promise.resolve(0),
       canVerifyVendorChanges ? prisma.vendorChangeRequest.count({ where: { status: "PENDING" } }) : Promise.resolve(0),
+      canSeeSettlements ? prisma.vendorSettlement.groupBy({ by: ["status"], _count: { _all: true } }) : Promise.resolve([]),
     ]);
 
     return reply({ success: true, data: {
@@ -153,6 +155,7 @@ export async function GET(request: Request) {
         counts: Object.fromEntries(serviceLocationGroups.map(item => [item.status, item._count._all])),
       } : null,
       vendorChanges: canVerifyVendorChanges ? { pending: pendingVendorChanges } : null,
+      settlements: canSeeSettlements ? { counts: Object.fromEntries(settlementGroups.map(item => [item.status, item._count._all])) } : null,
       analytics: { periodDays, city: city || null, state: state || null, serviceType: serviceType || null, vendorsAdded, leadsInPeriod, topServices: topServices.map(item => ({ serviceType: item.shiftingType, count: item._count._all })) },
       generatedAt: new Date().toISOString(),
     } });

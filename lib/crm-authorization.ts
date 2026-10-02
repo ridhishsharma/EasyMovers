@@ -30,6 +30,7 @@ export const CRM_PERMISSIONS = {
   MARKETING_REPORT_READ: "marketing_report.read",
   PAYMENT_READ: "payment.read",
   PAYMENT_MANAGE: "payment.manage",
+  SETTLEMENT_APPROVE: "settlement.approve",
   REFUND_APPROVE: "refund.approve",
   BILLING_READ: "billing.read",
   BILLING_MANAGE: "billing.manage",

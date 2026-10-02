@@ -7,6 +7,7 @@ import {
   QuotationStatus,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { getVendorFinancialLedger } from "@/lib/vendor-financial-ledger";
 
 export class VendorPortalError extends Error {
   constructor(public readonly code: string, message: string, public readonly status: number) {
@@ -50,12 +51,13 @@ async function linkedVendor(userId: string, vendorId: string) {
 
 export async function getVendorPortalOverview(userId: string, vendorId: string) {
   const { user, vendor } = await linkedVendor(userId, vendorId);
-  const [availability, enquiryPreference, pendingChanges, activeVehicles, quotationPerformance] = await Promise.all([
+  const [availability, enquiryPreference, pendingChanges, activeVehicles, quotationPerformance, financialLedger] = await Promise.all([
     prisma.vendorOperatorAvailability.findUnique({ where: { userId } }),
     prisma.vendorEnquiryPreference.findUnique({ where: { vendorId } }),
     prisma.vendorChangeRequest.count({ where: { vendorId, status: VendorChangeStatus.PENDING } }),
     prisma.vendorVehicle.count({ where: { vendorId, isActive: true } }),
     getVendorQuotationPerformance(vendorId),
+    getVendorFinancialLedger(vendorId),
   ]);
   return {
     user,
@@ -77,6 +79,7 @@ export async function getVendorPortalOverview(userId: string, vendorId: string) 
     },
     summary: { pendingChanges, activeVehicles },
     quotationPerformance,
+    financialLedger,
   };
 }
 

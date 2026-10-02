@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./vendor-portal.module.css";
 import performanceStyles from "./vendor-performance.module.css";
+import ledgerStyles from "./vendor-financial-ledger.module.css";
 
 type PortalData = {
   user: { fullName: string; email: string | null; mobile: string };
@@ -21,6 +22,16 @@ type PortalData = {
       id: string; quotationNumber: string; status: string; outcome: "ACCEPTED" | "NOT_ACCEPTED" | "IN_PROGRESS";
       totalAmount: number; validUntil: string | null; createdAt: string; updatedAt: string;
       booking: { bookingNumber: string; serviceType: string; moveType: string; moveDate: string; pickupCity: string; pickupState: string; dropCity: string; dropState: string };
+    }>;
+  };
+  financialLedger: {
+    summary: { bookings: number; customerTotal: number; customerReceived: number; customerOutstanding: number; commissionAmount: number; vendorNetPayable: number; settledAmount: number; failedAmount: number; vendorOutstanding: number; commissionPendingBookings: number };
+    rows: Array<{
+      id: string; paymentNumber: string; paymentStatus: string; currency: string; quotationNumber: string | null;
+      booking: { bookingNumber: string; bookingStatus: string; serviceType: string; moveType: string; moveDate: string; pickupCity: string; pickupState: string; dropCity: string; dropState: string };
+      customerTotal: number; customerReceived: number; customerOutstanding: number; vendorQuotedAmount: number | null;
+      commissionAmount: number | null; commissionStatus: "LOCKED" | "PENDING_CONFIGURATION"; vendorNetPayable: number | null;
+      settledAmount: number; processingAmount: number; failedAmount: number; vendorOutstanding: number | null; updatedAt: string;
     }>;
   };
 };
@@ -62,6 +73,7 @@ export function VendorPortalDashboard({ supabaseUrl, publishableKey }: { supabas
   const emptyQuote = { transportationCost: "", packingCost: "0", unpackingCost: "0", labourCost: "0", insuranceCost: "0", otherCost: "0", discountAmount: "0", taxAmount: "0", validUntil: "", remarks: "" };
   const [quote, setQuote] = useState(emptyQuote);
   const [quotationFilter, setQuotationFilter] = useState<"ALL" | "IN_PROGRESS" | "ACCEPTED" | "NOT_ACCEPTED">("ALL");
+  const [ledgerFilter, setLedgerFilter] = useState<"ALL" | "OUTSTANDING" | "SETTLED" | "COMMISSION_PENDING">("ALL");
 
   const request = useCallback(async (url: string, options?: RequestInit) => {
     const { data: session } = await client.auth.getSession();
@@ -171,6 +183,7 @@ export function VendorPortalDashboard({ supabaseUrl, publishableKey }: { supabas
   const newEnquiries = opportunities.filter(item => !item.myQuotation);
   const submittedQuotations = opportunities.filter(item => item.myQuotation);
   const performanceQuotations = data?.quotationPerformance.recent.filter(item => quotationFilter === "ALL" || item.outcome === quotationFilter) || [];
+  const ledgerRows = data?.financialLedger.rows.filter(item => ledgerFilter === "ALL" || (ledgerFilter === "OUTSTANDING" && (item.vendorOutstanding || 0) > 0) || (ledgerFilter === "SETTLED" && item.vendorNetPayable !== null && item.vendorOutstanding === 0) || (ledgerFilter === "COMMISSION_PENDING" && item.commissionStatus === "PENDING_CONFIGURATION")) || [];
   if (!data) return <main className={styles.page}><section className={styles.loading}>{message || "Loading your vendor workspace…"}</section></main>;
   return <main className={styles.page}>
     <section className={styles.hero}>
@@ -201,6 +214,26 @@ export function VendorPortalDashboard({ supabaseUrl, publishableKey }: { supabas
         <div><em className={`${performanceStyles.outcome} ${item.outcome === "ACCEPTED" ? performanceStyles.won : item.outcome === "NOT_ACCEPTED" ? performanceStyles.lost : performanceStyles.pending}`}>{item.status.replaceAll("_", " ")}</em><small>Updated {new Date(item.updatedAt).toLocaleDateString("en-IN")}</small></div>
       </article>)}</div> : <p className={styles.empty}>No quotations match this result filter.</p>}
     </section>}
+    <section className={ledgerStyles.panel}>
+      <div className={styles.sectionTitle}><div><p className={styles.eyebrow}>FINANCIAL LEDGER</p><h2>Collections and vendor settlement</h2></div><strong>{data.financialLedger.summary.bookings} bookings</strong></div>
+      <div className={ledgerStyles.cards}>
+        <article><span>Customer received</span><strong>₹{data.financialLedger.summary.customerReceived.toLocaleString("en-IN")}</strong><small>Outstanding ₹{data.financialLedger.summary.customerOutstanding.toLocaleString("en-IN")}</small></article>
+        <article><span>EasyMovers commission</span><strong>₹{data.financialLedger.summary.commissionAmount.toLocaleString("en-IN")}</strong><small>Locked booking snapshots only</small></article>
+        <article><span>Vendor net payable</span><strong>₹{data.financialLedger.summary.vendorNetPayable.toLocaleString("en-IN")}</strong><small>After recorded commission</small></article>
+        <article><span>Settlement remaining</span><strong>₹{data.financialLedger.summary.vendorOutstanding.toLocaleString("en-IN")}</strong><small>Settled ₹{data.financialLedger.summary.settledAmount.toLocaleString("en-IN")}{data.financialLedger.summary.failedAmount > 0 ? ` · Failed ₹${data.financialLedger.summary.failedAmount.toLocaleString("en-IN")}` : ""}</small></article>
+      </div>
+      {data.financialLedger.summary.commissionPendingBookings > 0 && <p className={ledgerStyles.warning}>{data.financialLedger.summary.commissionPendingBookings} booking(s) do not yet have a locked EasyMovers commission snapshot. Vendor payable is intentionally not estimated for those bookings.</p>}
+      <div className={ledgerStyles.filters} aria-label="Filter settlement ledger">
+        {(["ALL", "OUTSTANDING", "SETTLED", "COMMISSION_PENDING"] as const).map(filter => <button type="button" className={ledgerFilter === filter ? ledgerStyles.selected : ""} key={filter} onClick={() => setLedgerFilter(filter)}>{filter.replaceAll("_", " ")}</button>)}
+      </div>
+      {ledgerRows.length ? <div className={ledgerStyles.table}><div className={ledgerStyles.head}><span>Booking</span><span>Customer collection</span><span>Commission</span><span>Vendor payable</span><span>Settlement</span></div>{ledgerRows.map(item => <article key={item.id}>
+        <div><strong>{item.booking.bookingNumber}</strong><small>{item.quotationNumber || item.paymentNumber}</small></div>
+        <div><strong>₹{item.customerReceived.toLocaleString("en-IN")} received</strong><small>₹{item.customerOutstanding.toLocaleString("en-IN")} customer balance</small></div>
+        <div>{item.commissionAmount === null ? <strong className={ledgerStyles.pending}>Pending configuration</strong> : <><strong>₹{item.commissionAmount.toLocaleString("en-IN")}</strong><small>EasyMovers commission</small></>}</div>
+        <div>{item.vendorNetPayable === null ? <strong className={ledgerStyles.muted}>Not determined</strong> : <><strong>₹{item.vendorNetPayable.toLocaleString("en-IN")}</strong><small>Net payable</small></>}</div>
+        <div>{item.vendorOutstanding === null ? <strong className={ledgerStyles.muted}>Awaiting commission</strong> : <><strong className={item.vendorOutstanding === 0 ? ledgerStyles.positive : ledgerStyles.pending}>₹{item.vendorOutstanding.toLocaleString("en-IN")} remaining</strong><small>₹{item.settledAmount.toLocaleString("en-IN")} settled{item.processingAmount > 0 ? ` · ₹${item.processingAmount.toLocaleString("en-IN")} processing` : ""}{item.failedAmount > 0 ? ` · ₹${item.failedAmount.toLocaleString("en-IN")} failed` : ""}</small></>}</div>
+      </article>)}</div> : <p className={styles.empty}>No booking finances match this ledger filter.</p>}
+    </section>
     <section className={styles.workModes}>
       {data.capabilities.instantAvailability && <article className={styles.controlCard}>
         <p className={styles.eyebrow}>INSTANT-RATE WORK</p><div className={styles.cardTitle}><h2>Driver availability</h2><span className={styles.presence}>{data.availability.state}</span></div>

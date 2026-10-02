@@ -120,6 +120,7 @@ model Vendor {
   operatorAvailability   VendorOperatorAvailability[]
   availabilityEvents     VendorAvailabilityEvent[]
   enquiryPreference      VendorEnquiryPreference?
+  settlements            VendorSettlement[]
 
   @@index([deletedAt])
   @@index([engagementMode])
@@ -1184,6 +1185,7 @@ model Payment {
   bookingSync                   PaymentBookingSync?
   transactions                  PaymentTransaction[]
   webhooks                      PaymentWebhook[]
+  vendorSettlements             VendorSettlement[]
 
   @@index([paymentNumber])
   @@index([referenceId])
@@ -1239,6 +1241,38 @@ model PaymentTransaction {
   @@index([gatewayPaymentId])
   @@index([bankReference])
   @@index([initiatedAt])
+  @@index([createdAt])
+}
+
+model VendorSettlement {
+  id                  String                 @id @default(cuid())
+  vendorId            String
+  paymentId           String
+  amount              Decimal                @db.Decimal(12, 2)
+  currency            String                 @default("INR")
+  status              VendorSettlementStatus @default(PENDING)
+  settlementReference String?                @unique
+  expectedAt          DateTime?
+  settledAt           DateTime?
+  failureReason       String?
+  remarks             String?
+  createdBy           String?
+  reviewedBy          String?
+  reviewedAt          DateTime?
+  reviewNote          String?
+  statusUpdatedBy     String?
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  vendor              Vendor                 @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  payment             Payment                @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([vendorId])
+  @@index([paymentId])
+  @@index([status])
+  @@index([createdBy])
+  @@index([reviewedBy])
+  @@index([expectedAt])
+  @@index([settledAt])
   @@index([createdAt])
 }
 
@@ -1991,6 +2025,15 @@ enum PaymentTransactionStatus {
   FAILED
   CANCELLED
   REFUNDED
+}
+
+enum VendorSettlementStatus {
+  PENDING
+  PROCESSING
+  SETTLED
+  FAILED
+  REJECTED
+  CANCELLED
 }
 
 /// *
