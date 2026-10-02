@@ -65,33 +65,33 @@ model Lead {
 }
 
 model Vendor {
-  id                     String                       @id @default(cuid())
+  id                     String                         @id @default(cuid())
   companyName            String
   ownerName              String
-  businessType           VendorBusinessType           @default(UNSPECIFIED)
-  engagementMode         VendorEngagementMode         @default(QUOTATION)
+  businessType           VendorBusinessType             @default(UNSPECIFIED)
+  engagementMode         VendorEngagementMode           @default(QUOTATION)
   gstNumber              String?
   serviceCities          String
-  householdService       Boolean                      @default(false)
-  officeService          Boolean                      @default(false)
-  vehicleService         Boolean                      @default(false)
+  householdService       Boolean                        @default(false)
+  officeService          Boolean                        @default(false)
+  vehicleService         Boolean                        @default(false)
   experienceYears        Int?
-  rating                 Float                        @default(0)
-  reviewCount            Int                          @default(0)
-  status                 String                       @default("PENDING")
-  createdAt              DateTime                     @default(now())
-  updatedAt              DateTime                     @updatedAt
+  rating                 Float                          @default(0)
+  reviewCount            Int                            @default(0)
+  status                 String                         @default("PENDING")
+  createdAt              DateTime                       @default(now())
+  updatedAt              DateTime                       @updatedAt
   deletedAt              DateTime?
   address                String?
   city                   String?
   companyLogo            String?
-  completedMoves         Int                          @default(0)
+  completedMoves         Int                            @default(0)
   coordinatorEmail       String?
   coordinatorMobile      String?
   coordinatorName        String?
-  insuranceAvailable     Boolean                      @default(false)
+  insuranceAvailable     Boolean                        @default(false)
   ownerEmail             String?
-  ownerMobile            String                       @unique
+  ownerMobile            String                         @unique
   panNumber              String?
   pincode                String?
   quotationContactEmail  String?
@@ -101,9 +101,9 @@ model Vendor {
   state                  String?
   totalLabours           Int?
   totalVehicles          Int?
-  vendorCode             String                       @unique
+  vendorCode             String                         @unique
   website                String?
-  assignedBookings       Booking[]                    @relation("AssignedVendorBookings")
+  assignedBookings       Booking[]                      @relation("AssignedVendorBookings")
   payments               Payment[]
   quotations             Quotation[]
   User                   User[]
@@ -115,12 +115,13 @@ model Vendor {
   ratingSummary          VendorRating?
   reviews                VendorReview[]
   vehicles               VendorVehicle[]
-  sourceApplication      VendorApplication?           @relation("VendorApplicationCreatedVendor")
+  sourceApplication      VendorApplication?             @relation("VendorApplicationCreatedVendor")
   changeRequests         VendorChangeRequest[]
   operatorAvailability   VendorOperatorAvailability[]
   availabilityEvents     VendorAvailabilityEvent[]
   enquiryPreference      VendorEnquiryPreference?
   settlements            VendorSettlement[]
+  commercialTermRequests PaymentCommercialTermRequest[]
 
   @@index([deletedAt])
   @@index([engagementMode])
@@ -241,42 +242,43 @@ enum VendorPricingType {
 }
 
 model Quotation {
-  id                 String          @id @default(cuid())
-  quotationNumber    String          @unique
-  referenceId        String          @unique
-  leadId             String
-  bookingId          String
-  vendorId           String
-  userId             String?
-  transportationCost Decimal         @default(0) @db.Decimal(12, 2)
-  packingCost        Decimal         @default(0) @db.Decimal(12, 2)
-  unpackingCost      Decimal         @default(0) @db.Decimal(12, 2)
-  labourCost         Decimal         @default(0) @db.Decimal(12, 2)
-  insuranceCost      Decimal         @default(0) @db.Decimal(12, 2)
-  otherCost          Decimal         @default(0) @db.Decimal(12, 2)
-  discountAmount     Decimal         @default(0) @db.Decimal(12, 2)
-  taxAmount          Decimal         @default(0) @db.Decimal(12, 2)
-  totalAmount        Decimal         @db.Decimal(12, 2)
-  currency           String          @default("INR")
-  pickupDate         DateTime?
-  deliveryDate       DateTime?
-  transitDays        Int?
-  status             QuotationStatus @default(SUBMITTED)
-  validUntil         DateTime?
-  pricingBreakdown   Json?
-  termsJson          Json?
-  inclusionsJson     Json?
-  exclusionsJson     Json?
-  remarks            String?
-  internalRemarks    String?
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
-  selectedForBooking Booking?        @relation("SelectedBookingQuotation")
-  payments           Payment[]
-  booking            Booking         @relation("BookingQuotations", fields: [bookingId], references: [id], onDelete: Cascade)
-  lead               Lead            @relation(fields: [leadId], references: [id])
-  user               User?           @relation(fields: [userId], references: [id])
-  vendor             Vendor          @relation(fields: [vendorId], references: [id])
+  id                     String                         @id @default(cuid())
+  quotationNumber        String                         @unique
+  referenceId            String                         @unique
+  leadId                 String
+  bookingId              String
+  vendorId               String
+  userId                 String?
+  transportationCost     Decimal                        @default(0) @db.Decimal(12, 2)
+  packingCost            Decimal                        @default(0) @db.Decimal(12, 2)
+  unpackingCost          Decimal                        @default(0) @db.Decimal(12, 2)
+  labourCost             Decimal                        @default(0) @db.Decimal(12, 2)
+  insuranceCost          Decimal                        @default(0) @db.Decimal(12, 2)
+  otherCost              Decimal                        @default(0) @db.Decimal(12, 2)
+  discountAmount         Decimal                        @default(0) @db.Decimal(12, 2)
+  taxAmount              Decimal                        @default(0) @db.Decimal(12, 2)
+  totalAmount            Decimal                        @db.Decimal(12, 2)
+  currency               String                         @default("INR")
+  pickupDate             DateTime?
+  deliveryDate           DateTime?
+  transitDays            Int?
+  status                 QuotationStatus                @default(SUBMITTED)
+  validUntil             DateTime?
+  pricingBreakdown       Json?
+  termsJson              Json?
+  inclusionsJson         Json?
+  exclusionsJson         Json?
+  remarks                String?
+  internalRemarks        String?
+  createdAt              DateTime                       @default(now())
+  updatedAt              DateTime                       @updatedAt
+  selectedForBooking     Booking?                       @relation("SelectedBookingQuotation")
+  payments               Payment[]
+  booking                Booking                        @relation("BookingQuotations", fields: [bookingId], references: [id], onDelete: Cascade)
+  lead                   Lead                           @relation(fields: [leadId], references: [id])
+  user                   User?                          @relation(fields: [userId], references: [id])
+  vendor                 Vendor                         @relation(fields: [vendorId], references: [id])
+  commercialTermRequests PaymentCommercialTermRequest[]
 
   @@index([quotationNumber])
   @@index([referenceId])
@@ -1061,13 +1063,13 @@ model Payment {
   ///    * --------------------------------------------------------------------------
   ///    * Identity
   ///    * --------------------------------------------------------------------------
-  id                            String                  @id @default(cuid())
-  paymentNumber                 String                  @unique
+  id                            String                         @id @default(cuid())
+  paymentNumber                 String                         @unique
   /// *
   ///    * --------------------------------------------------------------------------
   ///    * Marketplace relations
   ///    * --------------------------------------------------------------------------
-  bookingId                     String                  @unique
+  bookingId                     String                         @unique
   quotationId                   String?
   userId                        String?
   vendorId                      String?
@@ -1078,8 +1080,8 @@ model Payment {
   ///    * Existing Payment records and existing code may still depend on amount.
   ///    * New aggregate code should use totalAmount / paidAmount / balanceAmount.
   ///    * --------------------------------------------------------------------------
-  amount                        Decimal                 @db.Decimal(12, 2)
-  currency                      String                  @default("INR")
+  amount                        Decimal                        @db.Decimal(12, 2)
+  currency                      String                         @default("INR")
   /// *
   ///    * --------------------------------------------------------------------------
   ///    * Legacy classification
@@ -1094,7 +1096,7 @@ model Payment {
   ///    * --------------------------------------------------------------------------
   ///    * Aggregate workflow
   ///    * --------------------------------------------------------------------------
-  paymentStatus                 PaymentStatus           @default(PENDING)
+  paymentStatus                 PaymentStatus                  @default(PENDING)
   /// *
   ///    * --------------------------------------------------------------------------
   ///    * Legacy transaction/gateway fields
@@ -1122,7 +1124,7 @@ model Payment {
   ///    * Refund summary
   ///    * Legacy refund fields remain alongside the new summary.
   ///    * --------------------------------------------------------------------------
-  refundAmount                  Decimal?                @db.Decimal(12, 2)
+  refundAmount                  Decimal?                       @db.Decimal(12, 2)
   refundReason                  String?
   refundedAt                    DateTime?
   /// *
@@ -1134,11 +1136,11 @@ model Payment {
   ///    * --------------------------------------------------------------------------
   ///    * Audit timestamps
   ///    * --------------------------------------------------------------------------
-  createdAt                     DateTime                @default(now())
-  updatedAt                     DateTime                @updatedAt
-  advanceAmount                 Decimal?                @db.Decimal(12, 2)
+  createdAt                     DateTime                       @default(now())
+  updatedAt                     DateTime                       @updatedAt
+  advanceAmount                 Decimal?                       @db.Decimal(12, 2)
   auditJson                     Json?
-  balanceAmount                 Decimal                 @default(0) @db.Decimal(12, 2)
+  balanceAmount                 Decimal                        @default(0) @db.Decimal(12, 2)
   /// *
   ///    * Snapshot/reference to the commercial calculation that produced the
   ///    * customer payable amount.
@@ -1156,36 +1158,37 @@ model Payment {
   ///    * Fast pointer only.
   ///    * The actual transaction remains in PaymentTransaction.
   latestSuccessfulTransactionId String?
-  paidAmount                    Decimal                 @default(0) @db.Decimal(12, 2)
+  paidAmount                    Decimal                        @default(0) @db.Decimal(12, 2)
   /// *
   ///    * Optional persisted copy of the aggregate payable summary.
   ///    * Numeric columns above remain searchable/reportable source fields.
   payableJson                   Json?
-  paymentPending                Decimal                 @default(0) @db.Decimal(12, 2)
+  paymentPending                Decimal                        @default(0) @db.Decimal(12, 2)
   /// *
   ///    * New canonical Payment-domain reference.
   ///    * Kept optional during the migration phase so existing Payment rows do not
   ///    * prevent migration. New PaymentService operations will always populate it.
   ///    * After old records are backfilled, this can become required.
-  referenceId                   String?                 @unique
-  refundPendingAmount           Decimal                 @default(0) @db.Decimal(12, 2)
+  referenceId                   String?                        @unique
+  refundPendingAmount           Decimal                        @default(0) @db.Decimal(12, 2)
   refundSummaryJson             Json?
-  source                        PaymentSource           @default(API)
+  source                        PaymentSource                  @default(API)
   /// *
   ///    * --------------------------------------------------------------------------
   ///    * Canonical aggregate financial summary
   ///    * --------------------------------------------------------------------------
-  totalAmount                   Decimal                 @default(0) @db.Decimal(12, 2)
-  booking                       Booking                 @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  quotation                     Quotation?              @relation(fields: [quotationId], references: [id])
-  user                          User?                   @relation(fields: [userId], references: [id])
-  vendor                        Vendor?                 @relation(fields: [vendorId], references: [id])
+  totalAmount                   Decimal                        @default(0) @db.Decimal(12, 2)
+  booking                       Booking                        @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  quotation                     Quotation?                     @relation(fields: [quotationId], references: [id])
+  user                          User?                          @relation(fields: [userId], references: [id])
+  vendor                        Vendor?                        @relation(fields: [vendorId], references: [id])
   gatewayOrders                 PaymentGatewayOrder[]
   reconciliations               PaymentReconciliation[]
   bookingSync                   PaymentBookingSync?
   transactions                  PaymentTransaction[]
   webhooks                      PaymentWebhook[]
   vendorSettlements             VendorSettlement[]
+  commercialTermRequests        PaymentCommercialTermRequest[]
 
   @@index([paymentNumber])
   @@index([referenceId])
@@ -1198,6 +1201,36 @@ model Payment {
   @@index([gatewayOrderId])
   @@index([gatewayPaymentId])
   @@index([createdAt])
+}
+
+model PaymentCommercialTermRequest {
+  id                       String                      @id @default(cuid())
+  paymentId                String
+  vendorId                 String
+  quotationId              String
+  customerPayableAmount    Decimal                     @db.Decimal(12, 2)
+  vendorQuotedAmount       Decimal                     @db.Decimal(12, 2)
+  platformCommissionAmount Decimal                     @db.Decimal(12, 2)
+  currency                 String                      @default("INR")
+  status                   CommercialTermRequestStatus @default(PENDING)
+  submissionNote           String?
+  reviewNote               String?
+  submittedBy              String
+  reviewedBy               String?
+  submittedAt              DateTime                    @default(now())
+  reviewedAt               DateTime?
+  appliedAt                DateTime?
+  createdAt                DateTime                    @default(now())
+  updatedAt                DateTime                    @updatedAt
+  payment                  Payment                     @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  vendor                   Vendor                      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  quotation                Quotation                   @relation(fields: [quotationId], references: [id], onDelete: Restrict)
+
+  @@index([paymentId, status])
+  @@index([vendorId, status])
+  @@index([submittedBy])
+  @@index([reviewedBy])
+  @@index([submittedAt])
 }
 
 model PaymentTransaction {
@@ -2032,6 +2065,13 @@ enum VendorSettlementStatus {
   PROCESSING
   SETTLED
   FAILED
+  REJECTED
+  CANCELLED
+}
+
+enum CommercialTermRequestStatus {
+  PENDING
+  APPROVED
   REJECTED
   CANCELLED
 }
