@@ -180,7 +180,7 @@ test('individual draft restores profile and catalogue choices but never persists
 
 test('fare uses the saved initial vehicle and rejects a removed vehicle', async () => {
   let routes = 0;
-  const h = harness({ lead: { findUnique: async () => ({ notes: JSON.stringify({ mode: 'LOCAL', localVehicle: 'LARGE', from: { city: 'Bhopal', state: 'Madhya Pradesh', latitude: 23.2, longitude: 77.4 }, to: { latitude: 23.3, longitude: 77.5 } }) }) } }, async () => { routes++; return Response.json({ routes: [{ distanceMeters: 1000 }] }); });
+  const h = harness({ lead: { findUnique: async () => ({ shiftingType: 'Goods', inventory: { items: [{ quantity: 1, fragile: false, requiresPacking: false }] }, notes: JSON.stringify({ mode: 'LOCAL', localVehicle: 'LARGE', from: { city: 'Bhopal', state: 'Madhya Pradesh', latitude: 23.2, longitude: 77.4 }, to: { latitude: 23.3, longitude: 77.5 } }) }) } }, async () => { routes++; return Response.json({ routes: [{ distanceMeters: 1000 }] }); });
   h.env.LOCAL_TRANSPORT_RATE_CARD = JSON.stringify(serviceCard);
   const endpoint = h.load('app/api/public/local-fare/route.ts');
   const cookie = h.load('lib/enquiry-session.ts').draftCookie('lead-a', reference, true);

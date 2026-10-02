@@ -9,6 +9,7 @@ import {
 } from "@/lib/enquiry-session";
 import { verifyIndianLocation } from "@/lib/verified-indian-location";
 import { isSupportedLocalSelection } from "@/lib/local-services";
+import { readLocalPricingPolicy, resolveLocalPricingRoute } from "@/lib/local-pricing-router";
 export const runtime = "nodejs";
 const reply = (body: object, status = 200, cookie?: string) =>
   NextResponse.json(body, {
@@ -387,6 +388,28 @@ export async function PATCH(req: Request) {
       } catch {
         previous = {};
       }
+      const pricingDecision = submit
+        ? resolveLocalPricingRoute(
+            {
+              mode: previous.mode || "INTERCITY",
+              serviceType: fields.shiftingType,
+              items,
+              pickupFloor: fields.pickupFloor,
+              pickupLift: fields.liftAvailable,
+              destinationFloor: extras.destinationFloor,
+              destinationLift: extras.destinationLift,
+              specialItems: extras.specialItems,
+              additionalServices: extras.additionalServices,
+            },
+            (() => {
+              try {
+                return readLocalPricingPolicy(process.env.LOCAL_INSTANT_ELIGIBILITY_POLICY);
+              } catch {
+                return readLocalPricingPolicy();
+              }
+            })(),
+          )
+        : null;
       const changed = await tx.inventory.updateMany({
         where: {
           referenceId: reference,
@@ -420,6 +443,7 @@ export async function PATCH(req: Request) {
             ...previous,
             ...extras,
             stage: submit ? "QUOTATION_REQUESTED" : "DRAFT",
+            ...(pricingDecision ? { pricingDecision } : {}),
             ...(submit ? { submittedAt: new Date().toISOString() } : {}),
             savedAt: new Date().toISOString(),
           }),
@@ -429,6 +453,8 @@ export async function PATCH(req: Request) {
         reference,
         version: inventory.updatedAt.toISOString(),
         status: submit ? "QUOTATION_REQUESTED" : "DRAFT",
+        pricingRoute: pricingDecision?.route || null,
+        pricingReasons: pricingDecision?.reasons || [],
       };
     });
     return reply({ success: true, ...result });

@@ -152,7 +152,9 @@ export function DraftEditor({ reference }: { reference: string }) {
         setLocked(true);
         setRoute(previous => ({...previous, status: "QUOTATION_REQUESTED"}));
         setNotice(
-          "Your quotation request has been submitted. Keep your reference to check its progress.",
+          data.pricingRoute === "INSTANT_RATE"
+            ? "Your request qualifies for instant local pricing. Use the instant estimate panel to confirm the current route rate."
+            : "Your requirements need complete vendor quotations. Your request has been submitted to eligible vendors.",
         );
       } else
         setNotice(
