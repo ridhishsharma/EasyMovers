@@ -4,6 +4,7 @@ import {
   VendorOperatorPresenceState,
   VendorChangeStatus,
   VehicleStatus,
+  QuotationStatus,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
@@ -49,11 +50,12 @@ async function linkedVendor(userId: string, vendorId: string) {
 
 export async function getVendorPortalOverview(userId: string, vendorId: string) {
   const { user, vendor } = await linkedVendor(userId, vendorId);
-  const [availability, enquiryPreference, pendingChanges, activeVehicles] = await Promise.all([
+  const [availability, enquiryPreference, pendingChanges, activeVehicles, quotationPerformance] = await Promise.all([
     prisma.vendorOperatorAvailability.findUnique({ where: { userId } }),
     prisma.vendorEnquiryPreference.findUnique({ where: { vendorId } }),
     prisma.vendorChangeRequest.count({ where: { vendorId, status: VendorChangeStatus.PENDING } }),
     prisma.vendorVehicle.count({ where: { vendorId, isActive: true } }),
+    getVendorQuotationPerformance(vendorId),
   ]);
   return {
     user,
@@ -74,6 +76,94 @@ export async function getVendorPortalOverview(userId: string, vendorId: string) 
       pausedUntil: null,
     },
     summary: { pendingChanges, activeVehicles },
+    quotationPerformance,
+  };
+}
+
+const openQuotationStatuses: QuotationStatus[] = [
+  QuotationStatus.DRAFT,
+  QuotationStatus.SUBMITTED,
+  QuotationStatus.REVISED,
+  QuotationStatus.SHORTLISTED,
+];
+const unsuccessfulQuotationStatuses: QuotationStatus[] = [
+  QuotationStatus.REJECTED,
+  QuotationStatus.EXPIRED,
+  QuotationStatus.WITHDRAWN,
+  QuotationStatus.CANCELLED,
+];
+
+export async function getVendorQuotationPerformance(vendorId: string) {
+  const [statusGroups, quotedValue, acceptedValue, recent] = await Promise.all([
+    prisma.quotation.groupBy({
+      by: ["status"],
+      where: { vendorId },
+      _count: { _all: true },
+    }),
+    prisma.quotation.aggregate({
+      where: { vendorId, status: { not: QuotationStatus.DRAFT } },
+      _sum: { totalAmount: true },
+    }),
+    prisma.quotation.aggregate({
+      where: { vendorId, status: QuotationStatus.ACCEPTED },
+      _sum: { totalAmount: true },
+    }),
+    prisma.quotation.findMany({
+      where: { vendorId },
+      orderBy: { updatedAt: "desc" },
+      take: 50,
+      select: {
+        id: true,
+        quotationNumber: true,
+        status: true,
+        totalAmount: true,
+        validUntil: true,
+        createdAt: true,
+        updatedAt: true,
+        booking: {
+          select: {
+            bookingNumber: true,
+            serviceType: true,
+            moveType: true,
+            moveDate: true,
+            pickupCity: true,
+            pickupState: true,
+            dropCity: true,
+            dropState: true,
+          },
+        },
+      },
+    }),
+  ]);
+  const counts = Object.fromEntries(statusGroups.map((group) => [group.status, group._count._all])) as Partial<Record<QuotationStatus, number>>;
+  const count = (statuses: QuotationStatus[]) => statuses.reduce((total, status) => total + (counts[status] || 0), 0);
+  const accepted = counts[QuotationStatus.ACCEPTED] || 0;
+  const unsuccessful = count(unsuccessfulQuotationStatuses);
+  const decided = accepted + unsuccessful;
+  return {
+    counts: {
+      total: Object.values(counts).reduce((total, value) => total + (value || 0), 0),
+      open: count(openQuotationStatuses),
+      submitted: counts[QuotationStatus.SUBMITTED] || 0,
+      revised: counts[QuotationStatus.REVISED] || 0,
+      shortlisted: counts[QuotationStatus.SHORTLISTED] || 0,
+      accepted,
+      unsuccessful,
+      expired: counts[QuotationStatus.EXPIRED] || 0,
+      withdrawn: counts[QuotationStatus.WITHDRAWN] || 0,
+    },
+    acceptanceRate: decided ? Math.round((accepted / decided) * 1000) / 10 : null,
+    totalQuotedValue: Number(quotedValue._sum.totalAmount || 0),
+    totalAcceptedValue: Number(acceptedValue._sum.totalAmount || 0),
+    recent: recent.map((quotation) => ({
+      ...quotation,
+      totalAmount: Number(quotation.totalAmount),
+      outcome: quotation.status === QuotationStatus.ACCEPTED
+        ? "ACCEPTED"
+        : unsuccessfulQuotationStatuses.includes(quotation.status)
+          ? "NOT_ACCEPTED"
+          : "IN_PROGRESS",
+    })),
   };
 }
 

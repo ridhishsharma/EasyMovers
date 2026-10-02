@@ -3,6 +3,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./vendor-portal.module.css";
+import performanceStyles from "./vendor-performance.module.css";
 
 type PortalData = {
   user: { fullName: string; email: string | null; mobile: string };
@@ -11,6 +12,17 @@ type PortalData = {
   availability: { state: string; lastHeartbeatAt: string | null };
   enquiryPreference: { acceptingQuotationEnquiries: boolean; pausedUntil: string | null };
   summary: { pendingChanges: number; activeVehicles: number };
+  quotationPerformance: {
+    counts: { total: number; open: number; submitted: number; revised: number; shortlisted: number; accepted: number; unsuccessful: number; expired: number; withdrawn: number };
+    acceptanceRate: number | null;
+    totalQuotedValue: number;
+    totalAcceptedValue: number;
+    recent: Array<{
+      id: string; quotationNumber: string; status: string; outcome: "ACCEPTED" | "NOT_ACCEPTED" | "IN_PROGRESS";
+      totalAmount: number; validUntil: string | null; createdAt: string; updatedAt: string;
+      booking: { bookingNumber: string; serviceType: string; moveType: string; moveDate: string; pickupCity: string; pickupState: string; dropCity: string; dropState: string };
+    }>;
+  };
 };
 type Opportunity = {
   id: string; bookingNumber: string; serviceType: string; moveType: string; moveDate: string;
@@ -49,6 +61,7 @@ export function VendorPortalDashboard({ supabaseUrl, publishableKey }: { supabas
   const [quoting, setQuoting] = useState<Opportunity | null>(null);
   const emptyQuote = { transportationCost: "", packingCost: "0", unpackingCost: "0", labourCost: "0", insuranceCost: "0", otherCost: "0", discountAmount: "0", taxAmount: "0", validUntil: "", remarks: "" };
   const [quote, setQuote] = useState(emptyQuote);
+  const [quotationFilter, setQuotationFilter] = useState<"ALL" | "IN_PROGRESS" | "ACCEPTED" | "NOT_ACCEPTED">("ALL");
 
   const request = useCallback(async (url: string, options?: RequestInit) => {
     const { data: session } = await client.auth.getSession();
@@ -157,6 +170,7 @@ export function VendorPortalDashboard({ supabaseUrl, publishableKey }: { supabas
 
   const newEnquiries = opportunities.filter(item => !item.myQuotation);
   const submittedQuotations = opportunities.filter(item => item.myQuotation);
+  const performanceQuotations = data?.quotationPerformance.recent.filter(item => quotationFilter === "ALL" || item.outcome === quotationFilter) || [];
   if (!data) return <main className={styles.page}><section className={styles.loading}>{message || "Loading your vendor workspace…"}</section></main>;
   return <main className={styles.page}>
     <section className={styles.hero}>
@@ -169,6 +183,24 @@ export function VendorPortalDashboard({ supabaseUrl, publishableKey }: { supabas
       <article><span>Active vehicles</span><strong>{data.summary.activeVehicles}</strong></article>
       <article><span>Changes awaiting review</span><strong>{data.summary.pendingChanges}</strong></article>
     </section>
+    {data.capabilities.quotationEnquiries && <section className={performanceStyles.panel}>
+      <div className={styles.sectionTitle}><div><p className={styles.eyebrow}>QUOTATION PERFORMANCE</p><h2>Commercial results</h2></div><strong>{data.quotationPerformance.counts.total} quotations</strong></div>
+      <div className={performanceStyles.cards}>
+        <article><span>In progress</span><strong>{data.quotationPerformance.counts.open}</strong><small>{data.quotationPerformance.counts.shortlisted} shortlisted</small></article>
+        <article><span>Accepted</span><strong>{data.quotationPerformance.counts.accepted}</strong><small>{data.quotationPerformance.acceptanceRate === null ? "No decided quotations" : `${data.quotationPerformance.acceptanceRate}% decision win rate`}</small></article>
+        <article><span>Not accepted</span><strong>{data.quotationPerformance.counts.unsuccessful}</strong><small>{data.quotationPerformance.counts.expired} expired · {data.quotationPerformance.counts.withdrawn} withdrawn</small></article>
+        <article><span>Accepted value</span><strong>₹{data.quotationPerformance.totalAcceptedValue.toLocaleString("en-IN")}</strong><small>Quoted ₹{data.quotationPerformance.totalQuotedValue.toLocaleString("en-IN")}</small></article>
+      </div>
+      <div className={performanceStyles.filters} aria-label="Filter quotation outcomes">
+        {(["ALL", "IN_PROGRESS", "ACCEPTED", "NOT_ACCEPTED"] as const).map(filter => <button type="button" className={quotationFilter === filter ? performanceStyles.selected : ""} key={filter} onClick={() => setQuotationFilter(filter)}>{filter.replaceAll("_", " ")}</button>)}
+      </div>
+      {performanceQuotations.length ? <div className={performanceStyles.table}><div className={performanceStyles.head}><span>Quotation</span><span>Requirement</span><span>Amount</span><span>Result</span></div>{performanceQuotations.map(item => <article key={item.id}>
+        <div><strong>{item.quotationNumber}</strong><small>{item.booking.bookingNumber}</small></div>
+        <div><strong>{item.booking.serviceType.replaceAll("_", " ")}</strong><small>{item.booking.pickupCity}, {item.booking.pickupState} → {item.booking.dropCity}, {item.booking.dropState}</small></div>
+        <strong>₹{item.totalAmount.toLocaleString("en-IN")}</strong>
+        <div><em className={`${performanceStyles.outcome} ${item.outcome === "ACCEPTED" ? performanceStyles.won : item.outcome === "NOT_ACCEPTED" ? performanceStyles.lost : performanceStyles.pending}`}>{item.status.replaceAll("_", " ")}</em><small>Updated {new Date(item.updatedAt).toLocaleDateString("en-IN")}</small></div>
+      </article>)}</div> : <p className={styles.empty}>No quotations match this result filter.</p>}
+    </section>}
     <section className={styles.workModes}>
       {data.capabilities.instantAvailability && <article className={styles.controlCard}>
         <p className={styles.eyebrow}>INSTANT-RATE WORK</p><div className={styles.cardTitle}><h2>Driver availability</h2><span className={styles.presence}>{data.availability.state}</span></div>
