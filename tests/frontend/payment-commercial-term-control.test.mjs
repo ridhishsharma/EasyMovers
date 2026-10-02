@@ -34,10 +34,12 @@ test("commercial term APIs separate maker and checker permissions", async () => 
 });
 
 test("finance UI explains commission math and settlement readiness", async () => {
-  const [component, dashboard, settlement] = await Promise.all([
+  const [component, dashboard, settlement, styles, permissionRepair] = await Promise.all([
     read("components/admin/commercial-term-admin.tsx"),
     read("components/admin/crm-dashboard.tsx"),
     read("components/admin/vendor-settlement-admin.tsx"),
+    read("components/admin/vendor-settlement-admin.module.css"),
+    read("prisma/migrations/20261002170000_reconcile_finance_permissions/migration.sql"),
   ]);
   assert.match(component, /Customer payable/);
   assert.match(component, /Vendor net after commission/);
@@ -45,4 +47,8 @@ test("finance UI explains commission math and settlement readiness", async () =>
   assert.match(component, /available in the vendor settlement dropdown/);
   assert.match(dashboard, /Commission terms awaiting checker/);
   assert.match(settlement, /\/admin\/commercial-terms/);
+  assert.match(component, /vendor-settlement-admin\.module\.css/);
+  assert.match(styles, /headerActions/);
+  assert.match(permissionRepair, /FINANCE_EXECUTIVE/);
+  assert.match(permissionRepair, /payment\.read/);
 });
