@@ -11,6 +11,9 @@ const admin = await readFile("components/admin/vendor-operations-admin.tsx", "ut
 const login = await readFile("components/vendor/vendor-login.tsx", "utf8");
 const portalRoute = await readFile("app/api/vendor/portal/route.ts", "utf8");
 const adminCss = await readFile("components/admin/vendor-operations-admin.module.css", "utf8");
+const vendorLoginCss = await readFile("components/vendor/vendor-login.module.css", "utf8");
+const vendorPortalCss = await readFile("components/vendor/vendor-portal.module.css", "utf8");
+const brandShell = await readFile("components/brand/app-brand-shell.tsx", "utf8");
 
 test("CRM creates vendor-specific Supabase invitations without shared passwords", () => {
   assert.match(accountRoute, /CRM_PERMISSIONS\.VENDOR_MANAGE/);
@@ -33,7 +36,18 @@ test("vendor invitation accepts a private password and returns to vendor sign in
   assert.match(login, /Create vendor password/);
   assert.match(login, /updateUser\(\{ password: newPassword \}\)/);
   assert.match(login, /minLength=\{12\}/);
+  assert.match(login, /resetPasswordForEmail/);
+  assert.match(login, /Forgot password\?/);
+  assert.match(login, /Send password-reset link/);
+  assert.match(login, /type=invite\|type=recovery/);
   assert.match(portalRoute, /emailVerified: true, lastLogin: new Date\(\)/);
+});
+
+test("vendor authentication and workspace have a distinct dark-blue identity", () => {
+  assert.match(vendorLoginCss, /#06192d/);
+  assert.match(vendorPortalCss, /#06192d/);
+  assert.match(brandShell, /styles\.vendorHeader/);
+  assert.match(brandShell, /variant=\{isVendor \? "vendor" : "default"\}/);
 });
 
 test("enquiry queue is scoped by active services coverage and linked vendor", () => {

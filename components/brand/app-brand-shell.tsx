@@ -100,10 +100,10 @@ export function AppBrandShell({ children, supabaseUrl, publishableKey }: {
   return (
     <>
       {pathname !== "/" && (
-        <header className={styles.header}>
+        <header className={`${styles.header} ${isVendor ? styles.vendorHeader : ""}`}>
           <div className={styles.inner}>
             <Link href={isAdmin ? "/admin/dashboard" : isVendor ? "/vendor/dashboard" : "/"} aria-label={isAdmin ? "EasyMovers administration" : isVendor ? "EasyMovers vendor portal" : "EasyMovers home"}>
-              <BrandLogo />
+              <BrandLogo variant={isVendor ? "vendor" : "default"} />
             </Link>
             {isAdmin ? isAdminLogin ? <span className={styles.adminArea}>Office administration</span> : sessionState === "authenticated" ? <div className={styles.adminActions}><nav className={styles.adminNav} aria-label="Office navigation"><Link href="/admin/dashboard">Dashboard</Link><Link href="/admin/vendor-applications">Vendor applications</Link><Link href="/admin/vendors">Vendor operations</Link><Link href="/admin/vendor-changes">Change approvals</Link><Link href="/admin/service-locations">Service locations</Link><Link href="/admin/users">Office users</Link></nav><button type="button" className={styles.signOut} disabled={signingOut} onClick={() => void signOutOffice()}>{signingOut ? "Signing out…" : "Sign out"}</button></div> : <span className={styles.adminArea}>Checking office session…</span> : isVendor ? isVendorLogin ? <span className={styles.adminArea}>Partner portal</span> : sessionState === "authenticated" ? <div className={styles.adminActions}><nav aria-label="Vendor navigation"><Link href="/vendor/dashboard">Dashboard</Link></nav><button type="button" className={styles.signOut} disabled={signingOut} onClick={() => void signOutOffice()}>{signingOut ? "Signing out…" : "Sign out"}</button></div> : <span className={styles.adminArea}>Checking vendor session…</span> : <nav aria-label="Page navigation">
               <Link href="/">Home</Link>

@@ -3,6 +3,25 @@
   border-bottom: 1px solid #dce5ef;
   color: #12365b;
 }
+.vendorHeader {
+  background: #071f38;
+  border-bottom-color: #164b75;
+  color: #e8f4ff;
+  box-shadow: 0 5px 20px rgba(1, 14, 28, .22);
+}
+.vendorHeader .inner a,
+.vendorHeader .adminArea {
+  color: #d9eeff;
+}
+.vendorHeader .signOut {
+  border-color: #4f85ad;
+  background: #103b5f;
+  color: #fff;
+}
+.vendorHeader .signOut:hover:not(:disabled) {
+  border-color: #79c8ff;
+  background: #17527f;
+}
 .inner {
   max-width: 1240px;
   margin: auto;
