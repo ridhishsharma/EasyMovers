@@ -1073,6 +1073,8 @@ model Payment {
   quotationId                   String?
   userId                        String?
   vendorId                      String?
+  businessSegment               FinancialBusinessSegment?
+  businessSegmentLockedAt       DateTime?
   /// *
   ///    * --------------------------------------------------------------------------
   ///    * Legacy Payment value
@@ -1201,6 +1203,7 @@ model Payment {
   @@index([gatewayOrderId])
   @@index([gatewayPaymentId])
   @@index([createdAt])
+  @@index([businessSegment])
 }
 
 model PaymentCommercialTermRequest {
@@ -1208,6 +1211,7 @@ model PaymentCommercialTermRequest {
   paymentId                String
   vendorId                 String
   quotationId              String
+  businessSegment          FinancialBusinessSegment
   customerPayableAmount    Decimal                        @db.Decimal(12, 2)
   vendorQuotedAmount       Decimal                        @db.Decimal(12, 2)
   platformCommissionAmount Decimal                        @db.Decimal(12, 2)
@@ -2101,6 +2105,14 @@ enum CommercialTaxTreatment {
   IGST
   NOT_APPLICABLE
   PENDING_REVIEW
+}
+
+enum FinancialBusinessSegment {
+  WITHIN_CITY_INSTANT
+  WITHIN_CITY_QUOTATION
+  INTERCITY_QUOTATION
+  CORPORATE_RELOCATION
+  ADD_ON_SERVICE
 }
 
 /// *

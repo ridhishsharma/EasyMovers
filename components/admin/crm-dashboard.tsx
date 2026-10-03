@@ -30,6 +30,7 @@ const accessModules = [
   { name: "Vendor operations", href: "/admin/vendors", permissions: [["vendor.read", "View"], ["vendor.manage", "Modify"], ["vendor.activate", "Activate / suspend"]] },
   { name: "Change approvals", href: "/admin/vendor-changes", permissions: [["vendor.verify", "Approve / reject"]] },
   { name: "Vendor settlements", href: "/admin/vendor-settlements", permissions: [["payment.read", "View"], ["payment.manage", "Create / complete"], ["settlement.approve", "Approve / reject"]] },
+  { name: "Finance overview", href: "/admin/finance", permissions: [["payment.read", "View monthly collections and income"]] },
   { name: "Commission control", href: "/admin/commercial-terms", permissions: [["payment.read", "View"], ["payment.manage", "Submit"], ["commission.approve", "Approve / reject"]] },
   { name: "Service locations", href: "/admin/service-locations", permissions: [["service_location.read", "View"], ["service_location.manage", "Modify"], ["service_location.activate", "Activate / suspend"]] },
   { name: "Office users", href: "/admin/users", permissions: [["crm_user.read", "View"], ["crm_user.manage", "Invite / assign roles"]] },
@@ -155,6 +156,7 @@ export function CrmDashboard({ supabaseUrl, publishableKey }: { supabaseUrl: str
         {data.officeUsers && <Link href="/admin/users"><strong>{can("crm_user.manage") ? "Manage office access" : "View office users"}</strong><span>{data.officeUsers.pendingInvitations} invitations awaiting password setup →</span></Link>}
         {data.vendors && <Link href="/admin/vendors"><strong>{can("vendor.activate") ? "Verify and activate vendors" : can("vendor.manage") ? "Maintain vendor records" : "View vendor directory"}</strong><span>{vendorExceptionTotal} operational exceptions require attention →</span></Link>}
         {data.vendorChanges && <Link href="/admin/vendor-changes?status=PENDING"><strong>Review vendor record changes</strong><span>{data.vendorChanges.pending} changes await an independent checker →</span></Link>}
+        {can("payment.read") && <Link href="/admin/finance"><strong>Review monthly finance</strong><span>Compare within-city and intercity collections, income and liabilities →</span></Link>}
         {can("payment.read") && <Link href="/admin/vendor-settlements"><strong>{can("settlement.approve") ? "Review vendor settlements" : can("payment.manage") ? "Manage vendor payouts" : "View vendor settlements"}</strong><span>Open the controlled payout ledger →</span></Link>}
         {can("payment.read") && <Link href="/admin/commercial-terms"><strong>{can("commission.approve") ? "Review commission terms" : can("payment.manage") ? "Prepare commission terms" : "View commission terms"}</strong><span>{data.commercialTerms?.pending ?? 0} requests await checker review →</span></Link>}
         {data.leads && <Link href="/admin/leads?status=OPEN"><strong>{can("lead.manage") ? "Manage sales pipeline" : "View sales pipeline"}</strong><span>{pipelineLeads} open leads require follow-up →</span></Link>}

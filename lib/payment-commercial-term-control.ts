@@ -1,5 +1,6 @@
 import { CommercialTaxTreatment, CommercialTermRequestStatus, Prisma, QuotationStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { deriveFinancialBusinessSegment } from "@/lib/financial-business-segment";
 
 export class CommercialTermError extends Error {
   constructor(public readonly code: string, message: string, public readonly status: number) { super(message); this.name = "CommercialTermError"; }
@@ -32,7 +33,7 @@ async function audit(tx: Prisma.TransactionClient, actorUserId:string, action:st
 }
 
 const requestSelection = {
-  id:true,paymentId:true,vendorId:true,quotationId:true,customerPayableAmount:true,vendorQuotedAmount:true,platformCommissionAmount:true,
+  id:true,paymentId:true,vendorId:true,quotationId:true,businessSegment:true,customerPayableAmount:true,vendorQuotedAmount:true,platformCommissionAmount:true,
   commissionRate:true,commissionBase:true,gstTreatment:true,gstRate:true,cgstAmount:true,sgstAmount:true,igstAmount:true,tcsApplicable:true,tcsRate:true,tcsBase:true,tcsAmount:true,
   placeOfSupplyState:true,vendorGstinSnapshot:true,easymoversGstinSnapshot:true,taxOverrideReason:true,revisedFromId:true,revisionNumber:true,currency:true,status:true,
   submissionNote:true,reviewNote:true,submittedBy:true,reviewedBy:true,submittedAt:true,reviewedAt:true,appliedAt:true,
@@ -70,7 +71,7 @@ export async function submitCommercialTermRequest(input: SubmitInput) {
   if (gstTreatment===CommercialTaxTreatment.NOT_APPLICABLE&&!taxOverrideReason) throw new CommercialTermError("TAX_REASON_REQUIRED","Record the reason when GST is not applicable.",400);
 
   return prisma.$transaction(async tx => {
-    const payment=await tx.payment.findUnique({where:{id:input.paymentId},select:{id:true,totalAmount:true,currency:true,commercialReference:true,booking:{select:{selectedQuotationId:true}},quotation:{select:{id:true,quotationNumber:true,status:true,vendorId:true,totalAmount:true,vendor:{select:{gstNumber:true,state:true}}}}}});
+    const payment=await tx.payment.findUnique({where:{id:input.paymentId},select:{id:true,totalAmount:true,currency:true,commercialReference:true,businessSegment:true,metadata:true,booking:{select:{selectedQuotationId:true,serviceType:true,moveType:true,requirementsJson:true}},quotation:{select:{id:true,quotationNumber:true,status:true,vendorId:true,totalAmount:true,pricingBreakdown:true,vendor:{select:{gstNumber:true,state:true}}}}}});
     if (!payment?.quotation) throw new CommercialTermError("PAYMENT_NOT_ELIGIBLE","Select a payment linked to an accepted vendor quotation.",404);
     if (payment.quotation.status!==QuotationStatus.ACCEPTED||payment.booking.selectedQuotationId!==payment.quotation.id) throw new CommercialTermError("QUOTATION_NOT_ACCEPTED","Commission can be locked only for the booking's accepted quotation.",409);
     if (locked(payment.commercialReference)) throw new CommercialTermError("COMMISSION_ALREADY_LOCKED","Commission is already locked for this payment.",409);
@@ -79,9 +80,10 @@ export async function submitCommercialTermRequest(input: SubmitInput) {
     const previous=revisedFromId?await tx.paymentCommercialTermRequest.findUnique({where:{id:revisedFromId},select:{id:true,paymentId:true,status:true,revisionNumber:true}}):null;
     if (revisedFromId&&(!previous||previous.paymentId!==payment.id||previous.status!==CommercialTermRequestStatus.REJECTED)) throw new CommercialTermError("INVALID_REVISION_SOURCE","Only a rejected request for the same payment can be revised.",409);
     const commissionBase=Number(payment.quotation.totalAmount);
+    const businessSegment=payment.businessSegment??deriveFinancialBusinessSegment({serviceType:payment.booking.serviceType,moveType:payment.booking.moveType,requirementsJson:payment.booking.requirementsJson,paymentMetadata:payment.metadata,pricingBreakdown:payment.quotation.pricingBreakdown});
     const taxes=calculateCommercialTaxes({commissionBase,commissionRate,gstTreatment,gstRate,tcsApplicable,tcsRate:tcsRate||0,tcsBase:commissionBase});
     if (taxes.totalSettlementDeduction>commissionBase) throw new CommercialTermError("DEDUCTIONS_EXCEED_QUOTE","Commission, GST and TCS deductions cannot exceed the vendor quotation.",400);
-    const request=await tx.paymentCommercialTermRequest.create({data:{paymentId:payment.id,vendorId:payment.quotation.vendorId,quotationId:payment.quotation.id,customerPayableAmount:payment.totalAmount,vendorQuotedAmount:payment.quotation.totalAmount,
+    const request=await tx.paymentCommercialTermRequest.create({data:{paymentId:payment.id,vendorId:payment.quotation.vendorId,quotationId:payment.quotation.id,businessSegment,customerPayableAmount:payment.totalAmount,vendorQuotedAmount:payment.quotation.totalAmount,
       platformCommissionAmount:decimal(taxes.platformCommissionAmount),commissionRate:rateDecimal(commissionRate),commissionBase:decimal(commissionBase),gstTreatment,gstRate:rateDecimal(gstTreatment===CommercialTaxTreatment.NOT_APPLICABLE?0:gstRate),
       cgstAmount:decimal(taxes.cgstAmount),sgstAmount:decimal(taxes.sgstAmount),igstAmount:decimal(taxes.igstAmount),tcsApplicable,tcsRate:rateDecimal(tcsRate||0),tcsBase:decimal(commissionBase),tcsAmount:decimal(taxes.tcsAmount),
       placeOfSupplyState:text(input.placeOfSupplyState,100)||payment.quotation.vendor.state,vendorGstinSnapshot:validGstin(payment.quotation.vendor.gstNumber),easymoversGstinSnapshot:validGstin(process.env.EASYMOVERS_GSTIN),taxOverrideReason,
@@ -103,13 +105,14 @@ export async function reviewCommercialTermRequest(input:{requestId:string;decisi
       if(!changed.count)throw new CommercialTermError("COMMISSION_REQUEST_REVIEWED","Another checker already reviewed this request.",409);
       await audit(tx,input.actorUserId,"COMMISSION_TERMS_REJECTED",request.id);return tx.paymentCommercialTermRequest.findUniqueOrThrow({where:{id:request.id}});
     }
-    const payment=await tx.payment.findUnique({where:{id:request.paymentId},select:{id:true,quotationId:true,totalAmount:true,currency:true,commercialReference:true,quotation:{select:{id:true,quotationNumber:true,vendorId:true,totalAmount:true,status:true}}}});
+    const payment=await tx.payment.findUnique({where:{id:request.paymentId},select:{id:true,quotationId:true,totalAmount:true,currency:true,commercialReference:true,businessSegment:true,businessSegmentLockedAt:true,quotation:{select:{id:true,quotationNumber:true,vendorId:true,totalAmount:true,status:true}}}});
     if(!payment?.quotation||payment.quotationId!==request.quotationId||payment.quotation.vendorId!==request.vendorId)throw new CommercialTermError("COMMERCIAL_CONTEXT_CHANGED","Payment or quotation context changed; reject and submit a fresh request.",409);
     if(payment.quotation.status!==QuotationStatus.ACCEPTED||Number(payment.totalAmount)!==Number(request.customerPayableAmount)||Number(payment.quotation.totalAmount)!==Number(request.vendorQuotedAmount)||payment.currency!==request.currency)throw new CommercialTermError("COMMERCIAL_CONTEXT_CHANGED","Commercial amounts changed; reject and submit a fresh request.",409);
     if(locked(payment.commercialReference))throw new CommercialTermError("COMMISSION_ALREADY_LOCKED","Commission was already locked by another approved request.",409);
     const platformInvoiceAmount=round(Number(request.platformCommissionAmount)+Number(request.cgstAmount)+Number(request.sgstAmount)+Number(request.igstAmount));
     const totalSettlementDeduction=round(platformInvoiceAmount+Number(request.tcsAmount));
-    await tx.payment.update({where:{id:payment.id},data:{commercialReference:{...asRecord(payment.commercialReference),quotationId:payment.quotation.id,quotationNumber:payment.quotation.quotationNumber,customerPayableAmount:Number(request.customerPayableAmount),vendorQuotedAmount:Number(request.vendorQuotedAmount),platformCommissionAmount:Number(request.platformCommissionAmount),commissionRate:Number(request.commissionRate),commissionBase:Number(request.commissionBase),gstTreatment:request.gstTreatment,gstRate:Number(request.gstRate),cgstAmount:Number(request.cgstAmount),sgstAmount:Number(request.sgstAmount),igstAmount:Number(request.igstAmount),platformInvoiceAmount,tcsApplicable:request.tcsApplicable,tcsRate:Number(request.tcsRate),tcsBase:Number(request.tcsBase),tcsAmount:Number(request.tcsAmount),totalSettlementDeduction,placeOfSupplyState:request.placeOfSupplyState,vendorGstinSnapshot:request.vendorGstinSnapshot,easymoversGstinSnapshot:request.easymoversGstinSnapshot,commercialTermRequestId:request.id,commercialTermRevision:request.revisionNumber,currency:request.currency}}});
+    if(payment.businessSegment&&payment.businessSegment!==request.businessSegment)throw new CommercialTermError("BUSINESS_SEGMENT_LOCKED","The payment business segment no longer matches this approval request.",409);
+    await tx.payment.update({where:{id:payment.id},data:{businessSegment:request.businessSegment,businessSegmentLockedAt:payment.businessSegmentLockedAt??now,commercialReference:{...asRecord(payment.commercialReference),businessSegment:request.businessSegment,quotationId:payment.quotation.id,quotationNumber:payment.quotation.quotationNumber,customerPayableAmount:Number(request.customerPayableAmount),vendorQuotedAmount:Number(request.vendorQuotedAmount),platformCommissionAmount:Number(request.platformCommissionAmount),commissionRate:Number(request.commissionRate),commissionBase:Number(request.commissionBase),gstTreatment:request.gstTreatment,gstRate:Number(request.gstRate),cgstAmount:Number(request.cgstAmount),sgstAmount:Number(request.sgstAmount),igstAmount:Number(request.igstAmount),platformInvoiceAmount,tcsApplicable:request.tcsApplicable,tcsRate:Number(request.tcsRate),tcsBase:Number(request.tcsBase),tcsAmount:Number(request.tcsAmount),totalSettlementDeduction,placeOfSupplyState:request.placeOfSupplyState,vendorGstinSnapshot:request.vendorGstinSnapshot,easymoversGstinSnapshot:request.easymoversGstinSnapshot,commercialTermRequestId:request.id,commercialTermRevision:request.revisionNumber,currency:request.currency}}});
     const changed=await tx.paymentCommercialTermRequest.updateMany({where:{id:request.id,status:CommercialTermRequestStatus.PENDING},data:{status:CommercialTermRequestStatus.APPROVED,reviewNote,reviewedBy:input.actorUserId,reviewedAt:now,appliedAt:now}});
     if(!changed.count)throw new CommercialTermError("COMMISSION_REQUEST_REVIEWED","Another checker already reviewed this request.",409);
     await audit(tx,input.actorUserId,"COMMISSION_TERMS_APPROVED",request.id,{paymentId:payment.id,commission:Number(request.platformCommissionAmount),platformInvoiceAmount,totalSettlementDeduction});
