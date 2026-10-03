@@ -1,0 +1,5 @@
+import{NextResponse}from"next/server";
+import{authorizeCrmPermission,CRM_PERMISSIONS}from"@/lib/crm-authorization";
+import{issuePlatformFeeInvoice,PlatformFeeInvoiceError}from"@/lib/platform-fee-invoice";
+export const runtime="nodejs";const reply=(body:unknown,status=200)=>NextResponse.json(body,{status,headers:{"Cache-Control":"no-store"}});
+export async function POST(request:Request,context:{params:Promise<{invoiceId:string}>}){try{const access=await authorizeCrmPermission(request,CRM_PERMISSIONS.BILLING_MANAGE);if(!access.authorized)return reply({success:false,error:{code:access.code,message:access.message}},access.status);const{invoiceId}=await context.params;return reply({success:true,data:await issuePlatformFeeInvoice({invoiceId,actorUserId:access.userId})});}catch(error){if(error instanceof PlatformFeeInvoiceError)return reply({success:false,error:{code:error.code,message:error.message}},error.status);const reference=crypto.randomUUID();console.error(`[PLATFORM_FEE_INVOICE_ISSUE_FAILED:${reference}]`,error);return reply({success:false,error:{code:"PLATFORM_FEE_INVOICE_ISSUE_FAILED",message:`Unable to issue invoice. Reference: ${reference}`}},503);}}
