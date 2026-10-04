@@ -300,8 +300,26 @@
   gap: 10px;
   margin: 10px 0;
 }
+.itemEntry .searchBox { min-width: 0; }
+.itemEntry .searchBox > input {
+  display: block;
+  width: 100%;
+  min-height: 58px;
+  box-sizing: border-box;
+  border: 1px solid #cad9e8;
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: white;
+  color: #12365b;
+  font: inherit;
+}
+.itemEntry .searchBox > input:focus {
+  outline: 3px solid #d5e9ff;
+  border-color: #1b64ac;
+}
 .itemEntry .addItem {
   min-height: 58px;
+  height: 58px;
   white-space: nowrap;
   align-self: stretch;
 }
@@ -473,7 +491,8 @@
     grid-template-columns: 1fr;
   }
   .itemEntry { grid-template-columns: 1fr; }
-  .itemEntry .addItem { width: 100%; min-height: 48px; }
+  .itemEntry .searchBox > input { min-height: 48px; }
+  .itemEntry .addItem { width: 100%; min-height: 48px; height: 48px; }
   .card {
     padding: 22px;
   }
