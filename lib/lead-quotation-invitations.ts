@@ -181,7 +181,13 @@ export async function inviteVendorsToLead(input: { leadId: string; vendorIds: st
       data: uniqueVendorIds.map(vendorId => ({ bookingId: booking!.id, vendorId, invitedByUserId: input.invitedByUserId, expiresAt: input.expiresAt })),
       skipDuplicates: true,
     });
+    const invited = await tx.vendorQuotationInvitation.findMany({
+      where: { bookingId: booking.id, vendorId: { in: uniqueVendorIds } },
+      select: { id: true, status: true, expiresAt: true, vendor: { select: { id: true, vendorCode: true, companyName: true } } },
+    });
+    if (invited.length !== uniqueVendorIds.length)
+      throw new LeadInvitationError("RFQ_INVITATION_PERSISTENCE_FAILED", "The selected vendor invitations were not fully recorded. No quotation request was sent.", 503);
     await tx.crmAuditLog.create({ data: { actorUserId: input.invitedByUserId, action: "LEAD_VENDOR_RFQ_SENT", entityType: "Booking", entityId: booking.id, metadata: { leadId: lead.id, vendorIds: uniqueVendorIds, expiresAt: input.expiresAt.toISOString() } } });
-    return { booking, invited: await tx.vendorQuotationInvitation.findMany({ where: { bookingId: booking.id, vendorId: { in: uniqueVendorIds } }, select: { id: true, status: true, expiresAt: true, vendor: { select: { id: true, vendorCode: true, companyName: true } } } }) };
+    return { booking, requestedCount: uniqueVendorIds.length, invited };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }

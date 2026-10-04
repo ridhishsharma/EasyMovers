@@ -29,7 +29,7 @@ export async function POST(request: Request, context: { params: Promise<{ leadId
     if (!Array.isArray(body.vendorIds) || body.vendorIds.some(id => typeof id !== "string" || !id || id.length > 100))
       return reply({ success: false, error: { code: "INVALID_VENDOR_SELECTION", message: "Select valid eligible vendors." } }, 400);
     const data = await inviteVendorsToLead({ leadId, vendorIds: body.vendorIds as string[], expiresAt: new Date(String(body.expiresAt || "")), invitedByUserId: access.userId });
-    return reply({ success: true, data, message: `Quotation request sent to ${data.invited.length} vendor(s).` }, 201);
+    return reply({ success: true, data, message: `${data.invited.length} quotation request(s) sent and recorded.` }, 201);
   } catch (error) {
     if (error instanceof SyntaxError) return reply({ success: false, error: { code: "INVALID_JSON", message: "Provide a valid invitation request." } }, 400);
     if (error instanceof LeadInvitationError) return reply({ success: false, error: { code: error.code, message: error.message } }, error.status);

@@ -36,8 +36,9 @@ export function LeadVendorInvitations({ leadId, supabaseUrl, publishableKey }: {
     try {
       const payload = await request();
       setWorkspace(payload.data);
-      const invited = new Set(payload.data.invitations.map((invitation: Invitation) => invitation.vendor.id));
-      setSelected(payload.data.candidates.filter((candidate: Candidate) => candidate.recommended && !invited.has(candidate.id)).slice(0, 5).map((candidate: Candidate) => candidate.id));
+      // Recommendations are suggestions only. Never pre-select vendors because a
+      // checked row can be mistaken for a quotation request that was already sent.
+      setSelected([]);
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to find eligible vendors."); }
     finally { setLoading(false); }
   }, [request]);
@@ -50,15 +51,23 @@ export function LeadVendorInvitations({ leadId, supabaseUrl, publishableKey }: {
   function toggle(vendorId: string) { setSelected(current => current.includes(vendorId) ? current.filter(id => id !== vendorId) : current.length < 5 ? [...current, vendorId] : current); }
   async function send() {
     setSending(true); setError(""); setMessage("");
-    try { const payload = await request("POST", { vendorIds: selected, expiresAt: new Date(deadline).toISOString() }); setMessage(payload.message); await load(); }
+    try {
+      const requested = [...selected];
+      const payload = await request("POST", { vendorIds: requested, expiresAt: new Date(deadline).toISOString() });
+      const persisted = Array.isArray(payload.data?.invited) ? payload.data.invited : [];
+      if (persisted.length !== requested.length)
+        throw new Error("The quotation requests were not fully recorded. Refresh and try again.");
+      setMessage(`${persisted.length} quotation request${persisted.length === 1 ? "" : "s"} sent and recorded successfully.`);
+      await load();
+    }
     catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to send quotation requests."); }
     finally { setSending(false); }
   }
 
   if (loading) return <section className={styles.invitationPanel}><h3>Vendor quotation invitations</h3><p>Finding eligible vendors…</p></section>;
-  return <section className={styles.invitationPanel}><div className={styles.invitationTitle}><div><h3>Vendor quotation invitations</h3><p>Eligibility is automatic; sending the RFQ remains under staff control. This does not assign the job.</p></div><button type="button" onClick={() => void load()}>Refresh eligibility</button></div>
+  return <section className={styles.invitationPanel}><div className={styles.invitationTitle}><div><h3>Vendor quotation invitations</h3><p>Eligibility is automatic. Select vendors, set the deadline, then press the send button. A checked vendor is not invited until it appears under Invitation progress.</p></div><button type="button" onClick={() => void load()}>Refresh eligibility</button></div>
     {message && <p className={styles.successMessage} role="status">{message}</p>}{error && <p className={styles.inlineError} role="alert">{error}</p>}
     {workspace?.invitations.length ? <div className={styles.invitationList}><strong>Invitation progress</strong>{workspace.invitations.map(invitation => <article key={invitation.id}><span><b>{invitation.vendor.companyName}</b><small>{invitation.vendor.vendorCode}</small></span><i className={styles.invitationStatus}>{label(invitation.status)}</i><small>Sent {dateTime(invitation.invitedAt)} · Due {dateTime(invitation.expiresAt)}</small></article>)}</div> : <p className={styles.muted}>No vendor has been invited for this request.</p>}
-    {!workspace?.candidates.length ? <p className={styles.inlineError}>No active quotation vendor currently matches the service, route, enquiry preference and portal-access requirements.</p> : <><div className={styles.candidateList}>{workspace.candidates.map(candidate => { const invited = workspace.invitations.some(invitation => invitation.vendor.id === candidate.id); return <label key={candidate.id} className={invited ? styles.invitedCandidate : undefined}><input type="checkbox" disabled={invited || sending} checked={invited || selected.includes(candidate.id)} onChange={() => toggle(candidate.id)}/><span><strong>{candidate.companyName}</strong><small>{candidate.vendorCode} · {[candidate.city, candidate.state].filter(Boolean).join(", ") || "Location not recorded"}</small><small>{candidate.rating.toFixed(1)} rating · {candidate.completedMoves} completed · {candidate.quotationCount} quotations</small><em>{candidate.reasons.join(" · ")}</em></span><b>{invited ? "Invited" : candidate.recommended ? "Recommended" : "Eligible"}</b></label>; })}</div><div className={styles.invitationActions}><label>Quotation deadline<input type="datetime-local" value={deadline} min={new Date().toISOString().slice(0, 16)} onChange={event => setDeadline(event.target.value)}/></label><span>{selected.length}/5 vendors selected</span><button type="button" disabled={sending || !selected.length || !workspace.capabilities.canInvite} onClick={() => void send()}>{sending ? "Sending…" : "Send quotation request"}</button></div></>}
+    {!workspace?.candidates.length ? <p className={styles.inlineError}>No active quotation vendor currently matches the service, route, enquiry preference and portal-access requirements.</p> : <><div className={styles.candidateList}>{workspace.candidates.map(candidate => { const invited = workspace.invitations.some(invitation => invitation.vendor.id === candidate.id); const chosen = selected.includes(candidate.id); return <label key={candidate.id} className={invited ? styles.invitedCandidate : undefined}><input type="checkbox" disabled={invited || sending} checked={invited || chosen} onChange={() => toggle(candidate.id)}/><span><strong>{candidate.companyName}</strong><small>{candidate.vendorCode} · {[candidate.city, candidate.state].filter(Boolean).join(", ") || "Location not recorded"}</small><small>{candidate.rating.toFixed(1)} rating · {candidate.completedMoves} completed · {candidate.quotationCount} quotations</small><em>{candidate.reasons.join(" · ")}</em></span><b>{invited ? "Invited" : chosen ? "Selected — not sent" : candidate.recommended ? "Recommended" : "Eligible"}</b></label>; })}</div><div className={styles.invitationActions}><label>Quotation deadline<input type="datetime-local" value={deadline} min={new Date().toISOString().slice(0, 16)} onChange={event => setDeadline(event.target.value)}/></label><span>{selected.length ? `${selected.length} selected — not sent` : "Select up to 5 vendors"}</span><button type="button" disabled={sending || !selected.length || !workspace.capabilities.canInvite} onClick={() => void send()}>{sending ? "Sending and verifying…" : selected.length ? `Send to ${selected.length} selected vendor${selected.length === 1 ? "" : "s"}` : "Select vendors to continue"}</button></div></>}
   </section>;
 }
