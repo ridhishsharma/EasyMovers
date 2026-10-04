@@ -8,6 +8,9 @@ const leadDetailApi = readFileSync(new URL("../../app/api/admin/leads/[leadId]/r
 const directory = readFileSync(new URL("../../components/admin/crm-directory.tsx", import.meta.url), "utf8");
 const leadWorkspace = readFileSync(new URL("../../components/admin/lead-workspace.tsx", import.meta.url), "utf8");
 const dashboard = readFileSync(new URL("../../components/admin/crm-dashboard.tsx", import.meta.url), "utf8");
+const customerComparison = readFileSync(new URL("../../lib/customer-quotation-comparison.ts", import.meta.url), "utf8");
+const customerComparisonApi = readFileSync(new URL("../../app/api/public/quotation-comparison/route.ts", import.meta.url), "utf8");
+const customerComparisonUi = readFileSync(new URL("../../components/moving/customer-quotation-comparison.tsx", import.meta.url), "utf8");
 
 test("vendor directory requires permission and bounded selected fields", () => {
   assert.match(vendorsApi, /CRM_PERMISSIONS\.VENDOR_READ/);
@@ -18,6 +21,19 @@ test("vendor directory requires permission and bounded selected fields", () => {
   assert.match(vendorsApi, /originCity/);
   assert.match(vendorsApi, /createdWithin/);
   assert.match(vendorsApi, /coverage/);
+});
+
+test("customer quotations are securely compared with an auditable safe-move score", () => {
+  assert.match(customerComparisonApi, /readDraftSession/);
+  assert.match(customerComparisonApi, /Cache-Control": "no-store/);
+  assert.match(customerComparison, /EM_SAFE_MOVE_V1/);
+  assert.match(customerComparison, /price: 30/);
+  assert.match(customerComparison, /quality: 25/);
+  assert.match(customerComparison, /suspiciouslyLow/);
+  assert.match(customerComparisonUi, /EM Safe Move Recommended/);
+  assert.match(customerComparisonUi, /New partner/);
+  assert.match(customerComparisonUi, /commission/);
+  assert.doesNotMatch(customerComparisonUi, /companyName/);
 });
 
 test("lead pipeline requires permission and supports open and today filters", () => {
@@ -36,6 +52,12 @@ test("lead workspace exposes requirements, assistance and protected photos", () 
   assert.match(leadWorkspace, /Pre-move survey/);
   assert.match(leadWorkspace, /Inventory photos/);
   assert.match(leadWorkspace, /Quotations/);
+  assert.match(leadDetailApi, /transportationCost: true/);
+  assert.match(leadDetailApi, /ratingSummary: \{ select:/);
+  assert.match(leadWorkspace, /Price breakdown/);
+  assert.match(leadWorkspace, /Verified performance/);
+  assert.match(leadWorkspace, /New partner/);
+  assert.match(leadWorkspace, /Do not display a fabricated rating/);
 });
 
 test("dashboard cards drill into filtered operational directories", () => {

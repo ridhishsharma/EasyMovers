@@ -639,6 +639,12 @@ export function DraftEditor({ reference }: { reference: string }) {
                     <p className={styles.muted}>Editing is allowed only until a vendor submits a quotation. After that, request assistance or a survey so vendors can price the change fairly.</p>
                   </div>
                 )}
+                {locked && ["QUOTATION_RECEIVED", "BOOKING_CREATED", "CONVERTED"].includes(route.status) && (
+                  <div className={styles.submittedActions}>
+                    <Link className={styles.primary} href={`/quotes/${encodeURIComponent(reference)}`}>Compare vendor quotations →</Link>
+                    <p className={styles.muted}>Review the EM Safe Move recommendation or compare every eligible quotation yourself.</p>
+                  </div>
+                )}
               </>
             )}
             {error && (
