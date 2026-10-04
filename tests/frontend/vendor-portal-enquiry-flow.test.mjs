@@ -52,6 +52,9 @@ test("vendor authentication and workspace have a distinct dark-blue identity", (
 });
 
 test("enquiry queue is scoped by active services coverage and linked vendor", () => {
+  assert.match(opportunities, /HOUSEHOLD:\s*VendorServiceType\.HOUSEHOLD_RELOCATION/);
+  assert.match(opportunities, /OFFICE:\s*VendorServiceType\.OFFICE_RELOCATION/);
+  assert.match(opportunities, /VEHICLE:\s*VendorServiceType\.VEHICLE_TRANSPORT/);
   assert.match(opportunities, /bookingStatus: \{ in: \["QUOTATION_PENDING", "QUOTATION_RECEIVED"\] \}/);
   assert.match(opportunities, /matchesService/);
   assert.match(opportunities, /matchesArea/);
