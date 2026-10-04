@@ -104,6 +104,10 @@ export async function listVendorOpportunities(vendorId: string) {
     where: {
       bookingStatus: { in: ["QUOTATION_PENDING", "QUOTATION_RECEIVED"] },
       selectedQuotationId: null,
+      OR: [
+        { quotationInvitations: { some: { vendorId, status: { in: ["INVITED", "VIEWED", "RESPONDED"] }, expiresAt: { gt: new Date() } } } },
+        { quotations: { some: { vendorId } } },
+      ],
     },
     orderBy: [{ moveDate: "asc" }, { createdAt: "asc" }],
     take: 100,
@@ -125,14 +129,20 @@ export async function listVendorOpportunities(vendorId: string) {
           validUntil: true, remarks: true, createdAt: true, updatedAt: true,
         },
       },
+      quotationInvitations: {
+        where: { vendorId }, take: 1,
+        select: { id: true, status: true, invitedAt: true, expiresAt: true, viewedAt: true },
+      },
     },
   });
-  const accepting = vendor.enquiryPreference?.acceptingQuotationEnquiries ?? true;
-  const pausedUntil = vendor.enquiryPreference?.pausedUntil;
-  const receivesNew = accepting && (!pausedUntil || pausedUntil <= new Date());
-  return bookings
-    .filter(booking => booking.quotations.length > 0 || (receivesNew && matchesService(booking.serviceType, vendor.serviceOfferings) && matchesArea(booking, vendor.serviceAreas)))
-    .map(({ quotations, pickupAddressJson, dropAddressJson, inventoryJson, inventorySummaryJson, servicesJson, requirementsJson, scheduleJson, ...booking }) => ({
+  const visible = bookings.filter(booking =>
+    booking.quotations.length > 0 ||
+    (booking.quotationInvitations.length > 0 && matchesService(booking.serviceType, vendor.serviceOfferings) && matchesArea(booking, vendor.serviceAreas)),
+  );
+  const newlyViewed = visible.flatMap(booking => booking.quotationInvitations.filter(invitation => invitation.status === "INVITED").map(invitation => invitation.id));
+  if (newlyViewed.length) await prisma.vendorQuotationInvitation.updateMany({ where: { id: { in: newlyViewed }, vendorId, status: "INVITED" }, data: { status: "VIEWED", viewedAt: new Date() } });
+  return visible
+    .map(({ quotations, quotationInvitations, pickupAddressJson, dropAddressJson, inventoryJson, inventorySummaryJson, servicesJson, requirementsJson, scheduleJson, ...booking }) => ({
       ...booking,
       pickupDetails: anonymousRequirement(pickupAddressJson),
       dropDetails: anonymousRequirement(dropAddressJson),
@@ -141,6 +151,7 @@ export async function listVendorOpportunities(vendorId: string) {
       requestedServices: anonymousRequirement(servicesJson),
       requirements: anonymousRequirement(requirementsJson),
       schedule: anonymousRequirement(scheduleJson),
+      invitation: quotationInvitations[0] ? { ...quotationInvitations[0], status: quotationInvitations[0].status === "INVITED" ? "VIEWED" : quotationInvitations[0].status, viewedAt: quotationInvitations[0].viewedAt || new Date() } : null,
       myQuotation: quotations[0] ? quotationView(quotations[0]) : null,
     }));
 }
@@ -152,7 +163,7 @@ export async function submitVendorOpportunityQuotation(input: {
   const booking = opportunities.find(item => item.id === input.bookingId && !item.myQuotation);
   if (!booking) throw new VendorOpportunityError("OPPORTUNITY_NOT_AVAILABLE", "This enquiry is not available to the linked vendor.", 404);
   const quotationModule = getOrCreateQuotationModule({ prisma });
-  return quotationModule.controller.create({
+  const result = await quotationModule.controller.create({
     body: {
       leadId: booking.leadId,
       bookingId: booking.id,
@@ -183,6 +194,9 @@ export async function submitVendorOpportunityQuotation(input: {
     ipAddress: input.ipAddress,
     userAgent: input.userAgent,
   });
+  if (result.status >= 200 && result.status < 300)
+    await prisma.vendorQuotationInvitation.updateMany({ where: { bookingId: booking.id, vendorId: input.vendorId, status: { in: ["INVITED", "VIEWED"] } }, data: { status: "RESPONDED", respondedAt: new Date() } });
+  return result;
 }
 
 export async function reviseVendorOpportunityQuotation(input: {
@@ -200,8 +214,8 @@ export async function reviseVendorOpportunityQuotation(input: {
     select: { id: true, status: true },
   });
   if (!quotation) throw new VendorOpportunityError("QUOTATION_NOT_EDITABLE", "This quotation can no longer be modified.", 409);
-  const module = getOrCreateQuotationModule({ prisma });
-  const result = await module.service.update({
+  const quotationModule = getOrCreateQuotationModule({ prisma });
+  const result = await quotationModule.service.update({
     quotationId: quotation.id as never,
     changes: {
       transportationCost: input.body.transportationCost,
@@ -221,9 +235,23 @@ export async function reviseVendorOpportunityQuotation(input: {
   });
   if (!result.success) throw new VendorOpportunityError(result.error.code, result.error.message, 400);
   if (quotation.status === QuotationStatus.SUBMITTED) {
-    const revised = await module.service.markRevised({ quotationId: quotation.id as never, revisedBy: input.userId, reason: "Vendor revised commercial quotation." });
+    const revised = await quotationModule.service.markRevised({ quotationId: quotation.id as never, revisedBy: input.userId, reason: "Vendor revised commercial quotation." });
     if (!revised.success) throw new VendorOpportunityError(revised.error.code, revised.error.message, 409);
     return quotationView(revised.data as never);
   }
   return quotationView(result.data as never);
+}
+
+export async function declineVendorOpportunity(input: { vendorId: string; bookingId: string; reason: string }) {
+  await vendorContext(input.vendorId);
+  const reason = input.reason.trim();
+  if (reason.length < 3 || reason.length > 500)
+    throw new VendorOpportunityError("INVALID_DECLINE_REASON", "Provide a decline reason from 3 to 500 characters.", 400);
+  const result = await prisma.vendorQuotationInvitation.updateMany({
+    where: { bookingId: input.bookingId, vendorId: input.vendorId, status: { in: ["INVITED", "VIEWED"] }, expiresAt: { gt: new Date() } },
+    data: { status: "DECLINED", declinedAt: new Date(), declineReason: reason },
+  });
+  if (result.count !== 1)
+    throw new VendorOpportunityError("OPPORTUNITY_NOT_DECLINABLE", "This quotation invitation is no longer available to decline.", 409);
+  return { bookingId: input.bookingId, status: "DECLINED" as const };
 }

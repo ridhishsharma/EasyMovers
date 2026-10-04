@@ -118,6 +118,7 @@ model Vendor {
   sourceApplication      VendorApplication?             @relation("VendorApplicationCreatedVendor")
   changeRequests         VendorChangeRequest[]
   operatorAvailability   VendorOperatorAvailability[]
+  quotationInvitations   VendorQuotationInvitation[]
   availabilityEvents     VendorAvailabilityEvent[]
   enquiryPreference      VendorEnquiryPreference?
   settlements            VendorSettlement[]
@@ -367,8 +368,8 @@ model DestinationDetails {
 }
 
 model Booking {
-  id                   String               @id @default(cuid())
-  bookingNumber        String               @unique
+  id                   String                      @id @default(cuid())
+  bookingNumber        String                      @unique
   leadId               String
   leadReferenceId      String
   userId               String?
@@ -383,14 +384,14 @@ model Booking {
   pickupState          String
   pickupPincode        String
   pickupDigipin        String?
-  pickupLatitude       Decimal?             @db.Decimal(10, 7)
-  pickupLongitude      Decimal?             @db.Decimal(10, 7)
+  pickupLatitude       Decimal?                    @db.Decimal(10, 7)
+  pickupLongitude      Decimal?                    @db.Decimal(10, 7)
   dropCity             String
   dropState            String
   dropPincode          String
   dropDigipin          String?
-  dropLatitude         Decimal?             @db.Decimal(10, 7)
-  dropLongitude        Decimal?             @db.Decimal(10, 7)
+  dropLatitude         Decimal?                    @db.Decimal(10, 7)
+  dropLongitude        Decimal?                    @db.Decimal(10, 7)
   pickupAddress        String
   dropAddress          String
   contactJson          Json
@@ -406,28 +407,29 @@ model Booking {
   vendorName           String?
   assignedVendorCode   String?
   vendorJson           Json?
-  selectedQuotationId  String?              @unique
+  selectedQuotationId  String?                     @unique
   quotationJson        Json?
   paymentJson          Json?
   trackingJson         Json?
   timelineJson         Json
   auditJson            Json
-  totalAmount          Decimal              @default(0) @db.Decimal(12, 2)
-  currency             String               @default("INR")
-  bookingStatus        String               @default("DRAFT")
-  paymentStatus        String               @default("PENDING")
-  trackingStatus       TrackingStatus       @default(NOT_STARTED)
+  totalAmount          Decimal                     @default(0) @db.Decimal(12, 2)
+  currency             String                      @default("INR")
+  bookingStatus        String                      @default("DRAFT")
+  paymentStatus        String                      @default("PENDING")
+  trackingStatus       TrackingStatus              @default(NOT_STARTED)
   notes                String?
-  createdAt            DateTime             @default(now())
-  updatedAt            DateTime             @updatedAt
-  lead                 Lead                 @relation(fields: [leadId], references: [id])
-  selectedQuotation    Quotation?           @relation("SelectedBookingQuotation", fields: [selectedQuotationId], references: [id])
-  user                 User?                @relation(fields: [userId], references: [id])
-  assignedVendor       Vendor?              @relation("AssignedVendorBookings", fields: [vendorId], references: [id])
+  createdAt            DateTime                    @default(now())
+  updatedAt            DateTime                    @updatedAt
+  lead                 Lead                        @relation(fields: [leadId], references: [id])
+  selectedQuotation    Quotation?                  @relation("SelectedBookingQuotation", fields: [selectedQuotationId], references: [id])
+  user                 User?                       @relation(fields: [userId], references: [id])
+  assignedVendor       Vendor?                     @relation("AssignedVendorBookings", fields: [vendorId], references: [id])
   bookingTrackings     BookingTracking[]
   payments             Payment?
   paymentBookingSyncs  PaymentBookingSync[]
-  quotations           Quotation[]          @relation("BookingQuotations")
+  quotations           Quotation[]                 @relation("BookingQuotations")
+  quotationInvitations VendorQuotationInvitation[]
 
   @@index([bookingNumber])
   @@index([leadId])
@@ -566,6 +568,7 @@ model User {
   vendorOperatorAvailability      VendorOperatorAvailability?
   vendorAvailabilityEvents        VendorAvailabilityEvent[]
   updatedVendorEnquiryPreferences VendorEnquiryPreference[]   @relation("VendorEnquiryPreferenceUpdatedBy")
+  sentQuotationInvitations        VendorQuotationInvitation[] @relation("VendorQuotationInvitationSender")
 
   @@index([mobile])
   @@index([email])
@@ -976,6 +979,32 @@ model VendorEnquiryPreference {
 
   @@index([acceptingQuotationEnquiries])
   @@index([pausedUntil])
+}
+
+/// A staff-controlled RFQ invitation. Eligibility may be calculated
+/// automatically, but a vendor only sees the enquiry after this record exists.
+model VendorQuotationInvitation {
+  id              String    @id @default(cuid())
+  bookingId       String
+  vendorId        String
+  invitedByUserId String?
+  status          String    @default("INVITED")
+  invitedAt       DateTime  @default(now())
+  expiresAt       DateTime
+  viewedAt        DateTime?
+  respondedAt     DateTime?
+  declinedAt      DateTime?
+  declineReason   String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  booking         Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  vendor          Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  invitedBy       User?     @relation("VendorQuotationInvitationSender", fields: [invitedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([bookingId, vendorId])
+  @@index([vendorId, status, expiresAt])
+  @@index([bookingId, status])
+  @@index([invitedByUserId])
 }
 
 model VendorAvailabilityEvent {

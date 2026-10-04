@@ -6,6 +6,7 @@ const accounts = await readFile("lib/vendor-portal-accounts.ts", "utf8");
 const accountRoute = await readFile("app/api/admin/vendors/[vendorId]/portal-users/route.ts", "utf8");
 const opportunities = await readFile("lib/vendor-opportunities.ts", "utf8");
 const quoteRoute = await readFile("app/api/vendor/opportunities/[bookingId]/quotation/route.ts", "utf8");
+const declineRoute = await readFile("app/api/vendor/opportunities/[bookingId]/decline/route.ts", "utf8");
 const dashboard = await readFile("components/vendor/vendor-portal-dashboard.tsx", "utf8");
 const admin = await readFile("components/admin/vendor-operations-admin.tsx", "utf8");
 const login = await readFile("components/vendor/vendor-login.tsx", "utf8");
@@ -60,8 +61,9 @@ test("enquiry queue is scoped by active services coverage and linked vendor", ()
   assert.match(opportunities, /anonymousRequirement/);
   assert.match(opportunities, /inventoryJson: true/);
   assert.match(opportunities, /requirementsJson: true/);
-  assert.match(opportunities, /const receivesNew =/);
-  assert.match(opportunities, /booking\.quotations\.length > 0 \|\| \(receivesNew/);
+  assert.match(opportunities, /quotationInvitations: \{ some:/);
+  assert.match(opportunities, /booking\.quotationInvitations\.length > 0/);
+  assert.match(opportunities, /status: "VIEWED"/);
   assert.doesNotMatch(opportunities, /customerMobile: true/);
   assert.doesNotMatch(opportunities, /customerName: true/);
   assert.doesNotMatch(opportunities, /customerEmail: true/);
@@ -83,4 +85,8 @@ test("quotation identity fields are forced from authenticated vendor opportunity
   assert.match(opportunities, /reviseVendorOpportunityQuotation/);
   assert.match(opportunities, /status: \{ in: \[QuotationStatus\.DRAFT, QuotationStatus\.SUBMITTED, QuotationStatus\.REVISED\] \}/);
   assert.match(opportunities, /markRevised/);
+  assert.match(opportunities, /status: "RESPONDED"/);
+  assert.match(declineRoute, /authorizeVendorPortal/);
+  assert.match(opportunities, /declineVendorOpportunity/);
+  assert.match(dashboard, /Confirm decline/);
 });

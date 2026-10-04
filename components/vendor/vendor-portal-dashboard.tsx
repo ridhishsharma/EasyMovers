@@ -70,6 +70,8 @@ export function VendorPortalDashboard({ supabaseUrl, publishableKey }: { supabas
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [viewing, setViewing] = useState<Opportunity | null>(null);
   const [quoting, setQuoting] = useState<Opportunity | null>(null);
+  const [declining, setDeclining] = useState<Opportunity | null>(null);
+  const [declineReason, setDeclineReason] = useState("");
   const emptyQuote = { transportationCost: "", packingCost: "0", unpackingCost: "0", labourCost: "0", insuranceCost: "0", otherCost: "0", discountAmount: "0", taxAmount: "0", validUntil: "", remarks: "" };
   const [quote, setQuote] = useState(emptyQuote);
   const [quotationFilter, setQuotationFilter] = useState<"ALL" | "IN_PROGRESS" | "ACCEPTED" | "NOT_ACCEPTED">("ALL");
@@ -168,6 +170,19 @@ export function VendorPortalDashboard({ supabaseUrl, publishableKey }: { supabas
     finally { setBusy(false); }
   }
 
+  async function declineInvitation(event: React.FormEvent) {
+    event.preventDefault();
+    if (!declining) return;
+    setBusy(true); setMessage("");
+    try {
+      const response = await request(`/api/vendor/opportunities/${declining.id}/decline`, { method: "POST", body: JSON.stringify({ reason: declineReason }) });
+      const payload = await response.json();
+      if (!response.ok || !payload.success) throw new Error(payload.error?.message || "The invitation could not be declined.");
+      setMessage(`Quotation invitation ${declining.bookingNumber} declined.`); setDeclining(null); setDeclineReason(""); await load();
+    } catch (error) { setMessage((error as Error).message); }
+    finally { setBusy(false); }
+  }
+
   function prepareQuotation(item: Opportunity) {
     const current = item.myQuotation;
     setQuote(current ? {
@@ -253,9 +268,10 @@ export function VendorPortalDashboard({ supabaseUrl, publishableKey }: { supabas
         <span>{item.bookingNumber}</span><h3>{item.serviceType.replaceAll("_", " ")}</h3>
         <p>{item.pickupCity}, {item.pickupState} → {item.dropCity}, {item.dropState}</p>
         <small>Move date: {new Date(item.moveDate).toLocaleDateString("en-IN")}</small>
-        <div className={styles.cardActions}><button className={styles.secondaryButton} onClick={() => setViewing(item)}>View requirements</button><button onClick={() => prepareQuotation(item)}>Prepare quotation</button></div>
+        <div className={styles.cardActions}><button className={styles.secondaryButton} onClick={() => setViewing(item)}>View requirements</button><button className={styles.secondaryButton} onClick={() => setDeclining(item)}>Decline</button><button onClick={() => prepareQuotation(item)}>Prepare quotation</button></div>
       </article>)}</div> : <p className={styles.empty}>No eligible quotation enquiries are currently available for this vendor&apos;s active services and coverage.</p>}
     </section>}
+    {declining && <form className={styles.quoteForm} onSubmit={declineInvitation}><div className={styles.sectionTitle}><div><p className={styles.eyebrow}>DECLINE QUOTATION INVITATION</p><h2>{declining.bookingNumber}</h2></div><button type="button" className={styles.close} onClick={() => { setDeclining(null); setDeclineReason(""); }}>Close</button></div><label>Reason<textarea required minLength={3} maxLength={500} value={declineReason} onChange={event => setDeclineReason(event.target.value)} placeholder="For example: unavailable on the moving date or route outside current capacity"/></label><button disabled={busy || declineReason.trim().length < 3}>{busy ? "Saving…" : "Confirm decline"}</button></form>}
     {data.capabilities.quotationEnquiries && <section className={styles.opportunities}>
       <div className={styles.sectionTitle}><div><p className={styles.eyebrow}>YOUR COMMERCIAL RESPONSES</p><h2>Submitted quotations</h2></div><strong>{submittedQuotations.length} visible</strong></div>
       {submittedQuotations.length ? <div className={styles.opportunityGrid}>{submittedQuotations.map(item => <article key={item.id}>
