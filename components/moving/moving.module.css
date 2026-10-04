@@ -293,6 +293,19 @@
   border-radius: 8px;
   cursor: pointer;
 }
+.itemEntry {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 132px;
+  align-items: stretch;
+  gap: 10px;
+  margin: 10px 0;
+}
+.itemEntry .addItem {
+  min-height: 58px;
+  white-space: nowrap;
+  align-self: stretch;
+}
+.submittedActions { margin-top: 20px; display: grid; gap: 10px; justify-items: start; }
 .progress {
   display: flex;
   gap: 8px;
@@ -459,6 +472,8 @@
   .row {
     grid-template-columns: 1fr;
   }
+  .itemEntry { grid-template-columns: 1fr; }
+  .itemEntry .addItem { width: 100%; min-height: 48px; }
   .card {
     padding: 22px;
   }
@@ -479,4 +494,4 @@
   }
 }
 
-.searchBox{position:relative;width:100%}.suggestions{position:absolute;z-index:20;top:100%;left:0;right:0;margin:6px 0 0;padding:6px;list-style:none;background:white;color:#12365b;border:1px solid #cbdcec;border-radius:12px;box-shadow:0 12px 30px #12365b22;max-height:300px;overflow:auto}.suggestions button{display:block;width:100%;text-align:left;background:white;border:0;border-radius:7px;padding:12px;color:inherit;font:inherit;cursor:pointer}.suggestions button:hover,.suggestions [aria-selected=true] button{background:#eaf3fc}.assistance{margin-top:24px;padding:20px;background:#f3f8fd;border:1px solid #d8e6f4;border-radius:14px}.photoList{display:flex;flex-wrap:wrap;gap:12px}.photoList img{width:100px;height:80px;object-fit:cover;border-radius:8px}
+.searchBox{position:relative;width:100%}.suggestions{position:absolute;z-index:20;top:100%;left:0;right:0;margin:6px 0 0;padding:6px;list-style:none;background:white;color:#12365b;border:1px solid #cbdcec;border-radius:12px;box-shadow:0 12px 30px #12365b22;max-height:300px;overflow:auto}.suggestions button{display:block;width:100%;text-align:left;background:white;border:0;border-radius:7px;padding:12px;color:inherit;font:inherit;cursor:pointer}.suggestions button:hover,.suggestions [aria-selected=true] button{background:#eaf3fc}.assistance{margin-top:24px;padding:20px;background:#f3f8fd;border:1px solid #d8e6f4;border-radius:14px}.photoUpload{display:inline-flex;align-items:center;justify-content:center;margin:8px 0 14px;padding:12px 16px;border:1px solid #1471c8;border-radius:9px;background:white;color:#0d5aa4;font-weight:700;cursor:pointer}.photoUpload:has(input:disabled){opacity:.55;cursor:not-allowed}.photoUpload input{position:absolute;width:1px;height:1px;opacity:0}.photoList{display:flex;flex-wrap:wrap;gap:12px}.photoList img{width:116px;height:88px;object-fit:cover;border-radius:8px;border:1px solid #d8e6f4}

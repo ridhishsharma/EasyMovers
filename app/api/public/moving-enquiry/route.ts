@@ -277,8 +277,36 @@ export async function PATCH(req: Request) {
         400,
       );
     const submit = data.action === "SUBMIT";
-    if (!["SAVE", "SUBMIT"].includes(data.action))
+    const reopen = data.action === "REOPEN";
+    if (!["SAVE", "SUBMIT", "REOPEN"].includes(data.action))
       return reply({ success: false, message: "Choose save or submit." }, 400);
+    if (reopen) {
+      const result = await prisma.$transaction(async (tx) => {
+        const lead = await tx.lead.findUnique({
+          where: { id: session.id, referenceId: reference },
+          select: { status: true, notes: true, quotations: { select: { id: true }, take: 1 }, inventory: { select: { id: true, status: true, updatedAt: true } } },
+        });
+        if (!lead?.inventory) throw Error("DRAFT_UNAVAILABLE");
+        if (lead.status !== "QUOTATION_REQUESTED" || lead.inventory.status === "DRAFT")
+          throw Error("REOPEN_NOT_ALLOWED");
+        if (lead.quotations.length) throw Error("QUOTATION_EXISTS");
+        if (lead.inventory.updatedAt.getTime() !== new Date(version).getTime())
+          throw Error("DRAFT_CONFLICT");
+        let previous: Record<string, unknown> = {};
+        try { previous = JSON.parse(lead.notes || "{}"); } catch {}
+        const inventory = await tx.inventory.update({
+          where: { id: lead.inventory.id },
+          data: { status: "DRAFT", completionPercentage: 0 },
+          select: { updatedAt: true },
+        });
+        await tx.lead.update({
+          where: { id: session.id },
+          data: { status: "INVENTORY_PENDING", notes: JSON.stringify({ ...previous, stage: "DRAFT", reopenedAt: new Date().toISOString() }) },
+        });
+        return { reference, version: inventory.updatedAt.toISOString(), status: "DRAFT" };
+      });
+      return reply({ success: true, ...result });
+    }
     let fields;
     let extras;
     let items: {
@@ -334,7 +362,10 @@ export async function PATCH(req: Request) {
         parking: text(data, "parking", 250),
         specialItems: text(data, "specialItems", 500),
         additionalServices: text(data, "additionalServices", 500),
+        surveyPreference: text(data, "surveyPreference", 30) || "VENDOR_DECIDES",
       };
+      if (!["VENDOR_DECIDES", "REQUESTED"].includes(extras.surveyPreference))
+        throw Error("Choose a valid survey preference.");
       if (submit && (!extras.pickupAddress || !extras.destinationAddress))
         throw Error("Enter both full addresses before submitting.");
       if (!Array.isArray(data.items) || data.items.length > 100)
@@ -470,6 +501,10 @@ export async function PATCH(req: Request) {
       );
     if (error instanceof Error && error.message === "DRAFT_UNAVAILABLE")
       return reply({ success: false, message: "Draft unavailable." }, 404);
+    if (error instanceof Error && error.message === "QUOTATION_EXISTS")
+      return reply({ success: false, message: "A vendor quotation already exists. Request assistance or a survey instead of changing the priced inventory." }, 409);
+    if (error instanceof Error && error.message === "REOPEN_NOT_ALLOWED")
+      return reply({ success: false, message: "This request can no longer be reopened directly." }, 409);
     return reply(
       {
         success: false,

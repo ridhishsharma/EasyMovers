@@ -30,6 +30,7 @@ const empty = {
   packingRequired: "",
   specialItems: "",
   additionalServices: "",
+  surveyPreference: "VENDOR_DECIDES",
 };
 const requestStages:Record<string,string> = {NEW:"Awaiting review",CONTACTED:"Team contacted you",QUALIFIED:"Requirements reviewed",INVENTORY_PENDING:"Inventory needed",QUOTATION_REQUESTED:"Quotation requested",QUOTATION_RECEIVED:"Quotation ready",BOOKING_CREATED:"Booking created",CONVERTED:"Booking confirmed",LOST:"Enquiry closed",CLOSED:"Closed"};
 
@@ -169,6 +170,33 @@ export function DraftEditor({ reference }: { reference: string }) {
       lock.current = false;
     }
   }
+  async function reopenForEditing() {
+    if (lock.current || !locked) return;
+    lock.current = true;
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/public/moving-enquiry", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reference, version, action: "REOPEN" }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success)
+        throw Error(data.message || "Unable to reopen this request.");
+      setVersion(data.version);
+      setLocked(false);
+      setStep(0);
+      setRoute((previous) => ({ ...previous, status: "INVENTORY_PENDING" }));
+      setNotice("Your request is editable again. Update it and request fresh quotations when ready.");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to reopen this request.");
+    } finally {
+      setBusy(false);
+      lock.current = false;
+    }
+  }
   const date = new Date().toLocaleDateString("en-CA", {
     timeZone: "Asia/Kolkata",
   });
@@ -241,7 +269,7 @@ export function DraftEditor({ reference }: { reference: string }) {
                         Add furniture, appliances, boxes or vehicles. Include
                         fragile and special items.
                       </p>
-                      <div className={styles.item}><SearchSuggestions label="Search moving items, e.g. sofa" value={itemQuery} options={[...new Set([...Object.values(inventoryMaster).flat().map(item=>item.name), "Double Bed", "Moving Box", "Suitcase"])]} onChange={setItemQuery} onSelect={setItemQuery}/><button type="button" className={styles.secondary} disabled={locked||items.length>=100||!itemQuery.trim()} onClick={()=>{setItems(previous=>[...previous,{itemName:itemQuery.trim(),quantity:1,category:Object.entries(inventoryMaster).find(([,list])=>list.some(item=>item.name===itemQuery))?.[0]||"OTHER",fragile:false,requiresPacking:true}]);setItemQuery("");dirty.current=true}}>+ Add item</button></div><p className={styles.muted}>Choose a suggestion or enter a custom item, then add it to your list below.</p>
+                      <div className={styles.itemEntry}><SearchSuggestions label="Search moving items, e.g. sofa" value={itemQuery} options={[...new Set([...Object.values(inventoryMaster).flat().map(item=>item.name), "Double Bed", "Moving Box", "Suitcase"])]} onChange={setItemQuery} onSelect={setItemQuery}/><button type="button" className={`${styles.secondary} ${styles.addItem}`} disabled={locked||items.length>=100||!itemQuery.trim()} onClick={()=>{setItems(previous=>[...previous,{itemName:itemQuery.trim(),quantity:1,category:Object.entries(inventoryMaster).find(([,list])=>list.some(item=>item.name===itemQuery))?.[0]||"OTHER",fragile:false,requiresPacking:true}]);setItemQuery("");dirty.current=true}}>+ Add item</button></div><p className={styles.muted}>Choose a suggestion or enter a custom item, then add it to your list below.</p>
                       {items.map((item, index) => (
                         <div
                           key={index}
@@ -501,6 +529,17 @@ export function DraftEditor({ reference }: { reference: string }) {
                           }
                         />
                       </label>
+                      <label className={styles.field}>
+                        Pre-move survey
+                        <select
+                          value={fields.surveyPreference}
+                          onChange={(e) => update("surveyPreference", e.target.value)}
+                        >
+                          <option value="VENDOR_DECIDES">Let the vendor recommend if a survey is needed</option>
+                          <option value="REQUESTED">I want a survey before the final quotation</option>
+                        </select>
+                      </label>
+                      <p className={styles.muted}>A survey is recommended for large homes, offices, fragile items or difficult access. It does not confirm a booking.</p>
                     </div>
                   )}
                   {step === 2 && (
@@ -550,6 +589,8 @@ export function DraftEditor({ reference }: { reference: string }) {
                         <dd>{fields.specialItems || "None specified"}</dd>
                         <dt>Extra services</dt>
                         <dd>{fields.additionalServices || "None specified"}</dd>
+                        <dt>Survey</dt>
+                        <dd>{fields.surveyPreference === "REQUESTED" ? "Requested before final quotation" : "Vendor may recommend after reviewing the move"}</dd>
                       </dl>
                       <p className={styles.muted}>
                         This requests a quotation. Your booking is confirmed
@@ -588,6 +629,14 @@ export function DraftEditor({ reference }: { reference: string }) {
                         Request quotation →
                       </button>
                     )}
+                  </div>
+                )}
+                {locked && route.status === "QUOTATION_REQUESTED" && (
+                  <div className={styles.submittedActions}>
+                    <button type="button" className={styles.secondary} disabled={busy} onClick={() => void reopenForEditing()}>
+                      {busy ? "Checking…" : "Edit request before quotation"}
+                    </button>
+                    <p className={styles.muted}>Editing is allowed only until a vendor submits a quotation. After that, request assistance or a survey so vendors can price the change fairly.</p>
                   </div>
                 )}
               </>
