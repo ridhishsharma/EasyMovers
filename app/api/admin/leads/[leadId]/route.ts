@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { authorizeCrmPermission, CRM_PERMISSIONS } from "@/lib/crm-authorization";
 import { prisma } from "@/lib/prisma";
+import { canonicalState, postalLocationCandidates } from "@/lib/india-location-catalog";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -100,5 +101,43 @@ export async function GET(request: Request, context: { params: Promise<{ leadId:
     const reference = crypto.randomUUID();
     console.error(`[CRM_LEAD_DETAIL_UNAVAILABLE:${reference}]`, error);
     return reply({ success: false, error: { code: "CRM_LEAD_DETAIL_UNAVAILABLE", message: `Lead details are temporarily unavailable. Reference: ${reference}` } }, 503);
+  }
+}
+
+const normalized = (value: string) => value.trim().toLowerCase().replace(/\s+/g, " ");
+
+export async function PATCH(request: Request, context: { params: Promise<{ leadId: string }> }) {
+  const access = await authorizeCrmPermission(request, CRM_PERMISSIONS.LEAD_ASSIGN);
+  if (!access.authorized) return reply({ success: false, error: { code: access.code, message: access.message } }, access.status);
+  try {
+    const { leadId } = await context.params;
+    const body = await request.json() as Record<string, unknown>;
+    const pickupPincode = typeof body.pickupPincode === "string" ? body.pickupPincode.trim() : "";
+    const destinationPincode = typeof body.destinationPincode === "string" ? body.destinationPincode.trim() : "";
+    if (!/^[1-9]\d{5}$/.test(pickupPincode) || !/^[1-9]\d{5}$/.test(destinationPincode)) return reply({ success: false, error: { code: "INVALID_RFQ_PIN_CODES", message: "Enter valid six-digit pickup and destination PIN codes." } }, 400);
+    const lead = await prisma.lead.findUnique({ where: { id: leadId }, select: { id: true, pickupCity: true, pickupState: true, destinationCity: true, destinationState: true, notes: true, _count: { select: { bookings: true, quotations: true } } } });
+    if (!lead) return reply({ success: false, error: { code: "LEAD_NOT_FOUND", message: "Lead not found." } }, 404);
+    if (lead._count.bookings || lead._count.quotations) return reply({ success: false, error: { code: "RFQ_ADDRESS_LOCKED", message: "The RFQ address cannot be changed after a booking or quotation exists." } }, 409);
+    const [pickupCandidates, destinationCandidates] = await Promise.all([postalLocationCandidates(pickupPincode), postalLocationCandidates(destinationPincode)]);
+    const matches = (candidates: Awaited<ReturnType<typeof postalLocationCandidates>>, city: string | null, state: string | null) => {
+      const canonical = canonicalState(state);
+      return Boolean(city && canonical && candidates.some(candidate => candidate.stateCode === canonical.code && normalized(candidate.city) === normalized(city)));
+    };
+    if (!matches(pickupCandidates, lead.pickupCity, lead.pickupState)) return reply({ success: false, error: { code: "PICKUP_PIN_MISMATCH", message: `Pickup PIN does not match ${lead.pickupCity || "the pickup city"}, ${lead.pickupState || "the pickup state"}.` } }, 400);
+    if (!matches(destinationCandidates, lead.destinationCity, lead.destinationState)) return reply({ success: false, error: { code: "DESTINATION_PIN_MISMATCH", message: `Destination PIN does not match ${lead.destinationCity || "the destination city"}, ${lead.destinationState || "the destination state"}.` } }, 400);
+    const notes = readNotes(lead.notes);
+    const pickupAddress = typeof body.pickupAddress === "string" ? body.pickupAddress.trim().slice(0, 300) : "";
+    const destinationAddress = typeof body.destinationAddress === "string" ? body.destinationAddress.trim().slice(0, 300) : "";
+    const updated = await prisma.$transaction(async tx => {
+      const record = await tx.lead.update({ where: { id: lead.id }, data: { pickupPincode, destinationPincode, notes: JSON.stringify({ ...notes, ...(pickupAddress ? { pickupAddress } : {}), ...(destinationAddress ? { destinationAddress } : {}), rfqAddressCompletedAt: new Date().toISOString() }), lastUpdatedAt: new Date() }, select: { pickupPincode: true, destinationPincode: true } });
+      await tx.crmAuditLog.create({ data: { actorUserId: access.userId, action: "LEAD_RFQ_ADDRESS_COMPLETED", entityType: "Lead", entityId: lead.id, metadata: { pickupPincode, destinationPincode } } });
+      return record;
+    });
+    return reply({ success: true, data: updated, message: "RFQ address verified and saved." });
+  } catch (error) {
+    if (error instanceof SyntaxError) return reply({ success: false, error: { code: "INVALID_JSON", message: "Provide valid RFQ address details." } }, 400);
+    if (error instanceof Error && ["INVALID_POSTAL_CODE", "POSTAL_CODE_NOT_FOUND"].includes(error.message)) return reply({ success: false, error: { code: error.message, message: "One or both PIN codes could not be verified." } }, 400);
+    const reference = crypto.randomUUID(); console.error(`[CRM_LEAD_ADDRESS_UPDATE_FAILED:${reference}]`, error);
+    return reply({ success: false, error: { code: "CRM_LEAD_ADDRESS_UPDATE_FAILED", message: `Unable to save RFQ address. Reference: ${reference}` } }, 503);
   }
 }
