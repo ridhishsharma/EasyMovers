@@ -138,9 +138,13 @@ export async function listVendorOpportunities(vendorId: string) {
       },
     },
   });
+  // Eligibility is validated when CRM staff creates the durable invitation.
+  // Do not hide an already-issued invitation by recalculating service and area
+  // eligibility from a booking that may use a different legacy service code.
+  // The query above remains restricted to the authenticated vendor, a live
+  // invitation, and an open quotation booking.
   const visible = bookings.filter(booking =>
-    booking.quotations.length > 0 ||
-    (booking.quotationInvitations.length > 0 && matchesService(booking.serviceType, vendor.serviceOfferings) && matchesArea(booking, vendor.serviceAreas)),
+    booking.quotations.length > 0 || booking.quotationInvitations.length > 0,
   );
   const newlyViewed = visible.flatMap(booking => booking.quotationInvitations.filter(invitation => invitation.status === "INVITED").map(invitation => invitation.id));
   if (newlyViewed.length) await prisma.vendorQuotationInvitation.updateMany({ where: { id: { in: newlyViewed }, vendorId, status: "INVITED" }, data: { status: "VIEWED", viewedAt: new Date() } });
