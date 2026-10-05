@@ -578,6 +578,87 @@ test("OTP resume rejects unverified phone before querying draft", async () => {
   assert.equal((await route.POST(req)).status, 401);
   assert.equal(reads, 0);
 });
+test("staging test OTP is origin-bound, allowlisted and creates the existing private session", async () => {
+  let query;
+  const h = harness({
+    lead: {
+      findFirst: async (input) => {
+        query = input;
+        return { id: "lead-a", referenceId: reference };
+      },
+    },
+  });
+  Object.assign(h.env, {
+    ENABLE_CUSTOMER_TEST_OTP: "true",
+    CUSTOMER_TEST_OTP_ALLOWED_ORIGIN: "https://staging.easymovers.in",
+    CUSTOMER_TEST_OTP_PHONES: "919000091301",
+    CUSTOMER_TEST_OTP: "123456",
+    APP_ALLOWED_ORIGINS: "https://staging.easymovers.in",
+  });
+  const route = h.load("app/api/public/customer-test-otp/route.ts");
+  const start = await route.POST(
+    request("POST", {
+      action: "REQUEST",
+      reference,
+      mobile: "9000091301",
+    }),
+  );
+  assert.equal(start.status, 200);
+  assert.equal(query, undefined);
+
+  const wrong = await route.POST(
+    request("POST", {
+      action: "VERIFY",
+      reference,
+      mobile: "9000091301",
+      code: "111111",
+    }),
+  );
+  assert.equal(wrong.status, 401);
+  assert.equal(query, undefined);
+
+  const verified = await route.POST(
+    request("POST", {
+      action: "VERIFY",
+      reference,
+      mobile: "9000091301",
+      code: "123456",
+    }),
+  );
+  assert.equal(verified.status, 200);
+  assert.equal(query.where.referenceId, reference);
+  assert.equal(query.where.mobile, "9000091301");
+  assert.match(verified.headers.get("set-cookie"), /HttpOnly/);
+  assert.match(verified.headers.get("set-cookie"), /Secure/);
+});
+test("staging test OTP fails closed outside its exact configured origin", async () => {
+  let reads = 0;
+  const h = harness({
+    lead: {
+      findFirst: () => {
+        reads += 1;
+      },
+    },
+  });
+  Object.assign(h.env, {
+    ENABLE_CUSTOMER_TEST_OTP: "true",
+    CUSTOMER_TEST_OTP_ALLOWED_ORIGIN: "https://www.easymovers.in",
+    CUSTOMER_TEST_OTP_PHONES: "919000091301",
+    CUSTOMER_TEST_OTP: "123456",
+    APP_ALLOWED_ORIGINS: "https://staging.easymovers.in",
+  });
+  const route = h.load("app/api/public/customer-test-otp/route.ts");
+  const response = await route.POST(
+    request("POST", {
+      action: "VERIFY",
+      reference,
+      mobile: "9000091301",
+      code: "123456",
+    }),
+  );
+  assert.equal(response.status, 503);
+  assert.equal(reads, 0);
+});
 test("legacy inventory endpoint does not expose a new draft by reference alone", async () => {
   const h = harness({}, undefined, { authenticated: false });
   const route = h.load("app/api/inventory/route.ts");

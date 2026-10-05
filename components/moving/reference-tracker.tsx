@@ -9,11 +9,13 @@ export function ReferenceTracker({
   supabaseUrl,
   publishableKey,
   phoneOtpEnabled,
+  testOtpEnabled,
 }: {
   initialReference: string;
   supabaseUrl: string;
   publishableKey: string;
   phoneOtpEnabled: boolean;
+  testOtpEnabled: boolean;
 }) {
   const router = useRouter();
   const client = useMemo(
@@ -71,7 +73,7 @@ export function ReferenceTracker({
     }
   }
   async function sendCode() {
-    if (!client || !phoneOtpEnabled || lock.current) return;
+    if (lock.current) return;
     if (!/^[6-9]\d{9}$/.test(mobile)) {
       setError("Enter your 10-digit registered mobile.");
       return;
@@ -80,15 +82,39 @@ export function ReferenceTracker({
     setBusy(true);
     setError("");
     try {
-      const { error } = await client.auth.signInWithOtp({
-        phone: `+91${mobile}`,
-      });
-      if (error) throw error;
+      if (phoneOtpEnabled && client) {
+        const { error } = await client.auth.signInWithOtp({
+          phone: `+91${mobile}`,
+        });
+        if (error) throw error;
+      } else if (testOtpEnabled) {
+        const response = await fetch("/api/public/customer-test-otp", {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "REQUEST",
+            reference: reference.trim(),
+            mobile,
+          }),
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success)
+          throw Error(result.message || "Staging verification is unavailable.");
+      } else {
+        throw Error("Mobile verification is not enabled.");
+      }
       setSent(true);
-      setNotice("Enter the verification code sent to your mobile.");
-    } catch {
+      setNotice(
+        phoneOtpEnabled && client
+          ? "Enter the verification code sent to your mobile."
+          : "Staging test: enter the configured verification code.",
+      );
+    } catch (reason) {
       setError(
-        "Could not send a code. Please try again later or contact the move coordinator.",
+        reason instanceof Error
+          ? reason.message
+          : "Could not start mobile verification.",
       );
     } finally {
       setBusy(false);
@@ -96,7 +122,7 @@ export function ReferenceTracker({
     }
   }
   async function confirm() {
-    if (!client || lock.current) return;
+    if (lock.current) return;
     if (!/^\d{6}$/.test(code)) {
       setError("Enter the six-digit verification code.");
       return;
@@ -105,20 +131,38 @@ export function ReferenceTracker({
     setBusy(true);
     setError("");
     try {
-      const { data, error } = await client.auth.verifyOtp({
-        phone: `+91${mobile}`,
-        token: code,
-        type: "sms",
-      });
-      if (error || !data.session) throw Error("Check the code and try again.");
-      const response = await fetch("/api/public/draft-resume", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${data.session.access_token}`,
-        },
-        body: JSON.stringify({ reference: reference.trim() }),
-      });
+      let response: Response;
+      if (phoneOtpEnabled && client) {
+        const { data, error } = await client.auth.verifyOtp({
+          phone: `+91${mobile}`,
+          token: code,
+          type: "sms",
+        });
+        if (error || !data.session) throw Error("Check the code and try again.");
+        response = await fetch("/api/public/draft-resume", {
+          method: "POST",
+          cache: "no-store",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${data.session.access_token}`,
+          },
+          body: JSON.stringify({ reference: reference.trim() }),
+        });
+      } else if (testOtpEnabled) {
+        response = await fetch("/api/public/customer-test-otp", {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "VERIFY",
+            reference: reference.trim(),
+            mobile,
+            code,
+          }),
+        });
+      } else {
+        throw Error("Mobile verification is not enabled.");
+      }
       const result = await response.json();
       if (!response.ok || !result.success)
         throw Error(result.message || "Unable to reopen draft.");
@@ -197,7 +241,7 @@ export function ReferenceTracker({
               </form>
               {verify && (
                 <div className={styles.otp}>
-                  {!phoneOtpEnabled || !client ? (
+                  {!((phoneOtpEnabled && client) || testOtpEnabled) ? (
                     <p className={styles.muted}>
                       Mobile verification is not enabled yet. Reopen this draft
                       on the device where you saved it, or contact your move
