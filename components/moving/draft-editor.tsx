@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { SearchSuggestions } from "./search-suggestions";
 import { inventoryMaster } from "@/lib/inventory-master";
 import { DraftAssistance } from "./draft-assistance";
+import { CustomerSessionExit } from "./customer-session-exit";
 import styles from "./moving.module.css";
 type Item = {
   itemName: string;
@@ -45,6 +46,8 @@ export function DraftEditor({ reference }: { reference: string }) {
     [notice, setNotice] = useState(""),
     [locked, setLocked] = useState(false),
     [verification, setVerification] = useState(false),
+    [confirmSubmit, setConfirmSubmit] = useState(false),
+    [declarations, setDeclarations] = useState([false, false, false]),
     [version, setVersion] = useState("");
   const [route, setRoute] = useState({
     from: "",
@@ -52,6 +55,7 @@ export function DraftEditor({ reference }: { reference: string }) {
     mobile: "",
     mode: "",
     status: "",
+    quotationCount: 0,
   });
   const dirty = useRef(false),
     lock = useRef(false);
@@ -90,6 +94,7 @@ export function DraftEditor({ reference }: { reference: string }) {
           mobile: lead.mobile,
           mode: meta.mode,
           status: lead.status || "NEW",
+          quotationCount: Number(data.quotationCount || 0),
         });
       })
       .catch((reason) => {
@@ -165,33 +170,6 @@ export function DraftEditor({ reference }: { reference: string }) {
       setError(
         reason instanceof Error ? reason.message : "Unable to save draft.",
       );
-    } finally {
-      setBusy(false);
-      lock.current = false;
-    }
-  }
-  async function reopenForEditing() {
-    if (lock.current || !locked) return;
-    lock.current = true;
-    setBusy(true);
-    setError("");
-    setNotice("");
-    try {
-      const response = await fetch("/api/public/moving-enquiry", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reference, version, action: "REOPEN" }),
-      });
-      const data = await response.json();
-      if (!response.ok || !data.success)
-        throw Error(data.message || "Unable to reopen this request.");
-      setVersion(data.version);
-      setLocked(false);
-      setStep(0);
-      setRoute((previous) => ({ ...previous, status: "INVENTORY_PENDING" }));
-      setNotice("Your request is editable again. Update it and request fresh quotations when ready.");
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Unable to reopen this request.");
     } finally {
       setBusy(false);
       lock.current = false;
@@ -624,25 +602,23 @@ export function DraftEditor({ reference }: { reference: string }) {
                         type="button"
                         className={styles.primary}
                         disabled={busy}
-                        onClick={() => save(true)}
+                        onClick={() => setConfirmSubmit(true)}
                       >
                         Request quotation →
                       </button>
                     )}
                   </div>
                 )}
-                {locked && route.status === "QUOTATION_REQUESTED" && (
+                {locked && route.quotationCount === 0 && (
                   <div className={styles.submittedActions}>
-                    <button type="button" className={styles.secondary} disabled={busy} onClick={() => void reopenForEditing()}>
-                      {busy ? "Checking…" : "Edit request before quotation"}
-                    </button>
-                    <p className={styles.muted}>Editing is allowed only until a vendor submits a quotation. After that, request assistance or a survey so vendors can price the change fairly.</p>
+                    <strong>Waiting for vendor quotations</strong>
+                    <p className={styles.muted}>Your submitted requirement is frozen for fair vendor pricing. Request assistance if an inventory, address, date or service detail has materially changed.</p>
                   </div>
                 )}
-                {locked && ["QUOTATION_RECEIVED", "BOOKING_CREATED", "CONVERTED"].includes(route.status) && (
+                {locked && route.quotationCount > 0 && (
                   <div className={styles.submittedActions}>
                     <Link className={styles.primary} href={`/quotes/${encodeURIComponent(reference)}`}>Compare vendor quotations →</Link>
-                    <p className={styles.muted}>Review the EM Safe Move recommendation or compare every eligible quotation yourself.</p>
+                    <p className={styles.muted}>{route.quotationCount} quotation{route.quotationCount === 1 ? "" : "s"} received. Review the EM Safe Move recommendation or compare every eligible quotation yourself.</p>
                   </div>
                 )}
               </>
@@ -691,6 +667,7 @@ export function DraftEditor({ reference }: { reference: string }) {
             >
               Track / resume move
             </Link>
+            <CustomerSessionExit reference={reference} />
             {locked && <p className={styles.muted}>Latest request stage: {requestStages[route.status] || "Submitted"}</p>}
           <h3>Your route</h3>
             <p className={styles.muted}>
@@ -705,6 +682,60 @@ export function DraftEditor({ reference }: { reference: string }) {
           </aside>
         </div>
       </div>
+      {confirmSubmit && (
+        <div className={styles.modalBackdrop} role="presentation">
+          <section
+            className={styles.mapDialog}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="final-submit-title"
+          >
+            <div className={styles.dialogTop}>
+              <h3 id="final-submit-title">Confirm quotation request</h3>
+              <button type="button" aria-label="Close" onClick={() => setConfirmSubmit(false)}>×</button>
+            </div>
+            <p className={styles.muted}>
+              After submission, direct editing is locked so every vendor prices the same requirement. Material changes may cancel existing offers and require fresh quotations.
+            </p>
+            <div className={styles.confirmList}>
+              {[
+                "I have declared all known moving items.",
+                "Pickup, destination, floors, lift, parking and moving date are correct.",
+                "I understand that later material changes may require fresh quotations.",
+              ].map((label, index) => (
+                <label key={label}>
+                  <input
+                    type="checkbox"
+                    checked={declarations[index]}
+                    onChange={(event) =>
+                      setDeclarations((current) =>
+                        current.map((value, itemIndex) =>
+                          itemIndex === index ? event.target.checked : value,
+                        ),
+                      )
+                    }
+                  />
+                  <span>{label}</span>
+                </label>
+              ))}
+            </div>
+            <div className={styles.actions}>
+              <button type="button" className={styles.secondary} onClick={() => setConfirmSubmit(false)}>Go back and review</button>
+              <button
+                type="button"
+                className={styles.primary}
+                disabled={busy || declarations.some((value) => !value)}
+                onClick={() => {
+                  setConfirmSubmit(false);
+                  void save(true);
+                }}
+              >
+                Confirm and request quotations
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </main>
   );
 }

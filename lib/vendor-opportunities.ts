@@ -201,8 +201,27 @@ export async function submitVendorOpportunityQuotation(input: {
     ipAddress: input.ipAddress,
     userAgent: input.userAgent,
   });
-  if (result.status >= 200 && result.status < 300)
-    await prisma.vendorQuotationInvitation.updateMany({ where: { bookingId: booking.id, vendorId: input.vendorId, status: { in: ["INVITED", "VIEWED"] } }, data: { status: "RESPONDED", respondedAt: new Date() } });
+  if (result.status >= 200 && result.status < 300) {
+    const respondedAt = new Date();
+    await prisma.$transaction([
+      prisma.vendorQuotationInvitation.updateMany({
+        where: {
+          bookingId: booking.id,
+          vendorId: input.vendorId,
+          status: { in: ["INVITED", "VIEWED"] },
+        },
+        data: { status: "RESPONDED", respondedAt },
+      }),
+      prisma.booking.updateMany({
+        where: { id: booking.id, bookingStatus: "QUOTATION_PENDING" },
+        data: { bookingStatus: "QUOTATION_RECEIVED" },
+      }),
+      prisma.lead.updateMany({
+        where: { id: booking.leadId, status: "QUOTATION_REQUESTED" },
+        data: { status: "QUOTATION_RECEIVED", lastUpdatedAt: respondedAt },
+      }),
+    ]);
+  }
   return result;
 }
 

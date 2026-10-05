@@ -324,6 +324,9 @@
   align-self: stretch;
 }
 .submittedActions { margin-top: 20px; display: grid; gap: 10px; justify-items: start; }
+.confirmList { display: grid; gap: 12px; margin-top: 18px; }
+.confirmList label { display: grid; grid-template-columns: 20px 1fr; gap: 10px; align-items: start; padding: 12px; border: 1px solid #dce5ef; border-radius: 10px; background: #f7fafe; font-size: 13px; line-height: 1.5; }
+.confirmList input { margin-top: 3px; }
 .progress {
   display: flex;
   gap: 8px;

@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 export const DRAFT_SECONDS = 30 * 24 * 60 * 60;
-export const CUSTOMER_ACCESS_SECONDS = 12 * 60 * 60;
+export const CUSTOMER_ACCESS_SECONDS = 30 * 60;
 export function enquirySecret() {
   const value = process.env.ENQUIRY_SESSION_SECRET;
   if (!value || value.length < 32) throw Error("Draft session unavailable");
@@ -69,6 +69,10 @@ export function customerAccessCookie(
   // Deliberately omit Max-Age and Expires. This is a browser-session cookie,
   // with a short signed-token lifetime as a backstop if a browser restores it.
   return `${draftCookieName(reference)}=${draftToken(id, reference, CUSTOMER_ACCESS_SECONDS)}; HttpOnly; SameSite=Lax; Path=/api${secure ? "; Secure" : ""}`;
+}
+
+export function clearCustomerAccessCookie(reference: string, secure: boolean) {
+  return `${draftCookieName(reference)}=; HttpOnly; SameSite=Lax; Path=/api; Max-Age=0${secure ? "; Secure" : ""}`;
 }
 
 function normalizedOrigin(value: string | null | undefined) {

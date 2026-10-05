@@ -39,6 +39,7 @@ const draftLeadSelect = {
   notes: true,
   lastUpdatedAt: true,
   status: true,
+  quotations: { select: { status: true } },
 } as const;
 function text(data: Record<string, unknown>, key: string, max = 300) {
   const value = data[key] ?? "";
@@ -242,8 +243,17 @@ export async function GET(req: Request) {
     } catch {
       metadata = {};
     }
-    const { id, notes, ...safeLead } = lead;
-    return reply({ success: true, lead: safeLead, metadata, inventory });
+    const quotationCount = lead.quotations.filter((quotation) =>
+      ["SUBMITTED", "REVISED", "SHORTLISTED"].includes(quotation.status),
+    ).length;
+    const { id, notes, quotations, ...safeLead } = lead;
+    return reply({
+      success: true,
+      lead: safeLead,
+      metadata,
+      inventory,
+      quotationCount,
+    });
   } catch {
     return reply(
       { success: false, message: "Unable to load your draft." },
@@ -277,36 +287,17 @@ export async function PATCH(req: Request) {
         400,
       );
     const submit = data.action === "SUBMIT";
-    const reopen = data.action === "REOPEN";
-    if (!["SAVE", "SUBMIT", "REOPEN"].includes(data.action))
+    if (data.action === "REOPEN")
+      return reply(
+        {
+          success: false,
+          message:
+            "Submitted requirements are frozen. Request assistance if something material has changed.",
+        },
+        409,
+      );
+    if (!["SAVE", "SUBMIT"].includes(data.action))
       return reply({ success: false, message: "Choose save or submit." }, 400);
-    if (reopen) {
-      const result = await prisma.$transaction(async (tx) => {
-        const lead = await tx.lead.findUnique({
-          where: { id: session.id, referenceId: reference },
-          select: { status: true, notes: true, quotations: { select: { id: true }, take: 1 }, inventory: { select: { id: true, status: true, updatedAt: true } } },
-        });
-        if (!lead?.inventory) throw Error("DRAFT_UNAVAILABLE");
-        if (lead.status !== "QUOTATION_REQUESTED" || lead.inventory.status === "DRAFT")
-          throw Error("REOPEN_NOT_ALLOWED");
-        if (lead.quotations.length) throw Error("QUOTATION_EXISTS");
-        if (lead.inventory.updatedAt.getTime() !== new Date(version).getTime())
-          throw Error("DRAFT_CONFLICT");
-        let previous: Record<string, unknown> = {};
-        try { previous = JSON.parse(lead.notes || "{}"); } catch {}
-        const inventory = await tx.inventory.update({
-          where: { id: lead.inventory.id },
-          data: { status: "DRAFT", completionPercentage: 0 },
-          select: { updatedAt: true },
-        });
-        await tx.lead.update({
-          where: { id: session.id },
-          data: { status: "INVENTORY_PENDING", notes: JSON.stringify({ ...previous, stage: "DRAFT", reopenedAt: new Date().toISOString() }) },
-        });
-        return { reference, version: inventory.updatedAt.toISOString(), status: "DRAFT" };
-      });
-      return reply({ success: true, ...result });
-    }
     let fields;
     let extras;
     let items: {

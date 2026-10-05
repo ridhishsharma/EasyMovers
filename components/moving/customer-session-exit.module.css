@@ -1,0 +1,16 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 8px 13px;
+  border: 1px solid #b9cad9;
+  border-radius: 8px;
+  background: #fff;
+  color: #174f80;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+}
+.button:disabled { opacity: .55; cursor: wait; }
