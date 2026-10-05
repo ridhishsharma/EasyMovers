@@ -36,12 +36,11 @@ export function customerTestOtpConfig(request: Request): TestOtpConfig | null {
     ["localhost", "127.0.0.1"].includes(allowed.hostname);
   if (!isStaging && !isLocalDevelopment) return null;
 
-  const requestUrl = new URL(request.url);
-  if (
-    requestUrl.origin !== allowed.origin ||
-    request.headers.get("origin") !== allowed.origin
-  )
-    return null;
+  // Railway terminates TLS at its public edge and may forward the request to
+  // Next.js with an internal service URL. The browser Origin header remains
+  // the authoritative public origin and is already protected by checkOrigin
+  // in the route, so do not compare it with the proxy-rewritten request URL.
+  if (request.headers.get("origin") !== allowed.origin) return null;
 
   return { allowedOrigin: allowed.origin, code, phones };
 }

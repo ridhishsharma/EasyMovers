@@ -631,6 +631,32 @@ test("staging test OTP is origin-bound, allowlisted and creates the existing pri
   assert.match(verified.headers.get("set-cookie"), /HttpOnly/);
   assert.match(verified.headers.get("set-cookie"), /Secure/);
 });
+test("staging test OTP accepts Railway proxy URLs with the exact public browser origin", async () => {
+  const h = harness();
+  Object.assign(h.env, {
+    ENABLE_CUSTOMER_TEST_OTP: "true",
+    CUSTOMER_TEST_OTP_ALLOWED_ORIGIN: "https://staging.easymovers.in",
+    CUSTOMER_TEST_OTP_PHONES: "919000091301",
+    CUSTOMER_TEST_OTP: "123456",
+    APP_ALLOWED_ORIGINS: "https://staging.easymovers.in",
+  });
+  const route = h.load("app/api/public/customer-test-otp/route.ts");
+  const response = await route.POST(
+    new Request("http://easymovers.railway.internal/api/public/customer-test-otp", {
+      method: "POST",
+      headers: {
+        Origin: "https://staging.easymovers.in",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        action: "REQUEST",
+        reference,
+        mobile: "9000091301",
+      }),
+    }),
+  );
+  assert.equal(response.status, 200);
+});
 test("staging test OTP fails closed outside its exact configured origin", async () => {
   let reads = 0;
   const h = harness({
