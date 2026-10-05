@@ -324,6 +324,12 @@
   align-self: stretch;
 }
 .submittedActions { margin-top: 20px; display: grid; gap: 10px; justify-items: start; }
+.quoteSummary { display: grid; gap: 9px; margin: 16px 0 22px; padding: 16px; border: 1px solid #acd3ef; border-left: 4px solid #1768aa; border-radius: 11px; background: #edf7ff; }
+.quoteSummary > span { color: #1768aa; font-size: 10px; font-weight: 850; letter-spacing: .12em; }
+.quoteSummary > strong { color: #0b3b67; font-size: 17px; line-height: 1.3; }
+.quoteSummary > p { margin: 0; color: #58748c; font-size: 12px; line-height: 1.5; }
+.quoteSummary .primary { width: 100%; min-height: 42px; padding: 9px 12px; }
+.sessionControl { display: flex; margin-top: 20px; padding-top: 16px; border-top: 1px solid #dce5ef; }
 .confirmList { display: grid; gap: 12px; margin-top: 18px; }
 .confirmList label { display: grid; grid-template-columns: 20px 1fr; gap: 10px; align-items: start; padding: 12px; border: 1px solid #dce5ef; border-radius: 10px; background: #f7fafe; font-size: 13px; line-height: 1.5; }
 .confirmList input { margin-top: 3px; }

@@ -65,5 +65,11 @@ export async function customerQuotationComparison(leadId: string) {
   });
   const ranked = [...scored].filter(item => item.scoring.total !== null && item.compliance.activePartner).sort((a, b) => (b.scoring.total || 0) - (a.scoring.total || 0) || a.costs.total - b.costs.total);
   const recommendedId = ranked[0]?.id || null;
-  return { reference: lead.referenceId, route: `${lead.pickupCity || "Pickup"} → ${lead.destinationCity || "Destination"}`, shiftingDate: lead.shiftingDate, booking: lead.bookings[0] || null, recommendation: { version: RECOMMENDATION_VERSION, weights, quotationId: recommendedId, explanation: recommendedId ? "Best verified balance of price, service quality, reliability, compliance and quotation completeness." : null }, quotations: scored.map(item => ({ ...item, recommended: item.id === recommendedId })) };
+  const recommended = ranked[0] || null;
+  const explanation = !recommended
+    ? null
+    : recommended.performance.status === "NEW_PARTNER"
+      ? "Recommended from the available offers for its balance of quoted price, verified credentials, service readiness, delivery commitment and quotation completeness. This partner is still building its EasyMovers performance history."
+      : "Recommended for the strongest overall balance of quoted price, verified credentials, customer rating, successful moves, on-time performance and quotation completeness.";
+  return { reference: lead.referenceId, route: `${lead.pickupCity || "Pickup"} → ${lead.destinationCity || "Destination"}`, shiftingDate: lead.shiftingDate, booking: lead.bookings[0] || null, recommendation: { version: RECOMMENDATION_VERSION, weights, quotationId: recommendedId, explanation }, quotations: scored.map(item => ({ ...item, recommended: item.id === recommendedId })) };
 }

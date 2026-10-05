@@ -31,8 +31,9 @@ test("customer quotations are securely compared with an auditable safe-move scor
   assert.match(customerComparison, /quality: 25/);
   assert.match(customerComparison, /suspiciouslyLow/);
   assert.match(customerComparisonUi, /EM Safe Move Recommended/);
-  assert.match(customerComparisonUi, /New partner/);
-  assert.match(customerComparisonUi, /commission/);
+  assert.match(customerComparisonUi, /New EasyMovers partner/);
+  assert.match(customerComparisonUi, /How EasyMovers recommends an offer/);
+  assert.doesNotMatch(customerComparisonUi, /commission/i);
   assert.doesNotMatch(customerComparisonUi, /companyName/);
 });
 

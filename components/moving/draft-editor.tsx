@@ -615,12 +615,6 @@ export function DraftEditor({ reference }: { reference: string }) {
                     <p className={styles.muted}>Your submitted requirement is frozen for fair vendor pricing. Request assistance if an inventory, address, date or service detail has materially changed.</p>
                   </div>
                 )}
-                {locked && route.quotationCount > 0 && (
-                  <div className={styles.submittedActions}>
-                    <Link className={styles.primary} href={`/quotes/${encodeURIComponent(reference)}`}>Compare vendor quotations →</Link>
-                    <p className={styles.muted}>{route.quotationCount} quotation{route.quotationCount === 1 ? "" : "s"} received. Review the EM Safe Move recommendation or compare every eligible quotation yourself.</p>
-                  </div>
-                )}
               </>
             )}
             {error && (
@@ -638,7 +632,17 @@ export function DraftEditor({ reference }: { reference: string }) {
             <span className={styles.status}>
               {locked ? "Submitted" : "Draft"}
             </span>
-            <h3>Save for later</h3>
+            {locked && route.quotationCount > 0 && (
+              <section className={styles.quoteSummary}>
+                <span>QUOTATIONS READY</span>
+                <strong>{route.quotationCount} vendor quotation{route.quotationCount === 1 ? "" : "s"} received</strong>
+                <p>Compare prices, service commitments and the EasyMovers recommendation.</p>
+                <Link className={styles.primary} href={`/quotes/${encodeURIComponent(reference)}`}>
+                  Review quotations →
+                </Link>
+              </section>
+            )}
+            <h3>{locked ? "Your submitted request" : "Save for later"}</h3>
             <p className={styles.muted}>Your customer reference</p>
             <div className={styles.reference}>
               <strong>{reference}</strong>
@@ -667,7 +671,6 @@ export function DraftEditor({ reference }: { reference: string }) {
             >
               Track / resume move
             </Link>
-            <CustomerSessionExit reference={reference} />
             {locked && <p className={styles.muted}>Latest request stage: {requestStages[route.status] || "Submitted"}</p>}
           <h3>Your route</h3>
             <p className={styles.muted}>
@@ -676,9 +679,13 @@ export function DraftEditor({ reference }: { reference: string }) {
               {route.to}
             </p>
             <p className={styles.muted}>
-              Save before closing the page. Route changes after saving require a
-              new enquiry or assistance from the team.
+              {locked
+                ? "This submitted requirement is read-only. Request assistance if an important detail has changed."
+                : "Save before closing the page. Route changes after saving require a new enquiry or assistance from the team."}
             </p>
+            <div className={styles.sessionControl}>
+              <CustomerSessionExit reference={reference} />
+            </div>
           </aside>
         </div>
       </div>
