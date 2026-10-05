@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { prisma } from "@/lib/prisma";
-import { checkOrigin, draftCookie } from "@/lib/enquiry-session";
+import { checkOrigin, customerAccessCookie } from "@/lib/enquiry-session";
 export async function POST(req: Request) {
   const reply = (body: object, status = 200, cookie?: string) =>
     NextResponse.json(body, {
@@ -69,7 +69,7 @@ export async function POST(req: Request) {
     return reply(
       { success: true, reference: lead.referenceId },
       200,
-      draftCookie(
+      customerAccessCookie(
         lead.id,
         lead.referenceId,
         new URL(req.url).protocol === "https:",

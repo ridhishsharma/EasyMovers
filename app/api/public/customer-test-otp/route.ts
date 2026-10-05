@@ -5,7 +5,7 @@ import {
   isAllowedCustomerTestPhone,
   matchesCustomerTestOtp,
 } from "@/lib/customer-test-otp";
-import { checkOrigin, draftCookie } from "@/lib/enquiry-session";
+import { checkOrigin, customerAccessCookie } from "@/lib/enquiry-session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -101,7 +101,7 @@ export async function POST(request: Request) {
     return reply(
       { success: true, reference: lead.referenceId },
       200,
-      draftCookie(
+      customerAccessCookie(
         lead.id,
         lead.referenceId,
         new URL(request.url).protocol === "https:",

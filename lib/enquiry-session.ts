@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 export const DRAFT_SECONDS = 30 * 24 * 60 * 60;
+export const CUSTOMER_ACCESS_SECONDS = 12 * 60 * 60;
 export function enquirySecret() {
   const value = process.env.ENQUIRY_SESSION_SECRET;
   if (!value || value.length < 32) throw Error("Draft session unavailable");
@@ -13,12 +14,16 @@ export function draftSignature(value: string) {
 export function draftCookieName(reference: string) {
   return `em_draft_${draftSignature(reference).slice(0, 16)}`;
 }
-export function draftToken(id: string, reference: string) {
+export function draftToken(
+  id: string,
+  reference: string,
+  lifetimeSeconds = DRAFT_SECONDS,
+) {
   const payload = Buffer.from(
     JSON.stringify({
       id,
       reference,
-      expires: Date.now() + DRAFT_SECONDS * 1000,
+      expires: Date.now() + lifetimeSeconds * 1000,
     }),
   ).toString("base64url");
   return `${payload}.${draftSignature(payload)}`;
@@ -54,6 +59,16 @@ export function readDraftSession(
 }
 export function draftCookie(id: string, reference: string, secure: boolean) {
   return `${draftCookieName(reference)}=${draftToken(id, reference)}; HttpOnly; SameSite=Lax; Path=/api; Max-Age=${DRAFT_SECONDS}${secure ? "; Secure" : ""}`;
+}
+
+export function customerAccessCookie(
+  id: string,
+  reference: string,
+  secure: boolean,
+) {
+  // Deliberately omit Max-Age and Expires. This is a browser-session cookie,
+  // with a short signed-token lifetime as a backstop if a browser restores it.
+  return `${draftCookieName(reference)}=${draftToken(id, reference, CUSTOMER_ACCESS_SECONDS)}; HttpOnly; SameSite=Lax; Path=/api${secure ? "; Secure" : ""}`;
 }
 
 function normalizedOrigin(value: string | null | undefined) {

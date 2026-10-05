@@ -557,6 +557,7 @@ test("OTP resume requires verified matching phone and ignores client identity cl
   assert.equal(response.status, 200);
   assert.equal(query.where.mobile, "9000091301");
   assert.match(response.headers.get("set-cookie"), /HttpOnly/);
+  assert.doesNotMatch(response.headers.get("set-cookie"), /Max-Age|Expires/i);
 });
 test("OTP resume rejects unverified phone before querying draft", async () => {
   let reads = 0;
@@ -630,6 +631,7 @@ test("staging test OTP is origin-bound, allowlisted and creates the existing pri
   assert.equal(query.where.mobile, "9000091301");
   assert.match(verified.headers.get("set-cookie"), /HttpOnly/);
   assert.match(verified.headers.get("set-cookie"), /Secure/);
+  assert.doesNotMatch(verified.headers.get("set-cookie"), /Max-Age|Expires/i);
 });
 test("staging test OTP accepts Railway proxy URLs with the exact public browser origin", async () => {
   const h = harness();
