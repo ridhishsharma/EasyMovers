@@ -60,7 +60,7 @@ function quotationView(quotation: {
   transportationCost: unknown; packingCost: unknown; unpackingCost: unknown;
   labourCost: unknown; insuranceCost: unknown; otherCost: unknown;
   discountAmount: unknown; taxAmount: unknown; totalAmount: unknown;
-  validUntil: Date | null; inclusionsJson: unknown; exclusionsJson: unknown; remarks: string | null; createdAt: Date; updatedAt: Date;
+  pickupDate: Date | null; deliveryDate: Date | null; validUntil: Date | null; inclusionsJson: unknown; exclusionsJson: unknown; remarks: string | null; createdAt: Date; updatedAt: Date;
 }) {
   const money = (value: unknown) => Number(value);
   return {
@@ -76,6 +76,8 @@ function quotationView(quotation: {
     discountAmount: money(quotation.discountAmount),
     taxAmount: money(quotation.taxAmount),
     totalAmount: money(quotation.totalAmount),
+    pickupDate: quotation.pickupDate,
+    deliveryDate: quotation.deliveryDate,
     validUntil: quotation.validUntil,
     inclusions: quotation.inclusionsJson,
     exclusions: quotation.exclusionsJson,
@@ -132,7 +134,7 @@ export async function listVendorOpportunities(vendorId: string) {
           transportationCost: true, packingCost: true, unpackingCost: true,
           labourCost: true, insuranceCost: true, otherCost: true,
           discountAmount: true, taxAmount: true, totalAmount: true,
-          validUntil: true, inclusionsJson: true, exclusionsJson: true, remarks: true, createdAt: true, updatedAt: true,
+          pickupDate: true, deliveryDate: true, validUntil: true, inclusionsJson: true, exclusionsJson: true, remarks: true, createdAt: true, updatedAt: true,
         },
       },
       quotationInvitations: {
@@ -171,6 +173,7 @@ export async function submitVendorOpportunityQuotation(input: {
 }) {
   if (input.body.platformFeeAcknowledged !== true)
     throw new VendorOpportunityError("PLATFORM_FEE_ACKNOWLEDGEMENT_REQUIRED", "Confirm the estimated EasyMovers platform fee and vendor payout before submitting.", 400);
+  validateCommittedSchedule(input.body);
   const opportunities = await listVendorOpportunities(input.vendorId);
   const booking = opportunities.find(item => item.id === input.bookingId && !item.myQuotation);
   if (!booking) throw new VendorOpportunityError("OPPORTUNITY_NOT_AVAILABLE", "This enquiry is not available to the linked vendor.", 404);
@@ -238,6 +241,7 @@ export async function reviseVendorOpportunityQuotation(input: {
 }) {
   if (input.body.platformFeeAcknowledged !== true)
     throw new VendorOpportunityError("PLATFORM_FEE_ACKNOWLEDGEMENT_REQUIRED", "Confirm the estimated EasyMovers platform fee and vendor payout before saving the revision.", 400);
+  validateCommittedSchedule(input.body);
   await vendorContext(input.vendorId);
   const quotation = await prisma.quotation.findFirst({
     where: {
@@ -262,6 +266,8 @@ export async function reviseVendorOpportunityQuotation(input: {
       discountAmount: input.body.discountAmount,
       taxAmount: input.body.taxAmount,
       totalAmount: input.body.totalAmount,
+      pickupDate: input.body.pickupDate,
+      deliveryDate: input.body.deliveryDate,
       validUntil: input.body.validUntil,
       inclusions: input.body.inclusions,
       exclusions: input.body.exclusions,
@@ -277,6 +283,15 @@ export async function reviseVendorOpportunityQuotation(input: {
     return quotationView(revised.data as never);
   }
   return quotationView(result.data as never);
+}
+
+function validateCommittedSchedule(body: Record<string, unknown>) {
+  const pickup = typeof body.pickupDate === "string" ? new Date(body.pickupDate) : null;
+  const delivery = typeof body.deliveryDate === "string" ? new Date(body.deliveryDate) : null;
+  if (!pickup || !delivery || !Number.isFinite(pickup.getTime()) || !Number.isFinite(delivery.getTime()))
+    throw new VendorOpportunityError("QUOTATION_SCHEDULE_REQUIRED", "Commit pickup and delivery dates before submitting the quotation.", 400);
+  if (delivery.getTime() < pickup.getTime())
+    throw new VendorOpportunityError("INVALID_QUOTATION_SCHEDULE", "Delivery cannot be earlier than pickup.", 400);
 }
 
 export function vendorQuotationFeePreview(body: Record<string, unknown>) {

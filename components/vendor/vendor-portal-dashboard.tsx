@@ -48,7 +48,7 @@ type Opportunity = {
     id: string; quotationNumber: string; status: string; transportationCost: number;
     packingCost: number; unpackingCost: number; labourCost: number; insuranceCost: number;
     otherCost: number; discountAmount: number; taxAmount: number; totalAmount: number;
-    validUntil: string | null; inclusions: unknown; exclusions: unknown; remarks: string | null; createdAt: string; updatedAt: string; editable: boolean;
+    pickupDate: string | null; deliveryDate: string | null; validUntil: string | null; inclusions: unknown; exclusions: unknown; remarks: string | null; createdAt: string; updatedAt: string; editable: boolean;
   };
 };
 
@@ -75,7 +75,7 @@ export function VendorPortalDashboard({ supabaseUrl, publishableKey }: { supabas
   const [declining, setDeclining] = useState<Opportunity | null>(null);
   const [declineReason, setDeclineReason] = useState("");
   const standardInclusions = ["Packing material", "Loading and unloading", "Furniture dismantling and reassembly", "Appliance uninstalling and installation", "Rope-pulling service", "Unpacking and placement", "Preferred pickup timing", "Dedicated move coordination"];
-  const emptyQuote = { transportationCost: "", packingCost: "0", unpackingCost: "0", labourCost: "0", insuranceCost: "0", otherCost: "0", discountAmount: "0", taxAmount: "0", validUntil: "", remarks: "", inclusions: [] as string[], exclusions: "", platformFeeAcknowledged: false };
+  const emptyQuote = { transportationCost: "", packingCost: "0", unpackingCost: "0", labourCost: "0", insuranceCost: "0", otherCost: "0", discountAmount: "0", taxAmount: "0", pickupDate: "", deliveryDate: "", validUntil: "", remarks: "", inclusions: [] as string[], exclusions: "", platformFeeAcknowledged: false };
   const [quote, setQuote] = useState(emptyQuote);
   const [quotationFilter, setQuotationFilter] = useState<"ALL" | "IN_PROGRESS" | "ACCEPTED" | "NOT_ACCEPTED">("ALL");
   const [ledgerFilter, setLedgerFilter] = useState<"ALL" | "OUTSTANDING" | "SETTLED" | "COMMISSION_PENDING">("ALL");
@@ -161,7 +161,7 @@ export function VendorPortalDashboard({ supabaseUrl, publishableKey }: { supabas
       if (totalAmount <= 0) throw new Error("Quotation total must be greater than zero.");
       const response = await request(`/api/vendor/opportunities/${quoting.id}/quotation`, {
         method: quoting.myQuotation ? "PUT" : "POST",
-        body: JSON.stringify({ ...amounts, totalAmount, validUntil: quote.validUntil ? new Date(`${quote.validUntil}T23:59:59+05:30`).toISOString() : undefined, remarks: quote.remarks, inclusions: { items: quote.inclusions }, exclusions: { items: quote.exclusions.split("\n").map(item => item.trim()).filter(Boolean) }, platformFeeAcknowledged: quote.platformFeeAcknowledged }),
+        body: JSON.stringify({ ...amounts, totalAmount, pickupDate: new Date(`${quote.pickupDate}T09:00:00+05:30`).toISOString(), deliveryDate: new Date(`${quote.deliveryDate}T18:00:00+05:30`).toISOString(), validUntil: quote.validUntil ? new Date(`${quote.validUntil}T23:59:59+05:30`).toISOString() : undefined, remarks: quote.remarks, inclusions: { items: quote.inclusions }, exclusions: { items: quote.exclusions.split("\n").map(item => item.trim()).filter(Boolean) }, platformFeeAcknowledged: quote.platformFeeAcknowledged }),
       });
       const payload = await response.json();
       if (!response.ok || !payload.success) throw new Error(payload.error?.message || "Quotation could not be submitted.");
@@ -194,6 +194,7 @@ export function VendorPortalDashboard({ supabaseUrl, publishableKey }: { supabas
       unpackingCost: String(current.unpackingCost), labourCost: String(current.labourCost),
       insuranceCost: String(current.insuranceCost), otherCost: String(current.otherCost),
       discountAmount: String(current.discountAmount), taxAmount: String(current.taxAmount),
+      pickupDate: current.pickupDate?.slice(0, 10) || "", deliveryDate: current.deliveryDate?.slice(0, 10) || "",
       validUntil: current.validUntil?.slice(0, 10) || "", remarks: current.remarks || "", inclusions: list(current.inclusions), exclusions: list(current.exclusions).join("\n"), platformFeeAcknowledged: false,
     } : emptyQuote);
     setQuoting(item);
@@ -316,6 +317,8 @@ export function VendorPortalDashboard({ supabaseUrl, publishableKey }: { supabas
         <label>Other charges ₹<input type="number" min="0" step="0.01" value={quote.otherCost} onChange={event => setQuote(current => ({ ...current, otherCost: event.target.value, platformFeeAcknowledged: false }))} /></label>
         <label>Discount ₹<input type="number" min="0" step="0.01" value={quote.discountAmount} onChange={event => setQuote(current => ({ ...current, discountAmount: event.target.value, platformFeeAcknowledged: false }))} /></label>
         <label>Tax ₹<input type="number" min="0" step="0.01" value={quote.taxAmount} onChange={event => setQuote(current => ({ ...current, taxAmount: event.target.value, platformFeeAcknowledged: false }))} /></label>
+        <label>Committed pickup date<input type="date" required value={quote.pickupDate} onChange={event => setQuote(current => ({ ...current, pickupDate: event.target.value, platformFeeAcknowledged: false }))} /></label>
+        <label>Committed delivery date<input type="date" required min={quote.pickupDate} value={quote.deliveryDate} onChange={event => setQuote(current => ({ ...current, deliveryDate: event.target.value, platformFeeAcknowledged: false }))} /></label>
         <label>Valid until<input type="date" required value={quote.validUntil} onChange={event => setQuote(current => ({ ...current, validUntil: event.target.value }))} /></label>
       </div>
       <fieldset className={quoteStyles.inclusions}><legend>What is included in your price?</legend>{standardInclusions.map(item=><label key={item}><input type="checkbox" checked={quote.inclusions.includes(item)} onChange={event=>setQuote(current=>({...current,inclusions:event.target.checked?[...current.inclusions,item]:current.inclusions.filter(value=>value!==item),platformFeeAcknowledged:false}))}/>{item}</label>)}</fieldset>

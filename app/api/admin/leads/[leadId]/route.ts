@@ -66,8 +66,30 @@ export async function GET(request: Request, context: { params: Promise<{ leadId:
           items: { orderBy: [{ category: "asc" }, { itemName: "asc" }], select: { id: true, category: true, itemName: true, quantity: true, fragile: true, requiresPacking: true, remarks: true } },
           photos: { orderBy: { createdAt: "asc" }, select: { id: true, imageUrl: true, roomType: true, createdAt: true } },
         } },
-        quotations: { orderBy: { createdAt: "desc" }, select: { id: true, quotationNumber: true, status: true, totalAmount: true, currency: true, validUntil: true, createdAt: true, vendor: { select: { vendorCode: true, companyName: true } } } },
+        quotations: { orderBy: { createdAt: "desc" }, select: {
+          id: true, quotationNumber: true, status: true, currency: true,
+          transportationCost: true, packingCost: true, unpackingCost: true,
+          labourCost: true, insuranceCost: true, otherCost: true,
+          discountAmount: true, taxAmount: true, totalAmount: true,
+          pickupDate: true, deliveryDate: true, transitDays: true,
+          validUntil: true, inclusionsJson: true, exclusionsJson: true,
+          remarks: true, createdAt: true, updatedAt: true,
+          vendor: { select: {
+            vendorCode: true, companyName: true,
+            ratingSummary: { select: {
+              averageRating: true, totalReviews: true, completedBookings: true,
+              onTimeDeliveryScore: true, recommendationRate: true,
+            } },
+          } },
+        } },
         bookings: { orderBy: { createdAt: "desc" }, select: { id: true, bookingNumber: true, bookingStatus: true, paymentStatus: true, totalAmount: true, currency: true, createdAt: true } },
+        moveSurveys: { orderBy: { version: "desc" }, select: {
+          id: true, surveyNumber: true, version: true, status: true, mode: true,
+          assignedToUserId: true, assignedToVendorId: true, scheduledAt: true,
+          customerConfirmedAt: true, submittedAt: true, reviewedAt: true,
+          approvedAt: true, sharedAt: true, reviewRemarks: true,
+          _count: { select: { rooms: true, media: true } },
+        } },
       },
     });
     if (!lead)

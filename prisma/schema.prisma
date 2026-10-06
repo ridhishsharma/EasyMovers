@@ -8,8 +8,8 @@ datasource db {
 }
 
 model Lead {
-  id                   String      @id @default(cuid())
-  referenceId          String      @unique
+  id                   String       @id @default(cuid())
+  referenceId          String       @unique
   name                 String
   mobile               String
   email                String?
@@ -20,34 +20,35 @@ model Lead {
   liftAvailable        String?
   packingRequired      String?
   notes                String?
-  createdAt            DateTime    @default(now())
+  createdAt            DateTime     @default(now())
   bikeCount            Int?
   carCount             Int?
   destinationDigipin   String?
   destinationInput     String?
-  destinationLatitude  Decimal?    @db.Decimal(10, 7)
-  destinationLongitude Decimal?    @db.Decimal(10, 7)
+  destinationLatitude  Decimal?     @db.Decimal(10, 7)
+  destinationLongitude Decimal?     @db.Decimal(10, 7)
   destinationPincode   String?
   destinationState     String?
   houseType            String?
-  lastUpdatedAt        DateTime    @updatedAt
+  lastUpdatedAt        DateTime     @updatedAt
   officeSize           String?
   pickupDigipin        String?
-  pickupLatitude       Decimal?    @db.Decimal(10, 7)
-  pickupLongitude      Decimal?    @db.Decimal(10, 7)
+  pickupLatitude       Decimal?     @db.Decimal(10, 7)
+  pickupLongitude      Decimal?     @db.Decimal(10, 7)
   pickupPincode        String?
   pickupState          String?
   plantsIncluded       Boolean?
   shiftingDate         String?
-  source               LeadSource  @default(WEBSITE)
+  source               LeadSource   @default(WEBSITE)
   userId               String?
   vehicleCount         Int?
   vehicleType          String?
-  status               LeadStatus  @default(NEW)
+  status               LeadStatus   @default(NEW)
   bookings             Booking[]
   inventory            Inventory?
-  user                 User?       @relation(fields: [userId], references: [id])
+  user                 User?        @relation(fields: [userId], references: [id])
   quotations           Quotation[]
+  moveSurveys          MoveSurvey[]
 
   @@index([referenceId])
   @@index([mobile])
@@ -351,6 +352,114 @@ model Inventory {
   lead                       Lead             @relation(fields: [leadId], references: [id])
   items                      InventoryItem[]
   photos                     InventoryPhoto[]
+  moveSurveys                MoveSurvey[]
+}
+
+enum MoveSurveyStatus {
+  REQUESTED
+  ASSIGNED
+  SCHEDULED
+  IN_PROGRESS
+  REPORT_SUBMITTED
+  REVIEW_PENDING
+  APPROVED
+  SHARED
+  RETURNED_FOR_CORRECTION
+  RESCHEDULED
+  CANCELLED
+  NO_SHOW
+}
+
+enum MoveSurveyMode {
+  CUSTOMER_SELF
+  VIDEO
+  PHYSICAL
+  TELEPHONE
+}
+
+enum MoveSurveyMediaType {
+  PHOTO
+  VIDEO
+  DOCUMENT
+}
+
+model MoveSurvey {
+  id                   String            @id @default(cuid())
+  surveyNumber         String            @unique
+  leadId               String
+  inventoryId          String?
+  version              Int               @default(1)
+  status               MoveSurveyStatus  @default(REQUESTED)
+  mode                 MoveSurveyMode    @default(CUSTOMER_SELF)
+  assignedToUserId     String?
+  assignedToVendorId   String?
+  scheduledAt          DateTime?
+  startedAt            DateTime?
+  submittedAt          DateTime?
+  reviewedAt           DateTime?
+  reviewedByUserId     String?
+  approvedAt           DateTime?
+  sharedAt             DateTime?
+  customerConfirmedAt  DateTime?
+  customerConfirmation String?
+  customerSessionRef   String?
+  reportRemarks        String?
+  reviewRemarks        String?
+  aiEstimateJson       Json?
+  createdByUserId      String?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  lead                 Lead              @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  inventory            Inventory?        @relation(fields: [inventoryId], references: [id], onDelete: SetNull)
+  rooms                MoveSurveyRoom[]
+  media                MoveSurveyMedia[]
+
+  @@unique([leadId, version])
+  @@index([leadId, status])
+  @@index([assignedToUserId, status])
+  @@index([assignedToVendorId, status])
+  @@index([scheduledAt])
+}
+
+model MoveSurveyRoom {
+  id                  String            @id @default(cuid())
+  surveyId            String
+  roomName            String
+  estimatedBoxes      Int               @default(0)
+  estimatedWeightKg   Decimal?          @db.Decimal(10, 2)
+  estimatedVolumeCft  Decimal?          @db.Decimal(10, 2)
+  fragileItems        Int               @default(0)
+  remarks             String?
+  sortOrder           Int               @default(0)
+  aiEstimateJson      Json?
+  confirmedByCustomer Boolean           @default(false)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  survey              MoveSurvey        @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  media               MoveSurveyMedia[]
+
+  @@unique([surveyId, roomName])
+  @@index([surveyId, sortOrder])
+}
+
+model MoveSurveyMedia {
+  id             String              @id @default(cuid())
+  surveyId       String
+  roomId         String?
+  mediaType      MoveSurveyMediaType @default(PHOTO)
+  objectKey      String
+  mimeType       String
+  fileSize       Int
+  caption        String?
+  uploadedByType String
+  uploadedById   String?
+  aiAnalysisJson Json?
+  createdAt      DateTime            @default(now())
+  survey         MoveSurvey          @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  room           MoveSurveyRoom?     @relation(fields: [roomId], references: [id], onDelete: SetNull)
+
+  @@index([surveyId, createdAt])
+  @@index([roomId])
 }
 
 model DestinationDetails {

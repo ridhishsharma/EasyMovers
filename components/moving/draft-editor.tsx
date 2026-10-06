@@ -672,6 +672,7 @@ export function DraftEditor({ reference }: { reference: string }) {
               Track / resume move
             </Link>
             {locked && <p className={styles.muted}>Latest request stage: {requestStages[route.status] || "Submitted"}</p>}
+            {locked && <Link className={styles.smallLink} href={`/survey/${encodeURIComponent(reference)}`}>Open mobile room survey</Link>}
           <h3>Your route</h3>
             <p className={styles.muted}>
               {route.from}

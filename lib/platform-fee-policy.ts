@@ -1,7 +1,4 @@
 export const PLATFORM_FEE_RATE_PERCENT = 10;
-export const PLATFORM_FEE_MINIMUM = 499;
-// Introductory launch protection. This is an internal commercial control, not a permanent entitlement.
-export const PLATFORM_FEE_LAUNCH_CAP = 2500;
 
 const money = (value: unknown) => {
   const amount = Number(value || 0);
@@ -35,9 +32,9 @@ export function platformFeeBase(quotation: PlatformFeeQuotation) {
 export function calculatePlatformFee(quotation: PlatformFeeQuotation) {
   const base = platformFeeBase(quotation);
   const percentageFee = round(base * PLATFORM_FEE_RATE_PERCENT / 100);
-  const fee = base > 0
-    ? Math.min(money(quotation.totalAmount) || base, PLATFORM_FEE_LAUNCH_CAP, Math.max(PLATFORM_FEE_MINIMUM, percentageFee))
-    : 0;
+  // Customer promotions are an independent EasyMovers-funded control. They
+  // must never silently alter the vendor quotation or settlement margin.
+  const fee = base > 0 ? Math.min(money(quotation.totalAmount) || base, percentageFee) : 0;
   return {
     base,
     rate: PLATFORM_FEE_RATE_PERCENT,

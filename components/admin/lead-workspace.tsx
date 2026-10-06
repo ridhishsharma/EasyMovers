@@ -17,8 +17,18 @@ type LeadDetail = Lead & {
   request: { pickupAddress: string | null; destinationAddress: string | null; destinationFloor: string | null; destinationLift: string | null; parking: string | null; specialItems: string | null; additionalServices: string | null; submittedAt: string | null; pricingDecision: { route?: string; reasons?: string[] } | null };
   assistance: { callbackRequested: boolean; callbackSlot: string | null; surveyPreference: "REQUESTED" | "VENDOR_DECIDES"; surveyStatus: "PENDING" | "NOT_REQUESTED" };
   inventory: null | { id: string; status: string; completionPercentage: number; updatedAt: string; callbackRequested: boolean; callbackSlot: string | null; photoInventoryRequested: boolean; pickupFloor: number | null; pickupLiftAvailable: boolean; pickupParkingDistance: string | null; pickupPropertyType: string | null; destinationFloor: number | null; destinationLiftAvailable: boolean; destinationParkingDistance: string | null; destinationPropertyType: string | null; packingType: string | null; surveyType: string | null; remarks: string | null; items: Array<{ id: string; category: string; itemName: string; quantity: number; fragile: boolean; requiresPacking: boolean; remarks: string | null }>; photos: Array<{ id: string; roomType: string | null; createdAt: string; url: string | null }> };
-  quotations: Array<{ id: string; quotationNumber: string; status: string; totalAmount: string; currency: string; validUntil: string | null; createdAt: string; vendor: { vendorCode: string; companyName: string } }>;
+  quotations: Array<{
+    id: string; quotationNumber: string; status: string; currency: string;
+    transportationCost: string; packingCost: string; unpackingCost: string;
+    labourCost: string; insuranceCost: string; otherCost: string;
+    discountAmount: string; taxAmount: string; totalAmount: string;
+    pickupDate: string | null; deliveryDate: string | null; transitDays: number | null;
+    validUntil: string | null; inclusionsJson: unknown; exclusionsJson: unknown;
+    remarks: string | null; createdAt: string; updatedAt: string;
+    vendor: { vendorCode: string; companyName: string; ratingSummary: null | { averageRating: string; totalReviews: number; completedBookings: number; onTimeDeliveryScore: string; recommendationRate: string } };
+  }>;
   bookings: Array<{ id: string; bookingNumber: string; bookingStatus: string; paymentStatus: string; totalAmount: string; currency: string; createdAt: string }>;
+  moveSurveys: Array<{ id: string; surveyNumber: string; version: number; status: string; mode: string; assignedToUserId: string | null; assignedToVendorId: string | null; scheduledAt: string | null; customerConfirmedAt: string | null; submittedAt: string | null; reviewedAt: string | null; approvedAt: string | null; sharedAt: string | null; reviewRemarks: string | null; _count: { rooms: number; media: number } }>;
 };
 type Pagination = { page: number; pageSize: number; total: number; totalPages: number };
 
@@ -26,6 +36,9 @@ const statuses = [["", "All statuses"], ["OPEN", "Open pipeline"], ["NEW", "New"
 const label = (value: string) => value.replaceAll("_", " ").toLowerCase().replace(/^./, character => character.toUpperCase());
 const dateTime = (value: string) => new Date(value).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
 const show = (value: unknown, fallback = "Not provided") => value === null || value === undefined || value === "" ? fallback : String(value);
+const money = (currency: string, value: string) => new Intl.NumberFormat("en-IN", { style: "currency", currency, maximumFractionDigits: 2 }).format(Number(value));
+const jsonItems = (value: unknown) => Array.isArray(value)
+  ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
 
 export function LeadWorkspace({ supabaseUrl, publishableKey }: { supabaseUrl: string; publishableKey: string }) {
   const router = useRouter();
@@ -103,10 +116,32 @@ function LeadDetailPanel({ detail, loading, supabaseUrl, publishableKey, onReloa
     <DetailSection title="Addresses and access"><dl><dt>Pickup</dt><dd>{show(detail.request.pickupAddress)}<small>{[detail.pickupCity, detail.pickupState, detail.pickupPincode].filter(Boolean).join(", ")}</small></dd><dt>Destination</dt><dd>{show(detail.request.destinationAddress)}<small>{[detail.destinationCity, detail.destinationState, detail.destinationPincode].filter(Boolean).join(", ")}</small></dd><dt>Pickup access</dt><dd>Floor {show(detail.inventory?.pickupFloor ?? detail.pickupFloor)} · Lift {detail.inventory ? (detail.inventory.pickupLiftAvailable ? "Yes" : "No") : show(detail.liftAvailable)}</dd><dt>Destination access</dt><dd>Floor {show(detail.inventory?.destinationFloor ?? detail.request.destinationFloor)} · Lift {detail.inventory ? (detail.inventory.destinationLiftAvailable ? "Yes" : "No") : show(detail.request.destinationLift)}</dd><dt>Parking / loading</dt><dd>{show(detail.request.parking)}</dd></dl></DetailSection>
     <DetailSection title={`Declared inventory (${detail.inventory?.items.length || 0})`}>{!detail.inventory?.items.length ? <p>No inventory items recorded.</p> : <div className={styles.itemList}>{detail.inventory.items.map(item => <article key={item.id}><strong>{item.quantity} × {item.itemName}</strong><span>{label(item.category)}</span><small>{item.fragile ? "Fragile · " : ""}{item.requiresPacking ? "Packing required" : "No packing requested"}</small></article>)}</div>}</DetailSection>
     <DetailSection title={`Inventory photos (${detail.inventory?.photos.length || 0})`}>{!detail.inventory?.photos.length ? <p>No photos uploaded.</p> : <div className={styles.photoGrid}>{detail.inventory.photos.map(photo => photo.url ? <a key={photo.id} href={photo.url} target="_blank" rel="noreferrer">{/* Signed private URLs are intentionally rendered without the public Next.js image optimizer. */}<img src={photo.url} alt={photo.roomType ? `${photo.roomType} inventory` : "Customer inventory"}/><span>{photo.roomType || "Inventory photo"}</span></a> : <article key={photo.id}>Photo temporarily unavailable</article>)}</div>}</DetailSection>
+    <DetailSection title={`Surveys (${detail.moveSurveys.length})`}>{detail.moveSurveys.length === 0 ? <p>No survey has been scheduled for this lead.</p> : <div className={styles.recordList}>{detail.moveSurveys.map(survey => <article key={survey.id}><strong>{survey.surveyNumber} · Version {survey.version}</strong><span>{label(survey.mode)} · {label(survey.status)}</span><small>{survey.scheduledAt ? `Scheduled ${dateTime(survey.scheduledAt)}` : "Schedule pending"} · {survey._count.rooms} room(s) · {survey._count.media} media file(s)</small>{survey.reviewRemarks ? <small>{survey.reviewRemarks}</small> : null}</article>)}</div>}</DetailSection>
     <LeadVendorInvitations leadId={detail.id} supabaseUrl={supabaseUrl} publishableKey={publishableKey} address={{ pickupAddress: detail.request.pickupAddress, pickupPincode: detail.pickupPincode, destinationAddress: detail.request.destinationAddress, destinationPincode: detail.destinationPincode }} onAddressUpdated={() => void onReload(detail.id)}/>
-    <DetailSection title={`Quotations (${detail.quotations.length})`}>{detail.quotations.length === 0 ? <p>No vendor quotations received yet.</p> : <div className={styles.recordList}>{detail.quotations.map(quotation => <article key={quotation.id}><strong>{quotation.quotationNumber}</strong><span>{quotation.vendor.companyName} · {quotation.currency} {quotation.totalAmount}</span><small>{label(quotation.status)} · {dateTime(quotation.createdAt)}</small></article>)}</div>}</DetailSection>
+    <DetailSection title={`Quotations (${detail.quotations.length})`}>{detail.quotations.length === 0 ? <p>No vendor quotations received yet.</p> : <><p className={styles.sectionHint}>Staff can inspect the complete commercial offer here. Customer delivery and acceptance must use the protected comparison journey.</p><div className={styles.quotationList}>{detail.quotations.map((quotation, index) => <QuotationCard key={quotation.id} quotation={quotation} position={index + 1}/>)}</div></>}</DetailSection>
     <DetailSection title={`Bookings (${detail.bookings.length})`}>{detail.bookings.length === 0 ? <p>No booking created.</p> : <div className={styles.recordList}>{detail.bookings.map(booking => <article key={booking.id}><strong>{booking.bookingNumber}</strong><span>{label(booking.bookingStatus)} · {label(booking.paymentStatus)}</span><small>{booking.currency} {booking.totalAmount}</small></article>)}</div>}</DetailSection>
   </aside>;
+}
+
+function QuotationCard({ quotation, position }: { quotation: LeadDetail["quotations"][number]; position: number }) {
+  const rating = quotation.vendor.ratingSummary;
+  const reviewed = Boolean(rating && rating.totalReviews > 0);
+  const included = jsonItems(quotation.inclusionsJson);
+  const excluded = jsonItems(quotation.exclusionsJson);
+  const costs = [
+    ["Transportation", quotation.transportationCost], ["Packing", quotation.packingCost],
+    ["Unpacking", quotation.unpackingCost], ["Labour", quotation.labourCost],
+    ["Insurance", quotation.insuranceCost], ["Other charges", quotation.otherCost],
+    ["Vendor discount", `-${quotation.discountAmount}`], ["Tax", quotation.taxAmount],
+  ] as const;
+  return <details className={styles.quotationCard} open={position === 1}>
+    <summary><span><strong>{quotation.vendor.companyName}</strong><small>{quotation.quotationNumber} · {label(quotation.status)}</small></span><span><b>{money(quotation.currency, quotation.totalAmount)}</b><small>Submitted {dateTime(quotation.createdAt)}</small></span></summary>
+    <div className={styles.quotationBody}>
+      <section className={styles.costBreakdown}><h4>Price breakdown</h4>{costs.map(([name, amount]) => <div key={name}><span>{name}</span><strong>{money(quotation.currency, amount)}</strong></div>)}<div className={styles.quotationTotal}><span>Total quotation</span><strong>{money(quotation.currency, quotation.totalAmount)}</strong></div></section>
+      <section className={styles.offerDetails}><h4>Schedule and terms</h4><dl><dt>Pickup</dt><dd>{quotation.pickupDate ? dateTime(quotation.pickupDate) : "Not committed"}</dd><dt>Delivery</dt><dd>{quotation.deliveryDate ? dateTime(quotation.deliveryDate) : "Not committed"}</dd><dt>Transit</dt><dd>{quotation.transitDays ? `${quotation.transitDays} day(s)` : "Not committed"}</dd><dt>Valid until</dt><dd>{quotation.validUntil ? dateTime(quotation.validUntil) : "No expiry supplied"}</dd><dt>Vendor remarks</dt><dd>{quotation.remarks || "No remarks"}</dd></dl>{included.length > 0 ? <p><strong>Included:</strong> <span>{included.join(", ")}</span></p> : null}{excluded.length > 0 ? <p><strong>Excluded:</strong> <span>{excluded.join(", ")}</span></p> : null}</section>
+      <section className={styles.vendorEvidence}><h4>Verified performance</h4>{reviewed ? <dl><dt>Customer rating</dt><dd>{Number(rating!.averageRating).toFixed(1)} / 5 ({rating!.totalReviews} reviews)</dd><dt>Completed moves</dt><dd>{rating!.completedBookings}</dd><dt>On-time delivery</dt><dd>{Number(rating!.onTimeDeliveryScore).toFixed(0)}%</dd><dt>Recommended</dt><dd>{Number(rating!.recommendationRate).toFixed(0)}%</dd></dl> : <p><strong>New partner</strong><span>No verified customer history is available yet. Do not display a fabricated rating or delivery percentage.</span></p>}</section>
+    </div>
+  </details>;
 }
 
 function DetailSection({ title, children }: { title: string; children: React.ReactNode }) {
