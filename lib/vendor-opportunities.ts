@@ -1,6 +1,7 @@
 import { QuotationStatus, VendorEngagementMode, VendorServiceType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateQuotationModule } from "@/domains/quotation/quotation.module";
+import { calculatePlatformFee } from "@/lib/platform-fee-policy";
 
 export class VendorOpportunityError extends Error {
   constructor(public readonly code: string, message: string, public readonly status: number) {
@@ -59,7 +60,7 @@ function quotationView(quotation: {
   transportationCost: unknown; packingCost: unknown; unpackingCost: unknown;
   labourCost: unknown; insuranceCost: unknown; otherCost: unknown;
   discountAmount: unknown; taxAmount: unknown; totalAmount: unknown;
-  validUntil: Date | null; remarks: string | null; createdAt: Date; updatedAt: Date;
+  validUntil: Date | null; inclusionsJson: unknown; exclusionsJson: unknown; remarks: string | null; createdAt: Date; updatedAt: Date;
 }) {
   const money = (value: unknown) => Number(value);
   return {
@@ -76,6 +77,8 @@ function quotationView(quotation: {
     taxAmount: money(quotation.taxAmount),
     totalAmount: money(quotation.totalAmount),
     validUntil: quotation.validUntil,
+    inclusions: quotation.inclusionsJson,
+    exclusions: quotation.exclusionsJson,
     remarks: quotation.remarks,
     createdAt: quotation.createdAt,
     updatedAt: quotation.updatedAt,
@@ -129,7 +132,7 @@ export async function listVendorOpportunities(vendorId: string) {
           transportationCost: true, packingCost: true, unpackingCost: true,
           labourCost: true, insuranceCost: true, otherCost: true,
           discountAmount: true, taxAmount: true, totalAmount: true,
-          validUntil: true, remarks: true, createdAt: true, updatedAt: true,
+          validUntil: true, inclusionsJson: true, exclusionsJson: true, remarks: true, createdAt: true, updatedAt: true,
         },
       },
       quotationInvitations: {
@@ -166,6 +169,8 @@ export async function listVendorOpportunities(vendorId: string) {
 export async function submitVendorOpportunityQuotation(input: {
   vendorId: string; userId: string; bookingId: string; body: Record<string, unknown>; requestId: string; ipAddress?: string; userAgent?: string;
 }) {
+  if (input.body.platformFeeAcknowledged !== true)
+    throw new VendorOpportunityError("PLATFORM_FEE_ACKNOWLEDGEMENT_REQUIRED", "Confirm the estimated EasyMovers platform fee and vendor payout before submitting.", 400);
   const opportunities = await listVendorOpportunities(input.vendorId);
   const booking = opportunities.find(item => item.id === input.bookingId && !item.myQuotation);
   if (!booking) throw new VendorOpportunityError("OPPORTUNITY_NOT_AVAILABLE", "This enquiry is not available to the linked vendor.", 404);
@@ -190,6 +195,8 @@ export async function submitVendorOpportunityQuotation(input: {
       deliveryDate: input.body.deliveryDate,
       transitDays: input.body.transitDays,
       validUntil: input.body.validUntil,
+      inclusions: input.body.inclusions,
+      exclusions: input.body.exclusions,
       remarks: input.body.remarks,
       status: QuotationStatus.SUBMITTED,
       createdBy: input.userId,
@@ -229,6 +236,8 @@ export async function reviseVendorOpportunityQuotation(input: {
   vendorId: string; userId: string; bookingId: string; body: Record<string, unknown>;
   requestId: string; ipAddress?: string; userAgent?: string;
 }) {
+  if (input.body.platformFeeAcknowledged !== true)
+    throw new VendorOpportunityError("PLATFORM_FEE_ACKNOWLEDGEMENT_REQUIRED", "Confirm the estimated EasyMovers platform fee and vendor payout before saving the revision.", 400);
   await vendorContext(input.vendorId);
   const quotation = await prisma.quotation.findFirst({
     where: {
@@ -254,6 +263,8 @@ export async function reviseVendorOpportunityQuotation(input: {
       taxAmount: input.body.taxAmount,
       totalAmount: input.body.totalAmount,
       validUntil: input.body.validUntil,
+      inclusions: input.body.inclusions,
+      exclusions: input.body.exclusions,
       remarks: input.body.remarks,
       updatedBy: input.userId,
     } as never,
@@ -266,6 +277,10 @@ export async function reviseVendorOpportunityQuotation(input: {
     return quotationView(revised.data as never);
   }
   return quotationView(result.data as never);
+}
+
+export function vendorQuotationFeePreview(body: Record<string, unknown>) {
+  return calculatePlatformFee(body);
 }
 
 export async function declineVendorOpportunity(input: { vendorId: string; bookingId: string; reason: string }) {

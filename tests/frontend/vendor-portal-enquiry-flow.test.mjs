@@ -92,4 +92,9 @@ test("quotation identity fields are forced from authenticated vendor opportunity
   assert.match(declineRoute, /authorizeVendorPortal/);
   assert.match(opportunities, /declineVendorOpportunity/);
   assert.match(dashboard, /Confirm decline/);
+  assert.match(dashboard, /Estimated EasyMovers platform fee/);
+  assert.match(dashboard, /I understand the estimated platform fee and vendor payout/);
+  assert.match(dashboard, /What is included in your price/);
+  assert.match(opportunities, /PLATFORM_FEE_ACKNOWLEDGEMENT_REQUIRED/);
+  assert.match(opportunities, /inclusions: input\.body\.inclusions/);
 });

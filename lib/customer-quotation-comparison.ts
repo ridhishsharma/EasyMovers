@@ -69,7 +69,7 @@ export async function customerQuotationComparison(leadId: string) {
   const explanation = !recommended
     ? null
     : recommended.performance.status === "NEW_PARTNER"
-      ? "Recommended from the available offers for its balance of quoted price, verified credentials, service readiness, delivery commitment and quotation completeness. This partner is still building its EasyMovers performance history."
-      : "Recommended for the strongest overall balance of quoted price, verified credentials, customer rating, successful moves, on-time performance and quotation completeness.";
+      ? "Recommended from the available offers for its balance of quoted price, verified credentials, included services, availability and quotation completeness. This partner is still building its EasyMovers performance history."
+      : "Recommended for the strongest overall balance of quoted price, verified credentials, included services, customer rating, successful moves and on-time performance.";
   return { reference: lead.referenceId, route: `${lead.pickupCity || "Pickup"} → ${lead.destinationCity || "Destination"}`, shiftingDate: lead.shiftingDate, booking: lead.bookings[0] || null, recommendation: { version: RECOMMENDATION_VERSION, weights, quotationId: recommendedId, explanation }, quotations: scored.map(item => ({ ...item, recommended: item.id === recommendedId })) };
 }

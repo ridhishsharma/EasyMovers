@@ -1,6 +1,7 @@
 import { CommercialTaxTreatment, CommercialTermRequestStatus, Prisma, QuotationStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { deriveFinancialBusinessSegment } from "@/lib/financial-business-segment";
+import { calculatePlatformFee, PLATFORM_FEE_RATE_PERCENT } from "@/lib/platform-fee-policy";
 
 export class CommercialTermError extends Error {
   constructor(public readonly code: string, message: string, public readonly status: number) { super(message); this.name = "CommercialTermError"; }
@@ -44,7 +45,7 @@ export async function getCommercialTermWorkspace(status: CommercialTermRequestSt
   const [payments, requests] = await Promise.all([
     prisma.payment.findMany({ where:{quotationId:{not:null}},orderBy:{updatedAt:"desc"},take:200,select:{
       id:true,paymentNumber:true,totalAmount:true,currency:true,commercialReference:true,booking:{select:{bookingNumber:true,selectedQuotationId:true}},
-      quotation:{select:{id:true,quotationNumber:true,status:true,vendorId:true,totalAmount:true,currency:true,vendor:{select:{vendorCode:true,companyName:true,gstNumber:true,state:true}}}},
+      quotation:{select:{id:true,quotationNumber:true,status:true,vendorId:true,totalAmount:true,transportationCost:true,packingCost:true,unpackingCost:true,labourCost:true,otherCost:true,discountAmount:true,currency:true,vendor:{select:{vendorCode:true,companyName:true,gstNumber:true,state:true}}}},
       commercialTermRequests:{where:{status:CommercialTermRequestStatus.PENDING},select:{id:true}},
     }}),
     prisma.paymentCommercialTermRequest.findMany({where:{status},orderBy:{submittedAt:"asc"},take:200,select:requestSelection}),
@@ -52,7 +53,8 @@ export async function getCommercialTermWorkspace(status: CommercialTermRequestSt
   const candidates = payments.flatMap(payment => {
     const quotation = payment.quotation;
     if (!quotation || quotation.status !== QuotationStatus.ACCEPTED || payment.booking.selectedQuotationId !== quotation.id || locked(payment.commercialReference) || payment.commercialTermRequests.length) return [];
-    return [{ paymentId:payment.id,paymentNumber:payment.paymentNumber,bookingNumber:payment.booking.bookingNumber,customerPayableAmount:Number(payment.totalAmount),currency:payment.currency,quotationId:quotation.id,quotationNumber:quotation.quotationNumber,vendorId:quotation.vendorId,vendorQuotedAmount:Number(quotation.totalAmount),vendor:quotation.vendor }];
+    const policy=calculatePlatformFee(quotation);
+    return [{ paymentId:payment.id,paymentNumber:payment.paymentNumber,bookingNumber:payment.booking.bookingNumber,customerPayableAmount:Number(payment.totalAmount),currency:payment.currency,quotationId:quotation.id,quotationNumber:quotation.quotationNumber,vendorId:quotation.vendorId,vendorQuotedAmount:Number(quotation.totalAmount),platformFeeBase:policy.base,platformFeeAmount:policy.fee,vendor:quotation.vendor }];
   });
   return { candidates, requests };
 }
@@ -71,7 +73,7 @@ export async function submitCommercialTermRequest(input: SubmitInput) {
   if (gstTreatment===CommercialTaxTreatment.NOT_APPLICABLE&&!taxOverrideReason) throw new CommercialTermError("TAX_REASON_REQUIRED","Record the reason when GST is not applicable.",400);
 
   return prisma.$transaction(async tx => {
-    const payment=await tx.payment.findUnique({where:{id:input.paymentId},select:{id:true,totalAmount:true,currency:true,commercialReference:true,businessSegment:true,metadata:true,booking:{select:{selectedQuotationId:true,serviceType:true,moveType:true,requirementsJson:true}},quotation:{select:{id:true,quotationNumber:true,status:true,vendorId:true,totalAmount:true,pricingBreakdown:true,vendor:{select:{gstNumber:true,state:true}}}}}});
+    const payment=await tx.payment.findUnique({where:{id:input.paymentId},select:{id:true,totalAmount:true,currency:true,commercialReference:true,businessSegment:true,metadata:true,booking:{select:{selectedQuotationId:true,serviceType:true,moveType:true,requirementsJson:true}},quotation:{select:{id:true,quotationNumber:true,status:true,vendorId:true,totalAmount:true,transportationCost:true,packingCost:true,unpackingCost:true,labourCost:true,otherCost:true,discountAmount:true,pricingBreakdown:true,vendor:{select:{gstNumber:true,state:true}}}}}});
     if (!payment?.quotation) throw new CommercialTermError("PAYMENT_NOT_ELIGIBLE","Select a payment linked to an accepted vendor quotation.",404);
     if (payment.quotation.status!==QuotationStatus.ACCEPTED||payment.booking.selectedQuotationId!==payment.quotation.id) throw new CommercialTermError("QUOTATION_NOT_ACCEPTED","Commission can be locked only for the booking's accepted quotation.",409);
     if (locked(payment.commercialReference)) throw new CommercialTermError("COMMISSION_ALREADY_LOCKED","Commission is already locked for this payment.",409);
@@ -79,9 +81,16 @@ export async function submitCommercialTermRequest(input: SubmitInput) {
     const revisedFromId=text(input.revisedFromId,64);
     const previous=revisedFromId?await tx.paymentCommercialTermRequest.findUnique({where:{id:revisedFromId},select:{id:true,paymentId:true,status:true,revisionNumber:true}}):null;
     if (revisedFromId&&(!previous||previous.paymentId!==payment.id||previous.status!==CommercialTermRequestStatus.REJECTED)) throw new CommercialTermError("INVALID_REVISION_SOURCE","Only a rejected request for the same payment can be revised.",409);
-    const commissionBase=Number(payment.quotation.totalAmount);
+    if (commissionRate!==PLATFORM_FEE_RATE_PERCENT) throw new CommercialTermError("PLATFORM_FEE_POLICY_MISMATCH",`Launch platform fee must be ${PLATFORM_FEE_RATE_PERCENT}%.`,400);
+    const policy=calculatePlatformFee(payment.quotation);
+    const commissionBase=policy.base;
     const businessSegment=payment.businessSegment??deriveFinancialBusinessSegment({serviceType:payment.booking.serviceType,moveType:payment.booking.moveType,requirementsJson:payment.booking.requirementsJson,paymentMetadata:payment.metadata,pricingBreakdown:payment.quotation.pricingBreakdown});
-    const taxes=calculateCommercialTaxes({commissionBase,commissionRate,gstTreatment,gstRate,tcsApplicable,tcsRate:tcsRate||0,tcsBase:commissionBase});
+    const calculatedTaxes=calculateCommercialTaxes({commissionBase,commissionRate,gstTreatment,gstRate,tcsApplicable,tcsRate:tcsRate||0,tcsBase:commissionBase});
+    const taxMultiplier=calculatedTaxes.platformCommissionAmount?policy.fee/calculatedTaxes.platformCommissionAmount:0;
+    const taxes={...calculatedTaxes,platformCommissionAmount:policy.fee,cgstAmount:round(calculatedTaxes.cgstAmount*taxMultiplier),sgstAmount:round(calculatedTaxes.sgstAmount*taxMultiplier),igstAmount:round(calculatedTaxes.igstAmount*taxMultiplier)};
+    taxes.totalGstAmount=round(taxes.cgstAmount+taxes.sgstAmount+taxes.igstAmount);
+    taxes.platformInvoiceAmount=round(taxes.platformCommissionAmount+taxes.cgstAmount+taxes.sgstAmount+taxes.igstAmount);
+    taxes.totalSettlementDeduction=round(taxes.platformInvoiceAmount+taxes.tcsAmount);
     if (taxes.totalSettlementDeduction>commissionBase) throw new CommercialTermError("DEDUCTIONS_EXCEED_QUOTE","Commission, GST and TCS deductions cannot exceed the vendor quotation.",400);
     const request=await tx.paymentCommercialTermRequest.create({data:{paymentId:payment.id,vendorId:payment.quotation.vendorId,quotationId:payment.quotation.id,businessSegment,customerPayableAmount:payment.totalAmount,vendorQuotedAmount:payment.quotation.totalAmount,
       platformCommissionAmount:decimal(taxes.platformCommissionAmount),commissionRate:rateDecimal(commissionRate),commissionBase:decimal(commissionBase),gstTreatment,gstRate:rateDecimal(gstTreatment===CommercialTaxTreatment.NOT_APPLICABLE?0:gstRate),

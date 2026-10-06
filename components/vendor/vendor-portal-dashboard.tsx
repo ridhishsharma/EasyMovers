@@ -5,6 +5,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./vendor-portal.module.css";
 import performanceStyles from "./vendor-performance.module.css";
 import ledgerStyles from "./vendor-financial-ledger.module.css";
+import quoteStyles from "./vendor-quotation.module.css";
+import { calculatePlatformFee } from "@/lib/platform-fee-policy";
 
 type PortalData = {
   user: { fullName: string; email: string | null; mobile: string };
@@ -46,7 +48,7 @@ type Opportunity = {
     id: string; quotationNumber: string; status: string; transportationCost: number;
     packingCost: number; unpackingCost: number; labourCost: number; insuranceCost: number;
     otherCost: number; discountAmount: number; taxAmount: number; totalAmount: number;
-    validUntil: string | null; remarks: string | null; createdAt: string; updatedAt: string; editable: boolean;
+    validUntil: string | null; inclusions: unknown; exclusions: unknown; remarks: string | null; createdAt: string; updatedAt: string; editable: boolean;
   };
 };
 
@@ -72,7 +74,8 @@ export function VendorPortalDashboard({ supabaseUrl, publishableKey }: { supabas
   const [quoting, setQuoting] = useState<Opportunity | null>(null);
   const [declining, setDeclining] = useState<Opportunity | null>(null);
   const [declineReason, setDeclineReason] = useState("");
-  const emptyQuote = { transportationCost: "", packingCost: "0", unpackingCost: "0", labourCost: "0", insuranceCost: "0", otherCost: "0", discountAmount: "0", taxAmount: "0", validUntil: "", remarks: "" };
+  const standardInclusions = ["Packing material", "Loading and unloading", "Furniture dismantling and reassembly", "Appliance uninstalling and installation", "Rope-pulling service", "Unpacking and placement", "Preferred pickup timing", "Dedicated move coordination"];
+  const emptyQuote = { transportationCost: "", packingCost: "0", unpackingCost: "0", labourCost: "0", insuranceCost: "0", otherCost: "0", discountAmount: "0", taxAmount: "0", validUntil: "", remarks: "", inclusions: [] as string[], exclusions: "", platformFeeAcknowledged: false };
   const [quote, setQuote] = useState(emptyQuote);
   const [quotationFilter, setQuotationFilter] = useState<"ALL" | "IN_PROGRESS" | "ACCEPTED" | "NOT_ACCEPTED">("ALL");
   const [ledgerFilter, setLedgerFilter] = useState<"ALL" | "OUTSTANDING" | "SETTLED" | "COMMISSION_PENDING">("ALL");
@@ -158,7 +161,7 @@ export function VendorPortalDashboard({ supabaseUrl, publishableKey }: { supabas
       if (totalAmount <= 0) throw new Error("Quotation total must be greater than zero.");
       const response = await request(`/api/vendor/opportunities/${quoting.id}/quotation`, {
         method: quoting.myQuotation ? "PUT" : "POST",
-        body: JSON.stringify({ ...amounts, totalAmount, validUntil: quote.validUntil ? new Date(`${quote.validUntil}T23:59:59+05:30`).toISOString() : undefined, remarks: quote.remarks }),
+        body: JSON.stringify({ ...amounts, totalAmount, validUntil: quote.validUntil ? new Date(`${quote.validUntil}T23:59:59+05:30`).toISOString() : undefined, remarks: quote.remarks, inclusions: { items: quote.inclusions }, exclusions: { items: quote.exclusions.split("\n").map(item => item.trim()).filter(Boolean) }, platformFeeAcknowledged: quote.platformFeeAcknowledged }),
       });
       const payload = await response.json();
       if (!response.ok || !payload.success) throw new Error(payload.error?.message || "Quotation could not be submitted.");
@@ -185,12 +188,13 @@ export function VendorPortalDashboard({ supabaseUrl, publishableKey }: { supabas
 
   function prepareQuotation(item: Opportunity) {
     const current = item.myQuotation;
+    const list = (value: unknown) => value && typeof value === "object" && !Array.isArray(value) && Array.isArray((value as {items?:unknown}).items) ? (value as {items:string[]}).items : [];
     setQuote(current ? {
       transportationCost: String(current.transportationCost), packingCost: String(current.packingCost),
       unpackingCost: String(current.unpackingCost), labourCost: String(current.labourCost),
       insuranceCost: String(current.insuranceCost), otherCost: String(current.otherCost),
       discountAmount: String(current.discountAmount), taxAmount: String(current.taxAmount),
-      validUntil: current.validUntil?.slice(0, 10) || "", remarks: current.remarks || "",
+      validUntil: current.validUntil?.slice(0, 10) || "", remarks: current.remarks || "", inclusions: list(current.inclusions), exclusions: list(current.exclusions).join("\n"), platformFeeAcknowledged: false,
     } : emptyQuote);
     setQuoting(item);
   }
@@ -199,6 +203,9 @@ export function VendorPortalDashboard({ supabaseUrl, publishableKey }: { supabas
   const submittedQuotations = opportunities.filter(item => item.myQuotation);
   const performanceQuotations = data?.quotationPerformance.recent.filter(item => quotationFilter === "ALL" || item.outcome === quotationFilter) || [];
   const ledgerRows = data?.financialLedger.rows.filter(item => ledgerFilter === "ALL" || (ledgerFilter === "OUTSTANDING" && (item.vendorOutstanding || 0) > 0) || (ledgerFilter === "SETTLED" && item.vendorNetPayable !== null && item.vendorOutstanding === 0) || (ledgerFilter === "COMMISSION_PENDING" && item.commissionStatus === "PENDING_CONFIGURATION")) || [];
+  const quoteAmounts = {transportationCost:Number(quote.transportationCost),packingCost:Number(quote.packingCost),unpackingCost:Number(quote.unpackingCost),labourCost:Number(quote.labourCost),insuranceCost:Number(quote.insuranceCost),otherCost:Number(quote.otherCost),discountAmount:Number(quote.discountAmount),taxAmount:Number(quote.taxAmount)};
+  const quoteTotal = quoteAmounts.transportationCost+quoteAmounts.packingCost+quoteAmounts.unpackingCost+quoteAmounts.labourCost+quoteAmounts.insuranceCost+quoteAmounts.otherCost+quoteAmounts.taxAmount-quoteAmounts.discountAmount;
+  const feePreview = calculatePlatformFee({...quoteAmounts,totalAmount:quoteTotal});
   if (!data) return <main className={styles.page}><section className={styles.loading}>{message || "Loading your vendor workspace…"}</section></main>;
   return <main className={styles.page}>
     <section className={styles.hero}>
@@ -301,18 +308,21 @@ export function VendorPortalDashboard({ supabaseUrl, publishableKey }: { supabas
     {quoting && <form className={styles.quoteForm} onSubmit={submitQuotation}>
       <div className={styles.sectionTitle}><div><p className={styles.eyebrow}>SECURE VENDOR QUOTATION</p><h2>{quoting.myQuotation ? `Modify ${quoting.myQuotation.quotationNumber}` : quoting.bookingNumber}</h2></div><button type="button" className={styles.close} onClick={() => setQuoting(null)}>Close</button></div>
       <div className={styles.quoteFields}>
-        <label>Transportation ₹<input type="number" min="0" step="0.01" required value={quote.transportationCost} onChange={event => setQuote(current => ({ ...current, transportationCost: event.target.value }))} /></label>
-        <label>Packing ₹<input type="number" min="0" step="0.01" value={quote.packingCost} onChange={event => setQuote(current => ({ ...current, packingCost: event.target.value }))} /></label>
-        <label>Unpacking ₹<input type="number" min="0" step="0.01" value={quote.unpackingCost} onChange={event => setQuote(current => ({ ...current, unpackingCost: event.target.value }))} /></label>
-        <label>Labour ₹<input type="number" min="0" step="0.01" value={quote.labourCost} onChange={event => setQuote(current => ({ ...current, labourCost: event.target.value }))} /></label>
-        <label>Insurance ₹<input type="number" min="0" step="0.01" value={quote.insuranceCost} onChange={event => setQuote(current => ({ ...current, insuranceCost: event.target.value }))} /></label>
-        <label>Other charges ₹<input type="number" min="0" step="0.01" value={quote.otherCost} onChange={event => setQuote(current => ({ ...current, otherCost: event.target.value }))} /></label>
-        <label>Discount ₹<input type="number" min="0" step="0.01" value={quote.discountAmount} onChange={event => setQuote(current => ({ ...current, discountAmount: event.target.value }))} /></label>
-        <label>Tax ₹<input type="number" min="0" step="0.01" value={quote.taxAmount} onChange={event => setQuote(current => ({ ...current, taxAmount: event.target.value }))} /></label>
+        <label>Transportation ₹<input type="number" min="0" step="0.01" required value={quote.transportationCost} onChange={event => setQuote(current => ({ ...current, transportationCost: event.target.value, platformFeeAcknowledged: false }))} /></label>
+        <label>Packing ₹<input type="number" min="0" step="0.01" value={quote.packingCost} onChange={event => setQuote(current => ({ ...current, packingCost: event.target.value, platformFeeAcknowledged: false }))} /></label>
+        <label>Unpacking ₹<input type="number" min="0" step="0.01" value={quote.unpackingCost} onChange={event => setQuote(current => ({ ...current, unpackingCost: event.target.value, platformFeeAcknowledged: false }))} /></label>
+        <label>Labour ₹<input type="number" min="0" step="0.01" value={quote.labourCost} onChange={event => setQuote(current => ({ ...current, labourCost: event.target.value, platformFeeAcknowledged: false }))} /></label>
+        <label>Insurance ₹<input type="number" min="0" step="0.01" value={quote.insuranceCost} onChange={event => setQuote(current => ({ ...current, insuranceCost: event.target.value, platformFeeAcknowledged: false }))} /></label>
+        <label>Other charges ₹<input type="number" min="0" step="0.01" value={quote.otherCost} onChange={event => setQuote(current => ({ ...current, otherCost: event.target.value, platformFeeAcknowledged: false }))} /></label>
+        <label>Discount ₹<input type="number" min="0" step="0.01" value={quote.discountAmount} onChange={event => setQuote(current => ({ ...current, discountAmount: event.target.value, platformFeeAcknowledged: false }))} /></label>
+        <label>Tax ₹<input type="number" min="0" step="0.01" value={quote.taxAmount} onChange={event => setQuote(current => ({ ...current, taxAmount: event.target.value, platformFeeAcknowledged: false }))} /></label>
         <label>Valid until<input type="date" required value={quote.validUntil} onChange={event => setQuote(current => ({ ...current, validUntil: event.target.value }))} /></label>
       </div>
+      <fieldset className={quoteStyles.inclusions}><legend>What is included in your price?</legend>{standardInclusions.map(item=><label key={item}><input type="checkbox" checked={quote.inclusions.includes(item)} onChange={event=>setQuote(current=>({...current,inclusions:event.target.checked?[...current.inclusions,item]:current.inclusions.filter(value=>value!==item),platformFeeAcknowledged:false}))}/>{item}</label>)}</fieldset>
+      <label>Important exclusions, one per line<textarea maxLength={1000} value={quote.exclusions} onChange={event=>setQuote(current=>({...current,exclusions:event.target.value,platformFeeAcknowledged:false}))} placeholder="Example: Storage beyond the moving date" /></label>
       <label>Remarks<textarea maxLength={1000} value={quote.remarks} onChange={event => setQuote(current => ({ ...current, remarks: event.target.value }))} /></label>
-      <button disabled={busy}>{busy ? "Saving…" : quoting.myQuotation ? "Save revised quotation" : "Submit quotation"}</button>
+      <section className={quoteStyles.payoutPreview}><div><span>Customer quotation</span><strong>₹{Math.max(0,quoteTotal).toLocaleString("en-IN")}</strong></div><div><span>Estimated EasyMovers platform fee</span><strong>₹{feePreview.fee.toLocaleString("en-IN")}</strong></div><div><span>Estimated vendor payout</span><strong>₹{feePreview.estimatedVendorPayoutBeforeTaxes.toLocaleString("en-IN")}</strong></div><p>Estimate before GST on platform services, statutory withholding and approved settlement adjustments.</p><label><input type="checkbox" checked={quote.platformFeeAcknowledged} onChange={event=>setQuote(current=>({...current,platformFeeAcknowledged:event.target.checked}))}/>I understand the estimated platform fee and vendor payout.</label></section>
+      <button disabled={busy||!quote.platformFeeAcknowledged}>{busy ? "Saving…" : quoting.myQuotation ? "Save revised quotation" : "Submit quotation"}</button>
     </form>}
   </main>;
 }

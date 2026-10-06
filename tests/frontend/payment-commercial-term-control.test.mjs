@@ -34,6 +34,8 @@ test("commercial terms calculate an immutable GST and TCS snapshot with revision
   assert.match(schema, /revisedFromId\s+String\?/);
   assert.match(migration, /PaymentCommercialTermRequest_tax_amounts_check/);
   assert.match(service, /calculateCommercialTaxes/);
+  assert.match(service, /calculatePlatformFee/);
+  assert.match(service, /PLATFORM_FEE_POLICY_MISMATCH/);
   assert.match(service, /COMMISSION_TERMS_REVISED/);
   assert.match(service, /commercialTermRevision/);
   assert.match(collection, /taxOverrideReason/);
