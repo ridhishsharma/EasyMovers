@@ -47,6 +47,7 @@ export async function GET(request: Request, context: { params: Promise<{ leadId:
   if (!leadId || leadId.length > 100)
     return reply({ success: false, error: { code: "INVALID_LEAD", message: "Choose a valid lead." } }, 400);
   try {
+    const assignmentAccess = await authorizeCrmPermission(request, CRM_PERMISSIONS.LEAD_ASSIGN);
     const lead = await prisma.lead.findUnique({
       where: { id: leadId },
       select: {
@@ -94,6 +95,38 @@ export async function GET(request: Request, context: { params: Promise<{ leadId:
     });
     if (!lead)
       return reply({ success: false, error: { code: "LEAD_NOT_FOUND", message: "Lead not found." } }, 404);
+    const surveyAssignees = assignmentAccess.authorized
+      ? await prisma.user.findMany({
+          where: {
+            isActive: true,
+            crmRoleAssignments: {
+              some: {
+                revokedAt: null,
+                OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+                role: {
+                  isActive: true,
+                  permissions: {
+                    some: {
+                      permission: {
+                        code: CRM_PERMISSIONS.LEAD_ASSIGN,
+                        isActive: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          orderBy: { fullName: "asc" },
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            mobile: true,
+          },
+          take: 100,
+        })
+      : [];
     const notes = readNotes(lead.notes);
     const photos = await signInventoryPhotos(lead.inventory?.photos || []);
     const { notes: _notes, inventory, ...summary } = lead;
@@ -117,6 +150,8 @@ export async function GET(request: Request, context: { params: Promise<{ leadId:
         surveyPreference: notes.surveyPreference === "REQUESTED" ? "REQUESTED" : "VENDOR_DECIDES",
         surveyStatus: notes.surveyPreference === "REQUESTED" ? "PENDING" : "NOT_REQUESTED",
       },
+      surveyAssignees,
+      capabilities: { canAssignSurvey: assignmentAccess.authorized },
       inventory: inventory ? { ...inventory, photos } : null,
     } });
   } catch (error) {

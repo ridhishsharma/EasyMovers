@@ -117,7 +117,7 @@ export async function listVendorOpportunities(vendorId: string) {
         { quotations: { some: { vendorId } } },
       ],
     },
-    orderBy: [{ moveDate: "asc" }, { createdAt: "asc" }],
+    orderBy: [{ createdAt: "desc" }, { moveDate: "asc" }],
     take: 100,
     select: {
       id: true, bookingNumber: true, leadId: true, serviceType: true, moveType: true, moveDate: true,

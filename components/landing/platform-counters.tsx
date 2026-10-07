@@ -54,6 +54,11 @@ export function PlatformCounters() {
     : metrics?.configuration === "invalid" ? "Some platform figures are unavailable pending review."
     : metrics?.configuration === "partial" ? "Available approved platform figures."
     : "Approved platform figures.";
+  const publishable = status === "ready" && metrics?.configuration === "ready"
+    && metrics.verifiedVendors !== null && metrics.verifiedVendors >= 500
+    && metrics.successfulMoves !== null && metrics.successfulMoves >= 1000
+    && metrics.citiesCovered !== null && metrics.rating !== null;
+  if (!publishable) return null;
   return <section className={styles.counterSection} aria-label="Platform figures" data-status={status === "ready" ? metrics?.configuration : status}>
     <div className={styles.counterGrid}>{items.map(({ label, value, Icon, rating }) => <div key={label}><span aria-hidden="true"><Icon size={24} /></span><Counter value={value} rating={rating} /><p>{label}</p></div>)}</div>
     <p className={styles.counterNote} role="status">{message}{status !== "ready" && metrics ? " Showing last loaded approved figures." : ""}{metrics?.updatedAt ? ` Updated ${new Date(metrics.updatedAt).toLocaleDateString("en-IN")}.` : ""}</p>

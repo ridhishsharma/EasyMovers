@@ -64,7 +64,15 @@ export async function updateSurveyOperations(surveyId: string, input: Record<str
   if (action === "SCHEDULE") {
     const scheduledAt = new Date(String(input.scheduledAt || ""));
     if (!Number.isFinite(scheduledAt.getTime()) || scheduledAt <= new Date()) throw new MoveSurveyError("INVALID_SURVEY_SCHEDULE", "Choose a future survey time.");
-    return prisma.moveSurvey.update({ where: { id: surveyId }, data: { status: MoveSurveyStatus.SCHEDULED, scheduledAt, assignedToUserId: text(input.assignedToUserId, 100) || null, assignedToVendorId: text(input.assignedToVendorId, 100) || null }, include: surveyInclude });
+    const assignedToUserId = text(input.assignedToUserId, 100) || null;
+    if (!assignedToUserId) throw new MoveSurveyError("SURVEY_ASSIGNEE_REQUIRED", "Choose an active authorised staff member.");
+    const assignee = await prisma.user.findFirst({ where: { id: assignedToUserId, isActive: true, crmRoleAssignments: { some: { revokedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }], role: { isActive: true, permissions: { some: { permission: { code: "lead.assign", isActive: true } } } } } } }, select: { id: true } });
+    if (!assignee) throw new MoveSurveyError("INVALID_SURVEY_ASSIGNEE", "The selected staff member is not active or authorised for lead assignment.", 400);
+    return prisma.$transaction(async tx => {
+      const survey = await tx.moveSurvey.update({ where: { id: surveyId }, data: { status: MoveSurveyStatus.SCHEDULED, mode: MoveSurveyMode.PHYSICAL, scheduledAt, assignedToUserId, assignedToVendorId: null }, include: surveyInclude });
+      await tx.crmAuditLog.create({ data: { actorUserId, action: "MOVE_SURVEY_ASSIGNED", entityType: "MoveSurvey", entityId: surveyId, metadata: { assignedToUserId, scheduledAt: scheduledAt.toISOString() } } });
+      return survey;
+    });
   }
   if (action === "APPROVE") {
     if (current.status !== MoveSurveyStatus.REVIEW_PENDING) throw new MoveSurveyError("SURVEY_REVIEW_REQUIRED", "Only a submitted survey can be approved.", 409);

@@ -232,15 +232,15 @@
   border: 0;
   padding: 12px 8px;
   border-radius: 8px;
-  background: transparent;
-  color: #476481;
+  background: #e5edf5;
+  color: #365875;
   font-weight: 600;
   cursor: pointer;
 }
 .tabs .active {
-  background: white;
-  color: #165ca3;
-  box-shadow: 0 2px 7px #183d6412;
+  background: #145f9f;
+  color: white;
+  box-shadow: 0 3px 9px #123f6b30;
 }
 .location {
   margin: 0 0 14px;
@@ -284,6 +284,7 @@
   padding: 10px;
   color: #12365b;
   background: white;
+  font-size: 14px;
 }
 .item button {
   height: 42px;

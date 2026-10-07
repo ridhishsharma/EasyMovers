@@ -64,6 +64,20 @@ function RequirementGroup({ title, value }: { title: string; value: unknown }) {
   return <article><h3>{title}</h3>{rows.length ? <dl>{rows.map(([name, value], index) => <div key={`${name}-${index}`}><dt>{name}</dt><dd>{value}</dd></div>)}</dl> : <p>No additional details provided.</p>}</article>;
 }
 
+function InventoryByCategory({ value }: { value: unknown }) {
+  const items = Array.isArray(value) ? value.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item)) : [];
+  const groups = items.reduce<Record<string, Array<{ name: string; quantity: string; notes: string[] }>>>((result, item) => {
+    const category = String(item.category || "Other").replaceAll("_", " ");
+    const name = String(item.itemName || item.name || "Declared item");
+    const quantity = String(item.quantity || 1);
+    const notes = [item.fragile === true ? "Fragile" : "", item.requiresPacking === true ? "Packing required" : ""].filter(Boolean);
+    (result[category] ||= []).push({ name, quantity, notes });
+    return result;
+  }, {});
+  const categories = Object.entries(groups).sort(([left], [right]) => left.localeCompare(right));
+  return <article><h3>Inventory and declared items — grouped by category</h3>{categories.length ? <dl>{categories.flatMap(([category, entries])=>entries.sort((left,right)=>left.name.localeCompare(right.name)).map((item,index)=><div key={`${category}-${item.name}-${index}`}><dt>{index === 0 ? category : ""}</dt><dd><strong>{item.name} × {item.quantity}</strong>{item.notes.length ? <small> · {item.notes.join(" · ")}</small> : null}</dd></div>))}</dl> : <p>No declared inventory items.</p>}</article>;
+}
+
 export function VendorPortalDashboard({ supabaseUrl, publishableKey }: { supabaseUrl: string; publishableKey: string }) {
   const client = useMemo(() => createClient(supabaseUrl, publishableKey), [supabaseUrl, publishableKey]);
   const [data, setData] = useState<PortalData | null>(null);
@@ -296,7 +310,7 @@ export function VendorPortalDashboard({ supabaseUrl, publishableKey }: { supabas
       <div className={styles.routeSummary}><div><span>Pickup</span><strong>{viewing.pickupCity}, {viewing.pickupState} {viewing.pickupPincode}</strong></div><b>→</b><div><span>Delivery</span><strong>{viewing.dropCity}, {viewing.dropState} {viewing.dropPincode}</strong></div><div><span>Move date</span><strong>{new Date(viewing.moveDate).toLocaleDateString("en-IN")}</strong></div></div>
       <p className={styles.privacyNote}>Customer identity, phone number, email and precise private address are hidden until the commercial workflow authorises disclosure.</p>
       <div className={styles.requirementGrid}>
-        <RequirementGroup title="Inventory and declared items" value={viewing.inventory} />
+        <InventoryByCategory value={viewing.inventory} />
         <RequirementGroup title="Inventory summary" value={viewing.inventorySummary} />
         <RequirementGroup title="Requested services" value={viewing.requestedServices} />
         <RequirementGroup title="Move requirements" value={viewing.requirements} />

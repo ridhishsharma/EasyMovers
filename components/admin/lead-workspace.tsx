@@ -29,6 +29,8 @@ type LeadDetail = Lead & {
   }>;
   bookings: Array<{ id: string; bookingNumber: string; bookingStatus: string; paymentStatus: string; totalAmount: string; currency: string; createdAt: string }>;
   moveSurveys: Array<{ id: string; surveyNumber: string; version: number; status: string; mode: string; assignedToUserId: string | null; assignedToVendorId: string | null; scheduledAt: string | null; customerConfirmedAt: string | null; submittedAt: string | null; reviewedAt: string | null; approvedAt: string | null; sharedAt: string | null; reviewRemarks: string | null; _count: { rooms: number; media: number } }>;
+  surveyAssignees: Array<{ id: string; fullName: string; email: string | null; mobile: string }>;
+  capabilities: { canAssignSurvey: boolean };
 };
 type Pagination = { page: number; pageSize: number; total: number; totalPages: number };
 
@@ -116,11 +118,39 @@ function LeadDetailPanel({ detail, loading, supabaseUrl, publishableKey, onReloa
     <DetailSection title="Addresses and access"><dl><dt>Pickup</dt><dd>{show(detail.request.pickupAddress)}<small>{[detail.pickupCity, detail.pickupState, detail.pickupPincode].filter(Boolean).join(", ")}</small></dd><dt>Destination</dt><dd>{show(detail.request.destinationAddress)}<small>{[detail.destinationCity, detail.destinationState, detail.destinationPincode].filter(Boolean).join(", ")}</small></dd><dt>Pickup access</dt><dd>Floor {show(detail.inventory?.pickupFloor ?? detail.pickupFloor)} · Lift {detail.inventory ? (detail.inventory.pickupLiftAvailable ? "Yes" : "No") : show(detail.liftAvailable)}</dd><dt>Destination access</dt><dd>Floor {show(detail.inventory?.destinationFloor ?? detail.request.destinationFloor)} · Lift {detail.inventory ? (detail.inventory.destinationLiftAvailable ? "Yes" : "No") : show(detail.request.destinationLift)}</dd><dt>Parking / loading</dt><dd>{show(detail.request.parking)}</dd></dl></DetailSection>
     <DetailSection title={`Declared inventory (${detail.inventory?.items.length || 0})`}>{!detail.inventory?.items.length ? <p>No inventory items recorded.</p> : <div className={styles.itemList}>{detail.inventory.items.map(item => <article key={item.id}><strong>{item.quantity} × {item.itemName}</strong><span>{label(item.category)}</span><small>{item.fragile ? "Fragile · " : ""}{item.requiresPacking ? "Packing required" : "No packing requested"}</small></article>)}</div>}</DetailSection>
     <DetailSection title={`Inventory photos (${detail.inventory?.photos.length || 0})`}>{!detail.inventory?.photos.length ? <p>No photos uploaded.</p> : <div className={styles.photoGrid}>{detail.inventory.photos.map(photo => photo.url ? <a key={photo.id} href={photo.url} target="_blank" rel="noreferrer">{/* Signed private URLs are intentionally rendered without the public Next.js image optimizer. */}<img src={photo.url} alt={photo.roomType ? `${photo.roomType} inventory` : "Customer inventory"}/><span>{photo.roomType || "Inventory photo"}</span></a> : <article key={photo.id}>Photo temporarily unavailable</article>)}</div>}</DetailSection>
-    <DetailSection title={`Surveys (${detail.moveSurveys.length})`}>{detail.moveSurveys.length === 0 ? <p>No survey has been scheduled for this lead.</p> : <div className={styles.recordList}>{detail.moveSurveys.map(survey => <article key={survey.id}><strong>{survey.surveyNumber} · Version {survey.version}</strong><span>{label(survey.mode)} · {label(survey.status)}</span><small>{survey.scheduledAt ? `Scheduled ${dateTime(survey.scheduledAt)}` : "Schedule pending"} · {survey._count.rooms} room(s) · {survey._count.media} media file(s)</small>{survey.reviewRemarks ? <small>{survey.reviewRemarks}</small> : null}</article>)}</div>}</DetailSection>
+    <SurveyAssignment key={`${detail.id}-${detail.moveSurveys[0]?.id || "new"}`} detail={detail} supabaseUrl={supabaseUrl} publishableKey={publishableKey} onReload={onReload}/>
     <LeadVendorInvitations leadId={detail.id} supabaseUrl={supabaseUrl} publishableKey={publishableKey} address={{ pickupAddress: detail.request.pickupAddress, pickupPincode: detail.pickupPincode, destinationAddress: detail.request.destinationAddress, destinationPincode: detail.destinationPincode }} onAddressUpdated={() => void onReload(detail.id)}/>
     <DetailSection title={`Quotations (${detail.quotations.length})`}>{detail.quotations.length === 0 ? <p>No vendor quotations received yet.</p> : <><p className={styles.sectionHint}>Staff can inspect the complete commercial offer here. Customer delivery and acceptance must use the protected comparison journey.</p><div className={styles.quotationList}>{detail.quotations.map((quotation, index) => <QuotationCard key={quotation.id} quotation={quotation} position={index + 1}/>)}</div></>}</DetailSection>
     <DetailSection title={`Bookings (${detail.bookings.length})`}>{detail.bookings.length === 0 ? <p>No booking created.</p> : <div className={styles.recordList}>{detail.bookings.map(booking => <article key={booking.id}><strong>{booking.bookingNumber}</strong><span>{label(booking.bookingStatus)} · {label(booking.paymentStatus)}</span><small>{booking.currency} {booking.totalAmount}</small></article>)}</div>}</DetailSection>
   </aside>;
+}
+
+function SurveyAssignment({ detail, supabaseUrl, publishableKey, onReload }: { detail: LeadDetail; supabaseUrl: string; publishableKey: string; onReload: (leadId: string) => Promise<void> }) {
+  const latest = detail.moveSurveys[0] || null;
+  const [assignee, setAssignee] = useState(latest?.assignedToUserId || "");
+  const [scheduledAt, setScheduledAt] = useState(latest?.scheduledAt ? new Date(latest.scheduledAt).toISOString().slice(0, 16) : "");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  async function action(kind: "CREATE" | "SCHEDULE") {
+    if (kind === "SCHEDULE" && (!latest || !assignee || !scheduledAt)) { setMessage("Choose an active staff member and a future survey time."); return; }
+    setBusy(true); setMessage("");
+    try {
+      const client = createClient(supabaseUrl, publishableKey);
+      const { data } = await client.auth.getSession();
+      if (!data.session) throw new Error("Sign in again to manage the survey.");
+      const response = await fetch(`/api/admin/leads/${encodeURIComponent(detail.id)}/surveys`, { method: "POST", cache: "no-store", headers: { Authorization: `Bearer ${data.session.access_token}`, "Content-Type": "application/json" }, body: JSON.stringify(kind === "CREATE" ? { action: "CREATE" } : { action: "SCHEDULE", surveyId: latest!.id, assignedToUserId: assignee, scheduledAt: new Date(scheduledAt).toISOString() }) });
+      const payload = await response.json();
+      if (!response.ok || !payload.success) throw new Error(payload.error?.message || "Unable to update the survey.");
+      setMessage(kind === "CREATE" ? "Survey record created. Assign it to staff now." : "Survey assigned and scheduled successfully.");
+      await onReload(detail.id);
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Unable to update the survey."); }
+    finally { setBusy(false); }
+  }
+  return <DetailSection title={`Surveys (${detail.moveSurveys.length})`}>
+    {detail.moveSurveys.length === 0 ? <p>No tracked survey exists. Create one before assigning staff.</p> : <div className={styles.recordList}>{detail.moveSurveys.map(survey => <article key={survey.id}><strong>{survey.surveyNumber} · Version {survey.version}</strong><span>{label(survey.mode)} · {label(survey.status)}</span><small>{survey.assignedToUserId ? detail.surveyAssignees.find(user => user.id === survey.assignedToUserId)?.fullName || "Assigned staff" : "Unassigned"} · {survey._count.rooms} room(s) · {survey._count.media} media file(s){survey.scheduledAt ? ` · ${dateTime(survey.scheduledAt)}` : ""}</small></article>)}</div>}
+    {detail.capabilities.canAssignSurvey && <div className={styles.invitationActions}>{!latest ? <button type="button" disabled={busy} onClick={() => void action("CREATE")}>{busy ? "Creating…" : "Create survey record"}</button> : <><label>Assign survey staff<select value={assignee} disabled={busy} onChange={event => setAssignee(event.target.value)}><option value="">Select active staff</option>{detail.surveyAssignees.map(user => <option key={user.id} value={user.id}>{user.fullName}{user.email ? ` · ${user.email}` : ""}</option>)}</select></label><label>Survey date and time<input type="datetime-local" min={new Date(Date.now() + 300000).toISOString().slice(0, 16)} value={scheduledAt} disabled={busy} onChange={event => setScheduledAt(event.target.value)}/></label><button type="button" disabled={busy || !assignee || !scheduledAt} onClick={() => void action("SCHEDULE")}>{busy ? "Saving…" : latest.assignedToUserId ? "Update assignment" : "Assign & schedule"}</button></>}</div>}
+    {message && <p className={styles.successMessage} role="status">{message}</p>}
+  </DetailSection>;
 }
 
 function QuotationCard({ quotation, position }: { quotation: LeadDetail["quotations"][number]; position: number }) {
