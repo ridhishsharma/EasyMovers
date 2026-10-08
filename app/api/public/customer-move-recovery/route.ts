@@ -63,10 +63,10 @@ export async function POST(request: Request) {
       if (!recovery || recovery.reference !== reference) return reply({ success: false, message: "Recovery verification has expired. Verify your mobile again." }, 401);
       const lead = await prisma.lead.findFirst({
         where: { id: recovery.id, referenceId: reference, mobile: recovery.mobile },
-        select: { id: true, referenceId: true, inventory: { select: { status: true } }, quotations: { where: { status: { in: ["SUBMITTED", "REVISED", "SHORTLISTED"] } }, take: 1, select: { id: true } } },
+        select: { id: true, referenceId: true, inventory: { select: { status: true } }, quotations: { where: { status: { in: ["SUBMITTED", "REVISED", "SHORTLISTED"] } }, take: 1, select: { id: true } }, bookings: { orderBy: { createdAt: "desc" }, take: 1, select: { selectedQuotationId: true } } },
       });
       if (!lead) return reply({ success: false, message: "Move not found." }, 404);
-      const destination = lead.inventory?.status === "SUBMITTED" && lead.quotations.length ? `/quotes/${encodeURIComponent(reference)}` : `/draft/${encodeURIComponent(reference)}`;
+      const destination = lead.bookings[0]?.selectedQuotationId || (lead.inventory?.status === "SUBMITTED" && lead.quotations.length) ? `/quotes/${encodeURIComponent(reference)}` : `/draft/${encodeURIComponent(reference)}`;
       return reply({ success: true, destination }, 200, customerAccessCookie(lead.id, lead.referenceId, new URL(request.url).protocol === "https:"));
     }
     return reply({ success: false, message: "Choose a valid recovery action." }, 400);

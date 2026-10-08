@@ -40,6 +40,7 @@ const draftLeadSelect = {
   lastUpdatedAt: true,
   status: true,
   quotations: { select: { status: true } },
+  bookings: { orderBy: { createdAt: "desc" }, take: 1, select: { bookingNumber: true, selectedQuotationId: true, bookingStatus: true } },
 } as const;
 function text(data: Record<string, unknown>, key: string, max = 300) {
   const value = data[key] ?? "";
@@ -246,13 +247,18 @@ export async function GET(req: Request) {
     const quotationCount = lead.quotations.filter((quotation) =>
       ["SUBMITTED", "REVISED", "SHORTLISTED"].includes(quotation.status),
     ).length;
-    const { id, notes, quotations, ...safeLead } = lead;
+    const { id, notes, quotations, bookings, ...safeLead } = lead;
     return reply({
       success: true,
       lead: safeLead,
       metadata,
       inventory,
       quotationCount,
+      selection: {
+        bookingNumber: bookings[0]?.bookingNumber || null,
+        selectedQuotationId: bookings[0]?.selectedQuotationId || null,
+        bookingStatus: bookings[0]?.bookingStatus || null,
+      },
     });
   } catch {
     return reply(

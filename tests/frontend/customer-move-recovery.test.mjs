@@ -26,8 +26,19 @@ test("move recovery requires verified mobile and short-lived signed selection", 
 });
 
 test("selected quotation replaces the offer count with the next booking stage", async () => {
-  const ui = await read("components/moving/customer-quotation-comparison.tsx");
+  const [ui, draft, enquiry, recovery, layout] = await Promise.all([
+    read("components/moving/customer-quotation-comparison.tsx"),
+    read("components/moving/draft-editor.tsx"),
+    read("app/api/public/moving-enquiry/route.ts"),
+    read("app/api/public/customer-move-recovery/route.ts"),
+    read("components/moving/moving.module.css"),
+  ]);
   assert.match(ui, /Quotation selected/);
   assert.match(ui, /Booking confirmation pending/);
   assert.match(ui, /data\?\.selection\.selectedQuotationId/);
+  assert.match(enquiry, /selectedQuotationId: true/);
+  assert.match(draft, /QUOTATION SELECTED/);
+  assert.match(draft, /Continue booking/);
+  assert.match(recovery, /lead\.bookings\[0\]\?\.selectedQuotationId/);
+  assert.match(layout, /\.sidebar \{\s*position: static/);
 });

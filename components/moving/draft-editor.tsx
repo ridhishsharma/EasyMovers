@@ -56,6 +56,8 @@ export function DraftEditor({ reference }: { reference: string }) {
     mode: "",
     status: "",
     quotationCount: 0,
+    selectedQuotationId: "",
+    bookingNumber: "",
   });
   const dirty = useRef(false),
     lock = useRef(false);
@@ -95,6 +97,8 @@ export function DraftEditor({ reference }: { reference: string }) {
           mode: meta.mode,
           status: lead.status || "NEW",
           quotationCount: Number(data.quotationCount || 0),
+          selectedQuotationId: data.selection?.selectedQuotationId || "",
+          bookingNumber: data.selection?.bookingNumber || "",
         });
       })
       .catch((reason) => {
@@ -632,7 +636,18 @@ export function DraftEditor({ reference }: { reference: string }) {
             <span className={styles.status}>
               {locked ? "Submitted" : "Draft"}
             </span>
-            {locked && route.quotationCount > 0 && (
+            {locked && route.selectedQuotationId && (
+              <section className={styles.selectedQuoteSummary}>
+                <span>QUOTATION SELECTED</span>
+                <strong>Booking confirmation pending</strong>
+                {route.bookingNumber && <p>Booking reference: {route.bookingNumber}</p>}
+                <p>Your selected offer is locked. Continue to review the selection and complete booking confirmation.</p>
+                <Link className={styles.primary} href={`/quotes/${encodeURIComponent(reference)}`}>
+                  Continue booking →
+                </Link>
+              </section>
+            )}
+            {locked && route.quotationCount > 0 && !route.selectedQuotationId && (
               <section className={styles.quoteSummary}>
                 <span>QUOTATIONS READY</span>
                 <strong>{route.quotationCount} vendor quotation{route.quotationCount === 1 ? "" : "s"} received</strong>
