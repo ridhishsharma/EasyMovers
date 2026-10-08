@@ -12,9 +12,12 @@ export async function customerQuotationComparison(leadId: string) {
     where: { id: leadId },
     select: {
       referenceId: true, pickupCity: true, destinationCity: true, shiftingDate: true,
-      bookings: { orderBy: { createdAt: "desc" }, take: 1, select: { id: true, bookingNumber: true, selectedQuotationId: true } },
+      bookings: { orderBy: { createdAt: "desc" }, take: 1, select: {
+        id: true, bookingNumber: true, selectedQuotationId: true, bookingStatus: true,
+        payments: { select: { id: true, paymentNumber: true, totalAmount: true, advanceAmount: true, paidAmount: true, paymentStatus: true } },
+      } },
       quotations: {
-        where: { status: { in: [QuotationStatus.SUBMITTED, QuotationStatus.REVISED, QuotationStatus.SHORTLISTED] } },
+        where: { status: { in: [QuotationStatus.SUBMITTED, QuotationStatus.REVISED, QuotationStatus.SHORTLISTED, QuotationStatus.ACCEPTED] } },
         orderBy: { createdAt: "asc" },
         select: {
           id: true, quotationNumber: true, status: true, currency: true,
@@ -79,6 +82,16 @@ export async function customerQuotationComparison(leadId: string) {
     selection: {
       bookingNumber: booking?.bookingNumber || null,
       selectedQuotationId: booking?.selectedQuotationId || null,
+      bookingStatus: booking?.bookingStatus || null,
+      payment: booking?.payments ? {
+        id: booking.payments.id,
+        paymentNumber: booking.payments.paymentNumber,
+        currency: lead.quotations.find(quotation => quotation.id === booking.selectedQuotationId)?.currency || "INR",
+        totalAmount: number(booking.payments.totalAmount),
+        advanceAmount: number(booking.payments.advanceAmount),
+        paidAmount: number(booking.payments.paidAmount),
+        status: booking.payments.paymentStatus,
+      } : null,
     },
     recommendation: { version: RECOMMENDATION_VERSION, weights, quotationId: recommendedId, explanation },
     quotations: scored.map(item => ({ ...item, recommended: item.id === recommendedId })),

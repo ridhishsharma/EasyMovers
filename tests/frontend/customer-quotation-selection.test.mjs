@@ -23,6 +23,6 @@ test("quotation comparison requires explicit confirmation and reflects the locke
   assert.match(ui, /Confirm your quotation choice/);
   assert.match(ui, /It does not collect payment yet/);
   assert.match(ui, /Another offer selected/);
-  assert.match(ui, /Booking confirmation and advance payment are the next secure steps/);
+  assert.match(ui, /Confirm the booking details to calculate and prepare the secure advance/);
   assert.doesNotMatch(ui, /Secure quotation acceptance will be enabled in the next step/);
 });
