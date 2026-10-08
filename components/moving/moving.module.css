@@ -454,6 +454,23 @@
   gap: 14px;
   margin-top: 20px;
 }
+.recoveredMoves {
+  display: grid;
+  gap: 9px;
+}
+.recoveredMoves button {
+  display: grid;
+  gap: 4px;
+  padding: 13px;
+  border: 1px solid #c9dbea;
+  border-radius: 10px;
+  background: #fff;
+  color: #12365b;
+  text-align: left;
+  cursor: pointer;
+}
+.recoveredMoves button:hover { border-color: #165ca3; background: #f3f8fd; }
+.recoveredMoves span, .recoveredMoves small { color: #60758b; }
 .leadPanel {
   padding: 22px;
   background: #123d69;

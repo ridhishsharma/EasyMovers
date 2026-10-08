@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 export const DRAFT_SECONDS = 30 * 24 * 60 * 60;
 export const CUSTOMER_ACCESS_SECONDS = 30 * 60;
+export const CUSTOMER_RECOVERY_SECONDS = 5 * 60;
 export function enquirySecret() {
   const value = process.env.ENQUIRY_SESSION_SECRET;
   if (!value || value.length < 32) throw Error("Draft session unavailable");
@@ -73,6 +74,27 @@ export function customerAccessCookie(
 
 export function clearCustomerAccessCookie(reference: string, secure: boolean) {
   return `${draftCookieName(reference)}=; HttpOnly; SameSite=Lax; Path=/api; Max-Age=0${secure ? "; Secure" : ""}`;
+}
+
+export function customerRecoveryToken(id: string, reference: string, mobile: string) {
+  const payload = Buffer.from(JSON.stringify({ id, reference, mobile, expires: Date.now() + CUSTOMER_RECOVERY_SECONDS * 1000 })).toString("base64url");
+  return `${payload}.${draftSignature(payload)}`;
+}
+
+export function readCustomerRecoveryToken(token: string) {
+  const [payload, signature, extra] = token.split(".");
+  if (!payload || !signature || extra || token.length > 1800) return null;
+  const expected = Buffer.from(draftSignature(payload));
+  const actual = Buffer.from(signature);
+  if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) return null;
+  try {
+    const data = JSON.parse(Buffer.from(payload, "base64url").toString()) as Record<string, unknown>;
+    return typeof data.id === "string" && typeof data.reference === "string" && /^[6-9]\d{9}$/.test(String(data.mobile)) && Number(data.expires) > Date.now()
+      ? { id: data.id, reference: data.reference, mobile: String(data.mobile) }
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 function normalizedOrigin(value: string | null | undefined) {
