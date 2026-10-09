@@ -1337,6 +1337,24 @@ export async function findPrismaPaymentRecordById(
   } catch (
     error
   ) {
+    // Local integration-test diagnostics only. Never log connection URLs,
+    // raw Prisma messages, query arguments, or customer/payment records.
+    if (process.env.PAYMENT_INTEGRATION_TEST === "1") {
+      const prismaCode =
+        error instanceof Prisma.PrismaClientKnownRequestError
+          ? error.code
+          : undefined;
+      const meta =
+        error instanceof Prisma.PrismaClientKnownRequestError
+          ? error.meta
+          : undefined;
+      console.error("[B2:PRISMA_READ_FAILURE]", {
+        errorName: error instanceof Error ? error.name : typeof error,
+        prismaCode,
+        modelName: typeof meta?.modelName === "string" ? meta.modelName : undefined,
+        column: typeof meta?.column === "string" ? meta.column : undefined,
+      });
+    }
     throw normalizePrismaPaymentRepositoryError(
       error
     );
