@@ -30,7 +30,9 @@ test("public confirmation requires the verified reference session", async () => 
 
 test("quotation comparison exposes the advance preparation stage", async () => {
   const ui = await read("components/moving/customer-quotation-comparison.tsx");
-  assert.match(ui, /Confirm details & prepare advance/);
+  assert.match(ui, /Confirm Your Booking/);
   assert.match(ui, /Secure advance due/);
-  assert.match(ui, /No payment has been collected yet/);
+  assert.match(ui, /Pay Secure Advance/);
+assert.match(ui, /\/api\/public\/booking-payment-order/);
+assert.match(ui, /Confirm Your Booking/);
 });
