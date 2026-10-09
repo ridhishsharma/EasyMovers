@@ -133,8 +133,21 @@ test("B3 concurrent INR 400 and INR 600 collections preserve both writes", async
     const outcomes = await Promise.allSettled([
       collect(400, "SPLIT-A"), collect(600, "SPLIT-B"),
     ]);
+    const rejected = outcomes.filter(
+      (outcome): outcome is PromiseRejectedResult => outcome.status === "rejected",
+    );
+    if (rejected.length) {
+      // Only log bounded metadata; never serialize raw Prisma errors or details.
+      for (const outcome of rejected) {
+        const reason = outcome.reason as { name?: unknown; code?: unknown } | null;
+        console.error("[B3:SPLIT_COLLECTION_REJECTION]", {
+          name: typeof reason?.name === "string" ? reason.name : "UNKNOWN",
+          code: typeof reason?.code === "string" ? reason.code : "UNKNOWN",
+        });
+      }
+    }
     assert.equal(outcomes.filter((x) => x.status === "fulfilled").length, 2,
-      "Both valid collections must eventually commit; inspect retry behavior if this fails");
+      "Both valid collections must eventually commit; inspect safe rejection code above");
     await verify(f, 1000, 2);
   } finally {
     await cleanup(f);
