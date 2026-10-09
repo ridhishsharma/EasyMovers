@@ -8,7 +8,7 @@ import {
   fetchCapturedRazorpayPayment,
   verifyRazorpayCheckoutSignature,
 } from "@/lib/payments/razorpay-verification";
-import { resolvePaymentApiCollectionWorkflowService } from "@/app/api/payments/_lib/payment-api.module";
+import { resolvePaymentApiCollectionWorkflowService, resolvePaymentApiBookingSyncService } from "@/app/api/payments/_lib/payment-api.module";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -91,8 +91,21 @@ export async function POST(request: Request) {
           decimalPaise(prior.amount) !== amount || prior.currency !== "INR" || prior.status !== "SUCCESS") {
         throw new VerifyError("PAYMENT_REPLAY_CONFLICT", "Payment identity requires manual review.");
       }
+      // A duplicate capture must not re-enter the collection workflow. Retry only
+      // the idempotent Payment -> Booking projection if it is still incomplete.
+      const sync = await prisma.paymentBookingSync.findUnique({
+        where: { paymentId: order.paymentId }, select: { status: true },
+      });
+      if (!sync || sync.status !== "SYNCHRONIZED") {
+        const service = await resolvePaymentApiBookingSyncService();
+        const result = await service.syncPaymentToBooking({
+          paymentId: order.paymentId, updatedBy: "RAZORPAY_TEST_CHECKOUT_REPLAY",
+        });
+        if (!result.success) throw new VerifyError("BOOKING_SYNC_PENDING",
+          "Advance is recorded but booking synchronization is pending. Do not pay again.", 503);
+      }
       return reply({ success: true, data: { verified: true, recorded: true, duplicate: true,
-        bookingConfirmed: false }, message: "Payment was previously recorded. Booking confirmation is being processed." });
+        bookingConfirmed: false }, message: "Advance is recorded and synchronized. Continue to booking confirmation." });
     }
     if (order.status === PaymentGatewayOrderStatus.PAID || Number(order.payment.paidAmount) !== 0) {
       throw new VerifyError("PAYMENT_RECONCILIATION_REQUIRED", "Payment is being reconciled. Do not pay again.");
@@ -104,7 +117,7 @@ export async function POST(request: Request) {
     // The canonical collection workflow owns the transaction, financial summary,
     // gateway-order transition and Booking financial projection.
     const workflow = await resolvePaymentApiCollectionWorkflowService();
-    await workflow.recordSuccessfulCollection({
+    const result = await workflow.recordSuccessfulCollection({
       paymentId: order.paymentId,
       amount: amount / 100,
       currency: "INR",
@@ -115,6 +128,10 @@ export async function POST(request: Request) {
       synchronizedBy: "RAZORPAY_TEST_CHECKOUT",
       remarks: "Razorpay Test Mode captured booking advance; verified server-side.",
     });
+    if (!result.bookingSynchronization.success) {
+      throw new VerifyError("BOOKING_SYNC_PENDING",
+        "Advance is recorded but booking synchronization is pending. Do not pay again.", 503);
+    }
     return reply({ success: true, data: { verified: true, recorded: true, duplicate: false,
       bookingConfirmed: false }, message: "Advance payment verified and recorded. Booking confirmation is pending." });
   } catch (error) {

@@ -7,7 +7,7 @@ import {
   fetchCapturedRazorpayPayment,
   verifyRazorpayWebhookSignature,
 } from "@/lib/payments/razorpay-verification";
-import { resolvePaymentApiCollectionWorkflowService } from "@/app/api/payments/_lib/payment-api.module";
+import { resolvePaymentApiCollectionWorkflowService, resolvePaymentApiBookingSyncService } from "@/app/api/payments/_lib/payment-api.module";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -113,15 +113,31 @@ export async function POST(request: Request) {
     }
     if (!existing) {
       const workflow = await resolvePaymentApiCollectionWorkflowService();
-      await workflow.recordSuccessfulCollection({
+      const result = await workflow.recordSuccessfulCollection({
         paymentId: order.paymentId, amount: amount / 100, currency: "INR",
         purpose: PaymentPurpose.ADVANCE, provider: PaymentProvider.RAZORPAY,
         gateway: { provider: PaymentProvider.RAZORPAY, gatewayOrderId: orderId, gatewayPaymentId: paymentId },
         updatedBy: "RAZORPAY_TEST_WEBHOOK", synchronizedBy: "RAZORPAY_TEST_WEBHOOK",
         remarks: "Razorpay Test Mode captured booking advance; verified server-side.",
       });
+      if (!result.bookingSynchronization.success) {
+        return respond({ success: false, code: "BOOKING_SYNC_PENDING" }, 503);
+      }
+    } else {
+      // Financial collection already exists: never collect it again. Recover
+      // the booking projection using the domain's idempotent sync service.
+      const sync = await prisma.paymentBookingSync.findUnique({
+        where: { paymentId: order.paymentId }, select: { status: true },
+      });
+      if (!sync || sync.status !== "SYNCHRONIZED") {
+        const service = await resolvePaymentApiBookingSyncService();
+        const result = await service.syncPaymentToBooking({
+          paymentId: order.paymentId, updatedBy: "RAZORPAY_TEST_WEBHOOK_REPLAY",
+        });
+        if (!result.success) return respond({ success: false, code: "BOOKING_SYNC_PENDING" }, 503);
+      }
     }
-    // Mark processed only after financial recording succeeded or an exact replay was verified.
+    // Mark processed only after financial recording and Booking sync are complete.
     await prisma.paymentWebhook.updateMany({
       where: { provider: PrismaPaymentProvider.RAZORPAY, providerEventId: eventId,
         payloadHash: hash, gatewayOrderId: orderId, gatewayPaymentId: paymentId },

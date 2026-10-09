@@ -2,11 +2,11 @@ import { NextResponse } from "next/server";
 import { PaymentGatewayOrderStatus, PaymentProvider, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { checkOrigin, readDraftSession } from "@/lib/enquiry-session";
+import { inspectRazorpayOrder, RazorpayVerificationError } from "@/lib/payments/razorpay-verification";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 const reply = (body: object, status = 200) => NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });
-const active = [PaymentGatewayOrderStatus.CREATED, PaymentGatewayOrderStatus.PENDING];
 
 class OrderError extends Error {
   constructor(readonly code: string, message: string, readonly status = 409) { super(message); }
@@ -70,15 +70,34 @@ export async function POST(request: Request) {
       }
       if (paid >= advance) throw new OrderError("ADVANCE_ALREADY_PAID", "Booking advance is already collected.");
       const due = advance - paid;
-      const existing = payment.gatewayOrders.find( item => item.status === "CREATED" || item.status === "PENDING")
-      if (existing) {
-        if (existing.currency !== "INR" || Number(existing.amount.mul(100).toFixed(0)) !== due) {
-          throw new OrderError("ORDER_REVIEW_REQUIRED", "An existing order requires staff review.");
-        }
-        return { orderId: existing.gatewayOrderId, amount: due, currency: "INR", keyId, reused: true };
-      }
+      // Any already-paid local order is a reconciliation signal, never a reason
+      // to create a fresh order or reopen checkout.
       if (payment.gatewayOrders.some(item => item.status === PaymentGatewayOrderStatus.PAID)) {
         throw new OrderError("ORDER_RECONCILIATION_REQUIRED", "Payment confirmation is being reconciled.");
+      }
+      const pendingOrders = payment.gatewayOrders.filter(item =>
+        item.status === PaymentGatewayOrderStatus.CREATED ||
+        item.status === PaymentGatewayOrderStatus.PENDING
+      );
+      if (pendingOrders.length > 1) {
+        throw new OrderError("MULTIPLE_ACTIVE_ORDERS", "Multiple gateway orders require reconciliation.");
+      }
+      const existing = pendingOrders[0];
+      if (existing) {
+        if (existing.currency !== "INR" || paise(existing.amount) !== due) {
+          throw new OrderError("ORDER_REVIEW_REQUIRED", "An existing order requires staff review.");
+        }
+        // Fail closed on API errors, partial/paginated gateway history, paid
+        // orders and any non-final payment attempt (authorized/captured/etc.).
+        // This check is required even when the local status remains CREATED.
+        const remote = await inspectRazorpayOrder(existing.gatewayOrderId, keyId, keySecret);
+        if (remote.currency !== "INR" || remote.amount !== due) {
+          throw new OrderError("GATEWAY_ORDER_MISMATCH", "Gateway order amount requires review.");
+        }
+        if (remote.requiresReconciliation) {
+          throw new OrderError("ORDER_RECONCILIATION_REQUIRED", "A gateway payment may already exist. Check payment status before retrying.");
+        }
+        return { orderId: existing.gatewayOrderId, amount: due, currency: "INR", keyId, reused: true };
       }
 
       const controller = new AbortController();
@@ -110,6 +129,7 @@ export async function POST(request: Request) {
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 15000, maxWait: 5000 });
     return reply({ success: true, data: order });
   } catch (error) {
+    if (error instanceof RazorpayVerificationError) return reply({ success: false, code: error.code, message: error.message }, error.status);
     if (error instanceof OrderError) return reply({ success: false, code: error.code, message: error.message }, error.status);
     if (error instanceof SyntaxError) return reply({ success: false, message: "Invalid JSON body." }, 400);
     if (error instanceof Error && error.message === "Invalid origin") return reply({ success: false, message: "Origin not permitted." }, 403);
