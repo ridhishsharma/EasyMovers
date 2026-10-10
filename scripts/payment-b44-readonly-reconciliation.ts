@@ -16,6 +16,7 @@ assert.ok(url.password);
 assert.deepEqual([...url.searchParams.entries()], [["schema", "public"]]);
 assert.equal(url.hash, "");
 
+async function main(): Promise<void> {
 const prisma = new PrismaClient();
 type Finding = { check: string; count: number; examples: string[] };
 const findings: Finding[] = [];
@@ -90,3 +91,10 @@ try {
 } finally {
   await prisma.$disconnect();
 }
+
+}
+
+main().catch(error => {
+  console.error("B4.4A reconciliation audit failed:", error);
+  process.exitCode = 1;
+});
