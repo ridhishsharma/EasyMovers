@@ -112,6 +112,9 @@ webhookBookingRecovery: [
 webhookRetryLifecycle: [
   "tests/payment-integration/razorpay-webhook-retry-lifecycle.test.ts",
 ],
+webhookHttpPostgres: [
+  "tests/payment-integration/razorpay-webhook-http-postgres-rejection.test.ts",
+],
 };
 const suite = process.argv[2] || "smoke";
 if (process.argv.length > 3 || !Object.hasOwn(suites, suite)) {
