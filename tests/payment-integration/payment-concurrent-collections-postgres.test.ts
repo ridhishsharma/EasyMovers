@@ -242,3 +242,95 @@ test("B3.4 failed financial update rolls back transaction and booking sync", asy
     await cleanup(f);
   }
 });
+
+
+// B3.5: A failed attempt must leave its idempotency identifiers reusable.
+// Once a retry commits, replaying those same identifiers must never double-credit.
+test("B3.5 failed collection recovers once and replay cannot double-credit", async () => {
+  const f = await fixture();
+  try {
+    const module = createPrismaPaymentRepositoryModule(f.prisma);
+    const transactionId = `B3-TXN-RECOVERY-${f.suffix}`;
+    const gatewayPaymentId = `B3-GW-RECOVERY-${f.suffix}`;
+    const input = {
+      paymentId: f.paymentId,
+      amount: 400,
+      transactionId,
+      provider: PaymentProvider.OTHER,
+      gateway: { provider: PaymentProvider.OTHER, gatewayPaymentId },
+      completedAt: new Date().toISOString(),
+      updatedBy: "PAYMENT_INTEGRATION_TEST",
+    };
+
+    let inserted = false;
+    const failingManager: Pick<typeof module.transactionManager, "runInTransaction"> = {
+      runInTransaction: (callback) =>
+        module.transactionManager.runInTransaction(async (context) => {
+          const original = context.repository;
+          const decorated = new Proxy(original, {
+            get(target, property, receiver) {
+              if (property === "createTransaction") {
+                return async (...args: Parameters<typeof target.createTransaction>) => {
+                  const result = await target.createTransaction(...args);
+                  inserted = true;
+                  return result;
+                };
+              }
+              if (property === "updateFinancialSummary") {
+                return async () => {
+                  assert.equal(inserted, true);
+                  throw new Error("B3_RECOVERY_INJECTION");
+                };
+              }
+              const value = Reflect.get(target, property, receiver);
+              return typeof value === "function" ? value.bind(target) : value;
+            },
+          });
+          return callback({ repository: decorated });
+        }),
+    };
+
+    await assert.rejects(
+      () => recordSuccessfulPaymentCollection(failingManager, input),
+      "Injected failure must reject the first attempt",
+    );
+    assert.equal(inserted, true, "First attempt must reach transaction insertion");
+    let payment = await f.prisma.payment.findUniqueOrThrow({ where: { id: f.paymentId } });
+    assert.equal(Number(payment.paidAmount), 0);
+    assert.equal(Number(payment.balanceAmount), 1000);
+    assert.equal(await f.prisma.paymentTransaction.count({
+      where: { paymentId: f.paymentId },
+    }), 0);
+    assert.equal(await f.prisma.paymentBookingSync.count({
+      where: { paymentId: f.paymentId },
+    }), 0);
+
+    // Retry with the identical business and gateway identifiers after rollback.
+    await recordSuccessfulPaymentCollection(module.transactionManager, input);
+    await verify(f, 400, 1);
+    assert.equal(await f.prisma.paymentTransaction.count({
+      where: { paymentId: f.paymentId, gatewayPaymentId },
+    }), 1);
+    assert.equal(await f.prisma.paymentBookingSync.count({
+      where: { paymentId: f.paymentId },
+    }), 1);
+
+    // A replay may reject as duplicate (current service contract), but must
+    // never create another transaction or increment the collected balance.
+    await assert.rejects(
+      () => recordSuccessfulPaymentCollection(module.transactionManager, input),
+      "A successfully recorded collection must not be credited again",
+    );
+    await verify(f, 400, 1);
+    payment = await f.prisma.payment.findUniqueOrThrow({ where: { id: f.paymentId } });
+    assert.equal(Number(payment.paymentPending), 600);
+    assert.equal(await f.prisma.paymentTransaction.count({
+      where: { paymentId: f.paymentId },
+    }), 1);
+    assert.equal(await f.prisma.paymentBookingSync.count({
+      where: { paymentId: f.paymentId },
+    }), 1);
+  } finally {
+    await cleanup(f);
+  }
+});
