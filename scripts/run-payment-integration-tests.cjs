@@ -94,6 +94,9 @@ webhookSecurity: [
 webhookHttp: [
   "tests/payment-integration/razorpay-webhook-http.test.ts",
 ],
+webhookReceipt: [
+  "tests/payment-integration/razorpay-webhook-receipt-postgres.test.ts",
+],
 };
 const suite = process.argv[2] || "smoke";
 if (process.argv.length > 3 || !Object.hasOwn(suites, suite)) {
