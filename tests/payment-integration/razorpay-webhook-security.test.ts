@@ -25,7 +25,7 @@ const require = createRequire(import.meta.url);
 const marker = require.resolve("server-only");
 require.cache[marker] = { id: marker, filename: marker, loaded: true, exports: {} } as NodeJS.Module;
 const { verifyRazorpayWebhookSignature, verifyRazorpayCheckoutSignature } =
-  await import("../../lib/payments/razorpay-verification");
+  require("../../lib/payments/razorpay-verification") as typeof import("../../lib/payments/razorpay-verification");
 
 const secret = "B4_LOCAL_TEST_SECRET_NOT_A_REAL_CREDENTIAL";
 const body = JSON.stringify({
