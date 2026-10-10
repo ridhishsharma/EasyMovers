@@ -118,6 +118,9 @@ webhookHttpPostgres: [
 webhookHttpCollection: [
   "tests/payment-integration/razorpay-webhook-http-postgres-collection.test.ts",
 ],
+webhookHttpConcurrency: [
+  "tests/payment-integration/razorpay-webhook-http-postgres-concurrency.test.ts",
+],
 };
 const suite = process.argv[2] || "smoke";
 if (process.argv.length > 3 || !Object.hasOwn(suites, suite)) {
