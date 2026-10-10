@@ -171,3 +171,76 @@ test("B3 concurrent duplicate gateway payment IDs cannot double-credit", async (
     await cleanup(f);
   }
 });
+
+// B3.4: Inject a controlled failure AFTER the transaction row is inserted,
+// while still inside the real Prisma Serializable transaction. The repository
+// decorator delegates all reads/writes except the deliberately failing step.
+// This verifies the public service's atomic rollback without production hooks.
+test("B3.4 failed financial update rolls back transaction and booking sync", async () => {
+  const f = await fixture();
+  try {
+    const module = createPrismaPaymentRepositoryModule(f.prisma);
+    const injected = new Error("B3_ROLLBACK_INJECTION");
+    let transactionInserted = false;
+    const failingManager = {
+      runInTransaction: async <T>(
+        callback: Parameters<typeof module.transactionManager.runInTransaction<T>>[0],
+      ): Promise<T> =>
+        module.transactionManager.runInTransaction(async (context) => {
+          const original = context.repository;
+          const decorated = new Proxy(original, {
+            get(target, property, receiver) {
+              if (property === "createTransaction") {
+                return async (...args: Parameters<typeof target.createTransaction>) => {
+                  const created = await target.createTransaction(...args);
+                  transactionInserted = true;
+                  return created;
+                };
+              }
+              if (property === "updateFinancialSummary") {
+                return async () => {
+                  assert.equal(transactionInserted, true,
+                    "Failure must occur after the transaction insert");
+                  throw injected;
+                };
+              }
+              const value = Reflect.get(target, property, receiver);
+              return typeof value === "function" ? value.bind(target) : value;
+            },
+          });
+          return callback({ repository: decorated });
+        }),
+    };
+
+    await assert.rejects(
+      () => recordSuccessfulPaymentCollection(failingManager, {
+        paymentId: f.paymentId,
+        amount: 400,
+        transactionId: `B3-TXN-ROLLBACK-${f.suffix}`,
+        provider: PaymentProvider.OTHER,
+        gateway: {
+          provider: PaymentProvider.OTHER,
+          gatewayPaymentId: `B3-GW-ROLLBACK-${f.suffix}`,
+        },
+        completedAt: new Date().toISOString(),
+        updatedBy: "PAYMENT_INTEGRATION_TEST",
+      }),
+    );
+    assert.equal(transactionInserted, true,
+      "Injection must have followed an actual database transaction insert");
+
+    const payment = await f.prisma.payment.findUniqueOrThrow({
+      where: { id: f.paymentId },
+    });
+    assert.equal(Number(payment.paidAmount), 0);
+    assert.equal(Number(payment.balanceAmount), 1000);
+    assert.equal(await f.prisma.paymentTransaction.count({
+      where: { paymentId: f.paymentId },
+    }), 0, "Transaction insert must roll back");
+    assert.equal(await f.prisma.paymentBookingSync.count({
+      where: { paymentId: f.paymentId },
+    }), 0, "No booking sync should survive the failed collection");
+  } finally {
+    await cleanup(f);
+  }
+});
