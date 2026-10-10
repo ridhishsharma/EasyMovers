@@ -106,6 +106,9 @@ webhookFinancialConcurrency: [
 webhookRecovery: [
   "tests/payment-integration/razorpay-webhook-recovery-postgres.test.ts",
 ],
+webhookBookingRecovery: [
+  "tests/payment-integration/razorpay-webhook-booking-sync-recovery.test.ts",
+],
 };
 const suite = process.argv[2] || "smoke";
 if (process.argv.length > 3 || !Object.hasOwn(suites, suite)) {
