@@ -127,6 +127,41 @@ webhookHttpConcurrency: [
 webhookFinalRecovery: [
   "tests/payment-integration/razorpay-webhook-http-postgres-finalization-recovery.test.ts",
 ],
+reconciliationAudit: [
+  "scripts/payment-b44-readonly-reconciliation.ts",
+],
+reconciliationRules: [
+  "tests/payment-integration/payment-b44-reconciliation-rules.test.ts",
+],
+
+webhookExceptions: [
+  "scripts/payment-b44-webhook-exceptions.ts",
+],
+webhookExceptionRules: [
+  "tests/payment-integration/payment-b44-webhook-exceptions.test.ts",
+],
+webhookExceptionsPostgres: [
+  "tests/payment-integration/payment-b44-webhook-exceptions-postgres.test.ts",
+],
+
+bookingSyncRules: [
+  "tests/payment-integration/payment-b44-booking-sync-rules.test.ts",
+],
+bookingSyncRecoveryPostgres: [
+  "tests/payment-integration/payment-b44-booking-sync-recovery-postgres.test.ts",
+],
+bookingSyncConcurrencyPostgres: [
+  "tests/payment-integration/payment-b44-booking-sync-concurrency-postgres.test.ts",
+],
+financialIntegrityPostgres: [
+  "tests/payment-integration/payment-b44d2-financial-integrity.test.ts",
+],
+financialIntegrityAnomaliesPostgres: [
+  "tests/payment-integration/payment-b44d2-populated-anomalies-postgres.test.ts",
+],
+financialLifecyclePostgres: [
+  "tests/payment-integration/payment-b44d2-lifecycle-integrity-postgres.test.ts",
+],
 };
 const suite = process.argv[2] || "smoke";
 if (process.argv.length > 3 || !Object.hasOwn(suites, suite)) {
