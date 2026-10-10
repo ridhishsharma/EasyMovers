@@ -18,14 +18,25 @@ assert.equal(url.searchParams.get("schema"), "public");
 assert.deepEqual([...url.searchParams.keys()], ["schema"]);
 assert.equal(url.hash, "");
 
-// The verification module imports Next's server-only marker. Stub only that
-// marker through Node's module resolution; do not modify production source.
+// The production verifier has a Next.js "server-only" sentinel import.
+// Intercept that sentinel only while loading the pure verification functions.
+// This avoids requiring the server-only package in this standalone Node test.
 import { createRequire } from "node:module";
+import Module from "node:module";
 const require = createRequire(import.meta.url);
-const marker = require.resolve("server-only");
-require.cache[marker] = { id: marker, filename: marker, loaded: true, exports: {} } as NodeJS.Module;
-const { verifyRazorpayWebhookSignature, verifyRazorpayCheckoutSignature } =
-  require("../../lib/payments/razorpay-verification") as typeof import("../../lib/payments/razorpay-verification");
+const moduleLoader = Module as typeof Module & { _load: (...args: unknown[]) => unknown };
+const originalLoad = moduleLoader._load;
+let verification: typeof import("../../lib/payments/razorpay-verification");
+try {
+  moduleLoader._load = function (request: unknown, ...args: unknown[]) {
+    if (request === "server-only") return {};
+    return originalLoad.call(this, request, ...args);
+  };
+  verification = require("../../lib/payments/razorpay-verification") as typeof import("../../lib/payments/razorpay-verification");
+} finally {
+  moduleLoader._load = originalLoad;
+}
+const { verifyRazorpayWebhookSignature, verifyRazorpayCheckoutSignature } = verification;
 
 const secret = "B4_LOCAL_TEST_SECRET_NOT_A_REAL_CREDENTIAL";
 const body = JSON.stringify({
