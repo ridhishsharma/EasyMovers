@@ -121,6 +121,20 @@ test("B4.2C simultaneous Razorpay collections sharing payment ID credit once", a
   const f = await createFixture();
   try {
     const outcomes = await Promise.allSettled([collect(f, "A"), collect(f, "B")]);
+    for (const [index, outcome] of outcomes.entries()) {
+      if (outcome.status === "rejected") {
+        const error = outcome.reason as { name?: unknown; code?: unknown; message?: unknown; cause?: { code?: unknown; message?: unknown } };
+        const safe = (v: unknown) => typeof v === "string" ? v.slice(0, 180) : "UNKNOWN";
+        console.error("[B4.2C:COLLECTION_REJECTION]", {
+          attempt: index + 1,
+          name: safe(error?.name),
+          code: safe(error?.code),
+          message: safe(error?.message),
+          causeCode: safe(error?.cause?.code),
+          causeMessage: safe(error?.cause?.message),
+        });
+      }
+    }
     assert.equal(outcomes.filter(x => x.status === "fulfilled").length, 1);
     assert.equal(outcomes.filter(x => x.status === "rejected").length, 1);
     await assertOneCredit(f);
@@ -140,6 +154,20 @@ test("B4.2C two event receipts cannot bypass unique financial payment ID", async
       })),
     });
     const outcomes = await Promise.allSettled([collect(f, "EVENT-A"), collect(f, "EVENT-B")]);
+    for (const [index, outcome] of outcomes.entries()) {
+      if (outcome.status === "rejected") {
+        const error = outcome.reason as { name?: unknown; code?: unknown; message?: unknown; cause?: { code?: unknown; message?: unknown } };
+        const safe = (v: unknown) => typeof v === "string" ? v.slice(0, 180) : "UNKNOWN";
+        console.error("[B4.2C:COLLECTION_REJECTION]", {
+          attempt: index + 1,
+          name: safe(error?.name),
+          code: safe(error?.code),
+          message: safe(error?.message),
+          causeCode: safe(error?.cause?.code),
+          causeMessage: safe(error?.cause?.message),
+        });
+      }
+    }
     assert.equal(outcomes.filter(x => x.status === "fulfilled").length, 1);
     assert.equal(outcomes.filter(x => x.status === "rejected").length, 1);
     await assertOneCredit(f);
