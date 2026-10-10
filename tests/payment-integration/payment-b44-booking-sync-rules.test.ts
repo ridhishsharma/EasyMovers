@@ -1,0 +1,13 @@
+import {test} from "node:test";
+import assert from "node:assert/strict";
+import {auditBookingSync,type SyncState,type PaymentState} from "../../scripts/payment-b44-booking-sync-rules";
+const now=Date.parse("2026-10-10T12:00:00Z");
+const p:PaymentState={id:"p1",bookingId:"b1",updatedAt:new Date(now-60000)};
+const s:SyncState={paymentId:"p1",bookingId:"b1",status:"SYNCHRONIZED",attemptCount:1,nextRetryAt:null,lastAttemptAt:null,paymentUpdatedAt:p.updatedAt,lastErrorCode:null};
+const reasons=(patch:Partial<SyncState>={},payment:PaymentState[]= [p])=>auditBookingSync(payment,[{...s,...patch}],now).map(x=>x.reason);
+test("B4.4C synchronized matching payment has no findings",()=>assert.deepEqual(reasons(),[]));
+test("B4.4C pending sync with retry due",()=>assert.deepEqual(reasons({status:"PENDING",nextRetryAt:new Date(now-1000)}),["SYNC_INCOMPLETE","RETRY_DUE"]));
+test("B4.4C detects repeated failure and sanitized error",()=>assert.deepEqual(reasons({status:"FAILED",attemptCount:3,lastErrorCode:"BOOKING_SYNC_FAILED"}),["SYNC_INCOMPLETE","REPEATED_SYNC_FAILURE","SYNC_ERROR_RECORDED"]));
+test("B4.4C identifies mismatched booking",()=>assert.deepEqual(reasons({bookingId:"b2"}),["BOOKING_ID_MISMATCH"]));
+test("B4.4C detects stale payment snapshot",()=>assert.deepEqual(reasons({paymentUpdatedAt:new Date(now-120000)}),["STALE_PAYMENT_PROJECTION"]));
+test("B4.4C missing payment is flagged",()=>assert.deepEqual(reasons({},[]),["MISSING_PAYMENT"]));
