@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { PrismaClient, PaymentProvider } from "@prisma/client";
+import { classifyWebhookExceptions } from "./payment-b44-webhook-exception-rules";
 
-// B4.4A read-only financial reconciliation audit.
+// B4.4B read-only webhook exception audit.
 // Isolated test DB ONLY. No writes, no external gateway calls, no secrets in output.
 assert.equal(process.env.PAYMENT_INTEGRATION_TEST, "1", "Use payment integration runner");
 assert.ok(process.env.DATABASE_URL);
@@ -33,24 +34,7 @@ async function main(): Promise<void> {
    where:{paymentId:{in:paymentIds}},
    select:{paymentId:true,status:true,attemptCount:true,nextRetryAt:true,lastErrorCode:true}
   });
-  const byGateway=new Map(transactions.filter(t=>t.gatewayPaymentId).map(t=>[t.gatewayPaymentId,t]));
-  const bySync=new Map(syncs.map(s=>[s.paymentId,s]));
-  const now=Date.now();
-  const exceptions=receipts.flatMap(r=>{
-   const reasons:string[]=[];
-   if(!r.processed)reasons.push("UNPROCESSED_RECEIPT");
-   if(!r.processed&&now-r.receivedAt.getTime()>15*60*1000)reasons.push("STALE_UNPROCESSED_RECEIPT");
-   if(r.errorCode)reasons.push("RECORDED_WEBHOOK_ERROR");
-   const txn=r.gatewayPaymentId?byGateway.get(r.gatewayPaymentId):undefined;
-   if(r.processed&&r.eventType==="payment.captured"&&(!txn||txn.paymentId!==r.paymentId))reasons.push("PROCESSED_CAPTURE_MISSING_SUCCESSFUL_TRANSACTION");
-   if(r.eventType==="payment.captured"&&r.paymentId){
-    const sync=bySync.get(r.paymentId);
-    if(txn&&!sync)reasons.push("SUCCESSFUL_CAPTURE_MISSING_BOOKING_SYNC");
-    else if(sync&&sync.status!=="SYNCHRONIZED")reasons.push("BOOKING_SYNC_NOT_COMPLETE");
-   }
-   return reasons.map(reason=>({receiptId:r.id,reason,ageMinutes:Math.floor((now-r.receivedAt.getTime())/60000),paymentId:r.paymentId,
-    nextAction:reason==="STALE_UNPROCESSED_RECEIPT"?"INVESTIGATE_RETRY":"MANUAL_REVIEW"}));
-  });
+  const exceptions=classifyWebhookExceptions(receipts,transactions,syncs,Date.now());
   console.log(JSON.stringify({audit:"B4.4B_READ_ONLY_WEBHOOK_EXCEPTIONS",totals:{receipts:receipts.length,exceptions:exceptions.length},exceptions:exceptions.slice(0,100)},null,2));
   assert.equal(exceptions.length,0,"Webhook exceptions require review; no financial records modified");
  }finally{await prisma.$disconnect();}
