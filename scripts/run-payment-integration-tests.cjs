@@ -76,8 +76,21 @@ if (url.hash) {
 // This script deliberately refuses arbitrary test paths. Add approved suites
 // here only after they have been reviewed for local-test isolation.
 const suites = {
-  smoke: ["tests/payment-integration/runner-smoke.test.ts"],
-  concurrency: ["tests/payment-integration/postgres-serializable.test.ts"],
+  smoke: [
+    "tests/payment-integration/runner-smoke.test.ts",
+  ],
+  concurrency: [
+    "tests/payment-integration/postgres-serializable.test.ts",
+  ],
+  collection: [
+    "tests/payment-integration/payment-collection-postgres.test.ts",
+  ],
+  collectionConcurrency: [
+    "tests/payment-integration/payment-concurrent-collections-postgres.test.ts",
+  ],
+webhookSecurity: [
+  "tests/payment-integration/razorpay-webhook-security.test.ts",
+],
 };
 const suite = process.argv[2] || "smoke";
 if (process.argv.length > 3 || !Object.hasOwn(suites, suite)) {
