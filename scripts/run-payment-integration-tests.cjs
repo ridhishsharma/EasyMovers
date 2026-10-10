@@ -109,6 +109,9 @@ webhookRecovery: [
 webhookBookingRecovery: [
   "tests/payment-integration/razorpay-webhook-booking-sync-recovery.test.ts",
 ],
+webhookRetryLifecycle: [
+  "tests/payment-integration/razorpay-webhook-retry-lifecycle.test.ts",
+],
 };
 const suite = process.argv[2] || "smoke";
 if (process.argv.length > 3 || !Object.hasOwn(suites, suite)) {
