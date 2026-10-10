@@ -91,6 +91,9 @@ const suites = {
 webhookSecurity: [
   "tests/payment-integration/razorpay-webhook-security.test.ts",
 ],
+webhookHttp: [
+  "tests/payment-integration/razorpay-webhook-http.test.ts",
+],
 };
 const suite = process.argv[2] || "smoke";
 if (process.argv.length > 3 || !Object.hasOwn(suites, suite)) {
