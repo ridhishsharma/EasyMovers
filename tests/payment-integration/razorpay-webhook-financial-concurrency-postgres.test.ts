@@ -60,7 +60,15 @@ async function createFixture(): Promise<Fixture> {
         currency: "INR", paymentStatus: "PENDING",
       },
     });
-    await prisma.paymentGatewayOrder.create({\n      data: {\n        paymentId: payment.id, provider: PrismaProvider.RAZORPAY,\n        gatewayOrderId: `order_${suffix}`, amount: 400, currency: "INR",\n        status: "CREATED",\n      },\n    });\n    return {\n      prisma, leadId, bookingId, paymentId: payment.id, suffix,
+    await prisma.paymentGatewayOrder.create({
+      data: {
+        paymentId: payment.id, provider: PrismaProvider.RAZORPAY,
+        gatewayOrderId: `order_${suffix}`, amount: 400, currency: "INR",
+        status: "CREATED",
+      },
+    });
+    return {
+      prisma, leadId, bookingId, paymentId: payment.id, suffix,
       gatewayPaymentId: `pay_${suffix}`, gatewayOrderId: `order_${suffix}`,
     };
   } catch (error) {
