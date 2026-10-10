@@ -182,10 +182,8 @@ test("B3.4 failed financial update rolls back transaction and booking sync", asy
     const module = createPrismaPaymentRepositoryModule(f.prisma);
     const injected = new Error("B3_ROLLBACK_INJECTION");
     let transactionInserted = false;
-    const failingManager = {
-      runInTransaction: async <T>(
-        callback: Parameters<typeof module.transactionManager.runInTransaction<T>>[0],
-      ): Promise<T> =>
+    const failingManager: Pick<typeof module.transactionManager, "runInTransaction"> = {
+      runInTransaction: (callback) =>
         module.transactionManager.runInTransaction(async (context) => {
           const original = context.repository;
           const decorated = new Proxy(original, {
