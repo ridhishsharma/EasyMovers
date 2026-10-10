@@ -1207,6 +1207,17 @@ export function normalizePrismaPaymentRepositoryError(
     switch (
       error.code
     ) {
+      // Preserve the original Prisma error only as an internal cause so the
+      // transaction manager can retry the complete Serializable callback.
+      // Never serialize this cause into API responses or diagnostic logs.
+      case "P2034":
+      case "P2028":
+        return new PaymentRepositoryError(
+          fallbackCode,
+          "Payment repository operation failed.",
+          { cause: error }
+        );
+
       case "P2002": {
         const target =
           Array.isArray(
