@@ -120,6 +120,16 @@ new Function("require", "module", "exports", compiled)(
   (name: string) => {
     if (Object.hasOwn(dependencies, name)) return dependencies[name];
     if (name === "node:crypto") return require("node:crypto");
+if (name === "@/lib/payments/payment-security-logger") {
+  return {
+    logPaymentSecurityFailure: (
+      _operation: string,
+      _requestId: string
+    ): void => {
+      // Test-only security logger mock.
+    },
+  };
+}
     throw new Error(`Unexpected dependency: ${name}`);
   }, moduleDouble, moduleDouble.exports,
 );

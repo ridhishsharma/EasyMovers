@@ -1,8 +1,11 @@
+
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { test } from "node:test";
 import { PrismaClient } from "@prisma/client";
+import { PaymentCurrency } from "../../domains/payment/models/payment.model";
 import { createPrismaPaymentRepositoryModule } from "../../domains/payment/repositories/payment.prisma.repository";
+
 
 // B4.4C.4: Real PostgreSQL repository concurrency and optimistic-version guards.
 // This suite does NOT simulate gateway collections or invoke production BookingService.
@@ -79,7 +82,7 @@ function snapshot(paidAmount: number) {
     paymentPending: 1000 - paidAmount,
     refundedAmount: 0,
     refundPendingAmount: 0,
-    currency: "INR",
+    currency: PaymentCurrency.INR,
   };
 }
 

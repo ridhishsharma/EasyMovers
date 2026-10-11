@@ -238,6 +238,16 @@ test("B4.3D.4 receipt finalization fails after real collection, then replay reco
       (name: string) => {
         if (Object.hasOwn(deps,name)) return deps[name];
         if (name === "node:crypto") return require("node:crypto");
+if (name === "@/lib/payments/payment-security-logger") {
+  return {
+    logPaymentSecurityFailure: (
+      _operation: string,
+      _requestId: string
+    ): void => {
+      // Test-only security logger mock.
+    },
+  };
+}
         throw new Error(`Unexpected dependency: ${name}`);
       }, moduleDouble, moduleDouble.exports,
     );

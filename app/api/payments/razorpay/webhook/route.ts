@@ -1,3 +1,4 @@
+import { logPaymentSecurityFailure } from "@/lib/payments/payment-security-logger";
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { PaymentProvider as PrismaPaymentProvider, Prisma } from "@prisma/client";
@@ -146,7 +147,7 @@ export async function POST(request: Request) {
     return respond({ success: true, duplicate: Boolean(existing) });
   } catch (error) {
     // 5xx causes Razorpay to retry. Do not expose secrets or acknowledge failed recording.
-    console.error(`[RAZORPAY_WEBHOOK_RECONCILIATION_FAILED:${requestId}]`, error);
+    logPaymentSecurityFailure("RAZORPAY_WEBHOOK_RECONCILIATION", requestId);
     return respond({ success: false, code: "PAYMENT_RECONCILIATION_REQUIRED" }, 503);
   }
 }

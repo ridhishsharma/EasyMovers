@@ -1,3 +1,4 @@
+import { logPaymentSecurityFailure } from "@/lib/payments/payment-security-logger";
 import { NextResponse } from "next/server";
 import { PaymentGatewayOrderStatus, PaymentProvider, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -133,7 +134,7 @@ export async function POST(request: Request) {
     if (error instanceof OrderError) return reply({ success: false, code: error.code, message: error.message }, error.status);
     if (error instanceof SyntaxError) return reply({ success: false, message: "Invalid JSON body." }, 400);
     if (error instanceof Error && error.message === "Invalid origin") return reply({ success: false, message: "Origin not permitted." }, 403);
-    console.error(`[RAZORPAY_ORDER_CREATE_FAILED:${requestId}]`, error);
+    logPaymentSecurityFailure("RAZORPAY_ORDER_CREATE", requestId);
     return reply({ success: false, message: `Unable to create payment order. Reference: ${requestId}` }, 503);
   }
 }

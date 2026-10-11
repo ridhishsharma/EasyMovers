@@ -121,9 +121,6 @@ webhookHttpCollection: [
 webhookHttpConcurrency: [
   "tests/payment-integration/razorpay-webhook-http-postgres-concurrency.test.ts",
 ],
-webhookHttpConcurrency: [
-  "tests/payment-integration/razorpay-webhook-http-postgres-concurrency.test.ts",
-],
 webhookFinalRecovery: [
   "tests/payment-integration/razorpay-webhook-http-postgres-finalization-recovery.test.ts",
 ],

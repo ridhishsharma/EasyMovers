@@ -12,6 +12,8 @@ import {
   PaymentCurrency,
   PaymentProvider,
   PaymentStatus,
+PaymentPurpose,
+  PaymentMethod,
 } from "../../domains/payment/models/payment.model";
 
 import type {
@@ -948,11 +950,8 @@ test(
           currency:
             "INR",
 
-          purpose:
-            "BALANCE",
-
-          method:
-            "OTHER",
+	purpose: PaymentPurpose.BALANCE,
+	method: PaymentMethod.OTHER,
 
           provider:
             PaymentProvider.OTHER,

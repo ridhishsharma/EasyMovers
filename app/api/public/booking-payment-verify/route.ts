@@ -1,3 +1,4 @@
+import { logPaymentSecurityFailure } from "@/lib/payments/payment-security-logger";
 import { NextResponse } from "next/server";
 import { PaymentProvider as PrismaPaymentProvider, PaymentGatewayOrderStatus, Prisma } from "@prisma/client";
 import { PaymentProvider, PaymentPurpose } from "@/domains/payment/models/payment.model";
@@ -140,7 +141,7 @@ export async function POST(request: Request) {
     }
     if (error instanceof SyntaxError) return reply({ success: false, message: "Invalid JSON body." }, 400);
     if (error instanceof Error && error.message === "Invalid origin") return reply({ success: false, message: "Origin not permitted." }, 403);
-    console.error(`[RAZORPAY_ADVANCE_VERIFY_FAILED:${requestId}]`, error);
+    logPaymentSecurityFailure("RAZORPAY_ADVANCE_VERIFY", requestId);
     return reply({ success: false, code: "PAYMENT_RECONCILIATION_REQUIRED",
       message: `Payment verification needs reconciliation. Do not pay again. Reference: ${requestId}` }, 503);
   }

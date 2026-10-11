@@ -50,7 +50,15 @@ const testModule = { exports: {} as Record<string, unknown> };
 const load = (name: string) => {
   if (Object.hasOwn(dependencies, name)) return dependencies[name];
   if (name === "node:crypto") return require("node:crypto");
-  throw new Error(`Unexpected module import: ${name}`);
+if (name === "@/lib/payments/payment-security-logger") {
+  return {
+    logPaymentSecurityFailure: (
+      _operation: string,
+      _requestId: string
+    ) => undefined,
+  };
+}
+throw new Error(`Unexpected module import: ${name}`);
 };
 new Function("require", "module", "exports", compiled)(load, testModule, testModule.exports);
 const POST = testModule.exports.POST as (request: Request) => Promise<Response>;

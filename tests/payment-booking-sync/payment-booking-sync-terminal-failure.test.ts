@@ -27,6 +27,8 @@ import {
   PaymentBookingSyncService,
 } from "../../application/payments/services/payment-booking-sync.service";
 
+import { PaymentCurrency } from "@/domains/payment/models/payment.model";
+
 /* ============================================================================
  * Test fixture
  * ============================================================================
@@ -134,8 +136,7 @@ test(
             refundPendingAmount:
               0,
 
-            currency:
-              "INR",
+            currency: PaymentCurrency.INR,
           },
 
           attemptCount:
