@@ -23,6 +23,10 @@ import {
 } from "../../_lib/payment-api.request";
 
 import {
+  authorizePaymentSyncRequest,
+} from "../../_lib/payment-api.internal-authorization";
+
+import {
   PaymentApiResponse,
 } from "../../_lib/payment-api.response";
 
@@ -91,42 +95,35 @@ export async function POST(
      * ------------------------------------------------------------------------
      */
 
-    const configuredSecret =
-      process.env
-        .PAYMENT_SYNC_RETRY_SECRET
-        ?.trim();
 
-    if (
-      !configuredSecret
-    ) {
-      return PaymentApiResponse
-        .unavailable(
-          "PAYMENT_SYNC_RETRY_NOT_CONFIGURED",
-          "Payment synchronization retry processing is not configured.",
-          requestId
-        );
-    }
+const authorization =
+  authorizePaymentSyncRequest(
+    request
+  );
 
-    const suppliedSecret =
-      request.headers
-        .get(
-          "x-payment-sync-retry-secret"
-        )
-        ?.trim();
+if (
+  authorization.status ===
+  "NOT_CONFIGURED"
+) {
+  return PaymentApiResponse
+    .unavailable(
+      "PAYMENT_SYNC_RETRY_NOT_CONFIGURED",
+      "Payment synchronization retry processing is not configured.",
+      requestId
+    );
+}
 
-    if (
-      !suppliedSecret ||
-      suppliedSecret !==
-        configuredSecret
-    ) {
-      return PaymentApiResponse
-        .failure(
-          401,
-          "PAYMENT_SYNC_RETRY_UNAUTHORIZED",
-          "Valid Payment synchronization retry authorization is required.",
-          requestId
-        );
-    }
+if (
+  !authorization.authorized
+) {
+  return PaymentApiResponse
+    .failure(
+      401,
+      "PAYMENT_SYNC_RETRY_UNAUTHORIZED",
+      "Valid Payment synchronization retry authorization is required.",
+      requestId
+    );
+}
 
     /* ------------------------------------------------------------------------
      * Parse request body

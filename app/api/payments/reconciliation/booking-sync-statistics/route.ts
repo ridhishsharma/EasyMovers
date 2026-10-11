@@ -26,7 +26,9 @@ import {
 import {
   PaymentApiRequest,
 } from "../../_lib/payment-api.request";
-
+import {
+  authorizePaymentSyncRequest,
+} from "../../_lib/payment-api.internal-authorization";
 import {
   PaymentApiResponse,
 } from "../../_lib/payment-api.response";
@@ -45,27 +47,11 @@ export const dynamic =
  */
 
 function isAuthorized(
-  request:
-    Request
+  request: Request
 ): boolean {
-  const configuredSecret =
-    process.env
-      .PAYMENT_SYNC_RETRY_SECRET
-      ?.trim();
-
-  const suppliedSecret =
-    request.headers
-      .get(
-        "x-payment-sync-retry-secret"
-      )
-      ?.trim();
-
-  return Boolean(
-    configuredSecret &&
-    suppliedSecret &&
-    suppliedSecret ===
-      configuredSecret
-  );
+  return authorizePaymentSyncRequest(
+    request
+  ).authorized;
 }
 
 /* ============================================================================
