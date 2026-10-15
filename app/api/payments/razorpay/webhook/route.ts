@@ -37,8 +37,30 @@ export async function POST(request: Request) {
   } catch {
     return respond({ success: false }, 400);
   }
-  if (!verifyRazorpayWebhookSignature(raw, request.headers.get("x-razorpay-signature") || "", secret)) {
-    return respond({ success: false, code: "INVALID_WEBHOOK_SIGNATURE" }, 401);
+    const webhookSignature =
+    request.headers.get("x-razorpay-signature") || "";
+
+  if (!verifyRazorpayWebhookSignature(raw, webhookSignature, secret)) {
+    const signatureHeaderState =
+      webhookSignature.length === 0
+        ? "MISSING"
+        : /^[a-fA-F0-9]{64}$/.test(webhookSignature)
+          ? "PRESENT_VALID_FORMAT"
+          : "PRESENT_INVALID_FORMAT";
+
+    console.warn(JSON.stringify({
+      level: "warn",
+      component: "razorpay-webhook",
+      operation: "SIGNATURE_VERIFICATION",
+      requestId,
+      code: "INVALID_WEBHOOK_SIGNATURE",
+      signatureHeaderState,
+    }));
+
+    return respond({
+      success: false,
+      code: "INVALID_WEBHOOK_SIGNATURE",
+    }, 401);
   }
 
   let event: unknown;
