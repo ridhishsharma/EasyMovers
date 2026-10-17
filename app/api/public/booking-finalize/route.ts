@@ -36,10 +36,20 @@ export async function POST(request: Request) {
       // Serialize finalization against another finalizer, and against payment aggregate updates.
       await tx.$queryRaw`SELECT "id" FROM "Booking" WHERE "id" = ${booking.id} FOR UPDATE`;
       const current = await tx.booking.findUniqueOrThrow({
-        where: { id: booking.id }, select: { bookingStatus: true, selectedQuotationId: true },
+        where: { id: booking.id }, select: { bookingStatus: true, selectedQuotationId: true, vendorId: true },
       });
       if (!["VENDOR_SELECTED", "CONFIRMED"].includes(current.bookingStatus) || !current.selectedQuotationId)
         return { code: "BOOKING_NOT_READY", status: 409 } as const;
+
+      const quotation = await tx.quotation.findFirst({
+        where: { id: current.selectedQuotationId, bookingId: booking.id, leadId: session.id },
+        select: { vendorId: true },
+      });
+      // Fail closed for missing assignments: vendorJson takes precedence in the
+      // booking mapper, so repairing only vendorId could preserve a conflicting vendor.
+      if (!quotation || typeof quotation.vendorId !== "string" || !quotation.vendorId.trim() ||
+          current.vendorId !== quotation.vendorId)
+        return { code: "BOOKING_VENDOR_REVIEW_REQUIRED", status: 409 } as const;
 
       const paymentRows = await tx.$queryRaw<Array<{ id: string }>>`
         SELECT "id" FROM "Payment" WHERE "bookingId" = ${booking.id} FOR UPDATE`;
@@ -47,7 +57,7 @@ export async function POST(request: Request) {
       const payment = await tx.payment.findUniqueOrThrow({
         where: { id: paymentRows[0].id },
         select: {
-          quotationId: true, currency: true, advanceAmount: true, paidAmount: true,
+          quotationId: true, vendorId: true, currency: true, advanceAmount: true, paidAmount: true,
           totalAmount: true, commercialReference: true,
           gatewayOrders: { where: { provider: PaymentProvider.RAZORPAY }, select: {
             gatewayOrderId: true, amount: true, currency: true, status: true,
@@ -59,6 +69,8 @@ export async function POST(request: Request) {
             } },
         },
       });
+      if (payment.vendorId !== quotation.vendorId)
+        return { code: "BOOKING_VENDOR_REVIEW_REQUIRED", status: 409 } as const;
       if (payment.quotationId !== current.selectedQuotationId || !payment.commercialReference ||
           payment.currency !== "INR" || !payment.advanceAmount)
         return { code: "PAYMENT_NOT_READY", status: 409 } as const;
@@ -90,7 +102,7 @@ export async function POST(request: Request) {
       if (current.bookingStatus === "CONFIRMED")
         return { confirmed: true, changed: false, bookingNumber: booking.bookingNumber } as const;
       const changed = await tx.booking.updateMany({
-        where: { id: booking.id, bookingStatus: "VENDOR_SELECTED", selectedQuotationId: current.selectedQuotationId },
+        where: { id: booking.id, bookingStatus: "VENDOR_SELECTED", selectedQuotationId: current.selectedQuotationId, vendorId: quotation.vendorId },
         data: { bookingStatus: "CONFIRMED" },
       });
       if (changed.count !== 1) return { code: "BOOKING_STATE_CHANGED", status: 409 } as const;
@@ -104,7 +116,9 @@ export async function POST(request: Request) {
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 15000, maxWait: 5000 });
 
     if ("code" in result) return reply({ success: false, code: result.code,
-      message: "Booking confirmation is awaiting verified advance reconciliation." }, result.status);
+      message: result.code === "BOOKING_VENDOR_REVIEW_REQUIRED"
+        ? "Booking confirmation requires staff review. Please contact EasyMovers."
+        : "Booking confirmation is awaiting verified advance reconciliation." }, result.status);
     return reply({ success: true, data: result,
       message: "Your booking is confirmed. The remaining payment milestones are still due." });
   } catch (error) {
